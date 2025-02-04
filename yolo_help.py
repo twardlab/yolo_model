@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import time
 from matplotlib.collections import PolyCollection
 from os import makedirs
 from os.path import join
@@ -624,3 +625,195 @@ def iou(bbox0,bbox1,nopairwise=False):
 
 
 
+def train_yolo_model(J_path, nepochs, lr, cls_loss, outdir, modelname, optimizername, lossname, resume = False):
+    """
+    Train a neural network defined by the YOLO framework and other provided hyperparameters using the simulated dataset 'groundtruth'.
+
+    Parameters:
+    -----------
+    J_path : str
+        The file path to the image to be used during the validation portion of training
+    nepochs : int
+        The number of epochs used to train the model
+    lr : float
+        The learning rate used to train the model
+    outdir : str
+        The output directory where all files will be saved during training, or where all files were saved if the model has already been trained.
+    modelname : str
+        The file name of the model used during training
+    optimizername : str
+        The file name of the optimizer used during training
+    lossname : str
+        The file name of the losses computed during training
+    resume : bool
+        Default - False; If True, resume the training of model 'outdir/modelname' or load the pretrained model saved at 'outdir/modelname'
+    
+    Returns:
+    --------
+    net : torch.nn.Module
+        A neural network which has been trained on a simulated dataset
+    """
+
+    # Check to see that outdir exists and create outdir if it does not exist
+    makedirs(outdir,exist_ok=True)
+
+    # TODO: Optional arguments?
+    net = Net()
+    groundtruth = GroundTruthDataset(reproducible = True)
+    optimizer = torch.optim.Adam(net.parameters(),lr=lr)
+    nclasses = 3
+    # End TODO
+
+    # Load the target image to be used during the evaluation step of training
+    J = plt.imread(J_path)
+    J= J[...,:3]
+    if J.dtype == np.uint8:
+        J = J / 255.0
+    J = J.transpose((-1,0,1))
+
+    Esave = []    
+    fig,ax = plt.subplots(2,3,figsize=(9,6)) 
+    ax = ax.ravel()
+    fig1,ax1 = plt.subplots(3,3,figsize=(9,9))
+    fig1.subplots_adjust(left=0,right=1,bottom=0,top=1,hspace=0.1,wspace=0.1)
+    
+    if resume:        
+        net.load_state_dict(torch.load(join(outdir,modelname)))
+        optimizer.load_state_dict(torch.load(join(outdir,optimizername)))
+        #Esave,Ersave,Ecsave = torch.load(join(outdir,lossname))
+        Esave = torch.load(join(outdir,lossname))[0]
+    for e in range(nepochs):
+        start = time.time()
+        if resume and e < len(Esave):
+            continue
+        count = 0
+        Esave_ = []    
+        for I,bbox,cl in groundtruth:
+            optimizer.zero_grad()
+            # run through the net
+            out = net(torch.tensor(I[None],dtype=torch.float32))
+            
+            # convert the data into bbox format
+            bboxes,data = convert_data(out,net.B,net.stride)
+            
+            # get assignments
+            assignment_inds,ious = get_assignment_inds(bboxes,bbox,out.shape,net.stride,net.B)
+            unassigned_inds = np.array([a for a in range(bboxes.shape[0]) if a not in assignment_inds])
+            
+            
+            # get target parameters
+            shiftx,shifty,scalex,scaley = get_reg_targets(assignment_inds,bbox,net.B,out.shape,net.stride)    
+    
+            
+            # now build the loss function
+            data_assigned = data[assignment_inds]
+            targets = np.stack((shiftx,shifty,scalex,scaley,ious),-1)
+            
+            # this is the mean square error for assigned
+            # they used a weight of 0.5 for noobj
+            # note that in the paper they used a different loss for the scales (take the square root first)
+            Ecoord = torch.sum((data_assigned[:,:4]-torch.tensor(targets[:,:4]))**2)*5
+            # if it is assigned ot an object we want to predict the iou
+            Eobj = torch.sum((data_assigned[:,-1]-torch.tensor(targets[:,-1]))**2)
+            # if there is no object assigned we want to predict 0
+            Enoobj = torch.sum((data[unassigned_inds,-1]-0)**2)*0.5
+            # and we want to classify
+            classprobs = out[:,-nclasses:].reshape(nclasses,-1)
+            classprobs_assigned = classprobs[...,assignment_inds%(out.shape[-1]*out.shape[-2])]
+            # note the paper uses mean square error on the probability vector
+            # here I use cross entropy
+            Ec = cls_loss(classprobs_assigned[None],torch.tensor(cl)[None])
+            
+            E = Ecoord + Eobj + Enoobj + Ec
+            Esave_.append(E.item())
+            E.backward()
+            optimizer.step()
+            count += 1
+            if count >= len(groundtruth): break
+        
+        # draw        
+        Esave.append(np.mean(Esave_))
+        ax[0].cla()
+        ax[0].plot(Esave,label='loss')
+        ax[0].legend()
+        ax[0].set_yscale('log')
+        ax[0].set_title('training loss')
+        
+        
+        ax[1].cla()
+        imshow(net.color.out.clone().detach()[0],ax[1])
+        ax[1].add_collection(bbox_to_rectangles(bbox,fc='none',ec=[0.5,0.5,0.5,0.5]))
+        
+        # get better colors
+        p = torch.softmax(classprobs.clone().detach(),0)
+        c0 = torch.tensor([1.0,0.0,0.0])
+        c1 = torch.tensor([0.0,1.0,0.0])
+        colors = ( (p[0]*c0[...,None]) + (p[1]*c1[...,None])  ).T.numpy()    
+        if nclasses == 3:
+            c2 = torch.tensor([0.0,0.0,1.0])
+            colors = ( (p[0]*c0[...,None]) + (p[1]*c1[...,None]) + (p[2]*c2[...,None]) ).T.numpy()    
+
+        bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,data[:,-1].clone().detach(),net.B)
+        # TODO: we need to select only one bounding box per cell (the one with the higher predicted IOU)
+        ax[1].add_collection(bbox_to_rectangles(bboxes_,fc='none',ec=colors,ls='-',alpha=scores_))
+        ax[1].set_title('Annotations')
+        
+        classprob = torch.softmax(out.clone().detach()[0,-nclasses:],0)
+        mask = torch.sigmoid(out[0,4].clone().detach())
+        ax[2].cla()
+        ax[2].imshow(mask,vmin=0,vmax=1,interpolation='gaussian')
+        ax[2].set_title('Predicted score (pobj*iou)')
+
+        ax[3].cla()    
+        ax[3].imshow(   classprob[0]*mask  ,vmin=0,vmax=1,interpolation='gaussian')
+        ax[3].set_title('Class 0 (smooth) prob map')
+        
+        ax[4].cla()
+        ax[4].imshow(   classprob[1]*mask   ,vmin=0,vmax=1,interpolation='gaussian')
+        ax[4].set_title('Class 1 (sharp) prob map')
+        
+        if nclasses == 3:
+            ax[5].cla()
+            ax[5].imshow(   classprob[2]*mask   ,vmin=0,vmax=1,interpolation='gaussian')
+            ax[5].set_title('Class 2 (bumpy) prob map')
+        fig.canvas.draw()
+        
+        
+        
+        with torch.no_grad():
+            net.eval()
+            for r in range(3):
+                for c in range(3):
+                    ax1[r,c].cla()
+                    sl = (slice(r*2000+2000,r*2000+2000+256),slice(c*2000+2000,c*2000+2000+256))
+                    out = net(torch.tensor(J[(slice(None),)+sl][None],dtype=torch.float32))
+    
+                    # convert the data into bbox format
+                    bboxes,data = convert_data(out,net.B,net.stride)
+                    imshow(net.color.out.clone().detach()[0],ax1[r,c])
+    
+                    classprobs = out[:,-nclasses:].reshape(nclasses,-1)
+                    p = torch.softmax(classprobs.clone().detach(),0)
+                    c0 = torch.tensor([1.0,0.0,0.0])
+                    c1 = torch.tensor([0.0,1.0,0.0])
+                    colors = 'r'
+                    bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,data[:,-1].clone().detach(),net.B)
+                    alpha = scores_.clone().detach()
+                    alpha = alpha * (alpha>0.5)
+                    
+                    ax1[r,c].add_collection(bbox_to_rectangles(bboxes_,fc='none',ec=colors,ls='-',alpha=alpha))
+                    ax1[r,c].axis('off')
+            net.train()
+        fig1.canvas.draw()
+        if not e%10:
+            fig1.savefig(join(outdir,f'example_e_{e:06d}.png'))
+        
+        
+        # save data
+        torch.save(net.state_dict(),join(outdir,modelname))
+        torch.save(optimizer.state_dict(),join(outdir,optimizername))
+        torch.save([Esave],join(outdir,lossname))  
+
+    # print(f'{time.time() - start:.2f} seconds for epoch {e}')
+    start = time.time()
+    return net
