@@ -1,4 +1,5 @@
+nbsphinx
 numpy
-scipy
 matplotlib
+scipy
 torch
