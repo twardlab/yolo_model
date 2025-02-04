@@ -14,7 +14,7 @@ def NMS(bboxes_, scores_, nms_threshold = 0.5):
     Parameters:
     -----------
     bboxes_ : torch.Tensor of size [N, 4]
-        N corresponds to the number of bboxes
+        N corresponds to the number of bounding boxes
     scores_ : torch.Tensor of size [N,4]
         N corresponds to the number of bboxes; The confidence scores corresponding to the
     nms_threshold : float

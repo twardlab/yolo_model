@@ -9,7 +9,7 @@ from os.path import join
 from scipy.ndimage import gaussian_filter
 
 class GroundTruthDataset(torch.utils.data.Dataset):
-    ''' This dataset will generate a set of random images of size N x N. And they will contain poisson distributed cells with mean M.
+    """ This dataset will generate a set of random images of size N x N. And they will contain poisson distributed cells with mean M.
     
     Parameters for Initialization:
     ------------------------------
@@ -29,7 +29,8 @@ class GroundTruthDataset(torch.utils.data.Dataset):
         - out_arr[0] is a 1 x N x N array defining the base image
         - out_arr[1] is a X x 4 array containing the bbox info for X cells
         - out_arr[2] is a X x 1 array containing the categorical label for the cell within the corresponding bbox; 0 - smooth boundary, 1 - sharp boudnary; 2 - bumpy boundary
-    '''
+        
+    """
 
     dtype = torch.float32
     
@@ -157,7 +158,18 @@ class GroundTruthDataset(torch.utils.data.Dataset):
 # TODO: Add more to the docstring?
 class Net(torch.nn.Module):
     """
-    A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of  variable shape.
+    A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of variable shape.
+
+    Parameters:
+    -----------
+    nclasses : int
+        Default - 3; The number of distinct classes in the dataset
+
+    Returns:
+    --------
+    Net : torch.nn.Module
+        A neural network which can take input images with any number of channels
+    
     """
     def __init__(self, nclasses = 3):
         super().__init__()
@@ -263,7 +275,7 @@ class Net(torch.nn.Module):
 
 
 class VariableInputConv2d(torch.nn.Module):
-    ''' The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
+    """The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
     - (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each
         - 1 x N x R x C => N x 1 x R x C
     - (2) Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable
@@ -283,7 +295,7 @@ class VariableInputConv2d(torch.nn.Module):
     --------
     out : torch.tensor of size 1 x M x R x C
     
-    '''
+    """
     def __init__(self,M):
         super().__init__()
         self.M = M
@@ -322,6 +334,7 @@ def bbox_to_rectangles(bbox,**kwargs):
     --------
     out : matplotlib.collections.PolyCollection 
         Contains N rectangles to be plotted later
+    
     """
     N = bbox.shape[0]
     p0 = np.stack((bbox[:,0],bbox[:,1]),-1)
@@ -338,8 +351,8 @@ def bbox_to_rectangles(bbox,**kwargs):
 
 
 def convert_data(out,B,stride):
-    '''
-    Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable
+    """
+    Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable.
     
         It also outputs the raw data, reformmated into a list intsead of an image of grid cells.
     These outputs are differentiable.  The last one of these outputs is the score (data[...,-1]).
@@ -360,7 +373,7 @@ def convert_data(out,B,stride):
     data : torch.Tensor of size N x 5
         N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h,conf]
     
-    '''
+    """
     # Get the positions of the grid cells
     x = torch.arange(out.shape[-1])*stride + (stride-1)/2
     y = torch.arange(out.shape[-2])*stride + (stride-1)/2
@@ -404,7 +417,7 @@ def convert_data(out,B,stride):
 
 
 def get_assignment_inds(bboxes,bbox,shape,stride,B):
-    '''
+    """
     Assigns each training bounding box to a specific cell, and picks the bounding box from that cell with the best iou.
 
     Parameters:
@@ -427,8 +440,7 @@ def get_assignment_inds(bboxes,bbox,shape,stride,B):
     ious : numpy array of size X
         The iou between the ith bounding box from the 'bbox' parameter, and the corresponding bbox from the 'bboxes' parameter
 
-    
-    '''
+    """
     # this should be the shape of the outputs
     x = np.arange(shape[-1])*stride + (stride-1)/2
     y = np.arange(shape[-2])*stride + (stride-1)/2
@@ -520,6 +532,7 @@ def get_reg_targets(assignment_inds,bbox,B,shape,stride):
         Defines the scale in x needed to align bbox[i] with the corresponding best estimated bounding box
     scaley : numpy array of shape [X,]
         Defines the scale in y needed to align bbox[i] with the corresponding best estimated bounding box
+    
     """
     # get the yx positions of each bbox
     x = np.arange(shape[-1])*stride + (stride-1)/2
@@ -572,7 +585,7 @@ def imshow(I,ax,**kwargs):
 
 
 def iou(bbox0,bbox1,nopairwise=False):
-    '''
+    """
     Calculate pairwise iou between a set of estimated bounding boxes (bbox0) and the set of ground truth bounding boxes (bbox1)
 
     Parameters:
@@ -588,7 +601,8 @@ def iou(bbox0,bbox1,nopairwise=False):
     --------
     out : Array of length N
         An array containing the pairwise (or pointwise) IOU values between the elements bbox0 and bbox 1
-    '''
+    
+    """
     if bbox0.ndim == 1: bbox0 = bbox0[None]
     if bbox1.ndim == 1: bbox1 = bbox1[None]
     if not nopairwise:
@@ -652,6 +666,7 @@ def train_yolo_model(J_path, nepochs, lr, cls_loss, outdir, modelname, optimizer
     --------
     net : torch.nn.Module
         A neural network which has been trained on a simulated dataset
+    
     """
 
     # Check to see that outdir exists and create outdir if it does not exist
