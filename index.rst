@@ -10,6 +10,8 @@ Welcome to yolo_model's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   yolo_help
+   yolo_post_help
 
 
 Indices and tables
