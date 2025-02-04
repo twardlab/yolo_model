@@ -9,7 +9,7 @@ from scipy.integrate import trapezoid
 
 def NMS(bboxes_, scores_, nms_threshold = 0.5):
     """
-    Perform non-maximum suppression on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes
+    Perform non-maximum suppression on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.
 
     Parameters:
     -----------

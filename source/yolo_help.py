@@ -276,6 +276,7 @@ class Net(torch.nn.Module):
 
 class VariableInputConv2d(torch.nn.Module):
     """The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
+    
     - (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each
         - 1 x N x R x C => N x 1 x R x C
     - (2) Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable
@@ -352,10 +353,7 @@ def bbox_to_rectangles(bbox,**kwargs):
 
 def convert_data(out,B,stride):
     """
-    Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable.
-    
-        It also outputs the raw data, reformmated into a list intsead of an image of grid cells.
-    These outputs are differentiable.  The last one of these outputs is the score (data[...,-1]).
+    Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable. It also outputs the raw data, reformmated into a list intsead of an image of grid cells. These outputs are differentiable. The last one of these outputs is the score (data[...,-1]).
 
     Parameters:
     -----------
@@ -586,7 +584,7 @@ def imshow(I,ax,**kwargs):
 
 def iou(bbox0,bbox1,nopairwise=False):
     """
-    Calculate pairwise iou between a set of estimated bounding boxes (bbox0) and the set of ground truth bounding boxes (bbox1)
+    Calculate pairwise iou between a set of estimated bounding boxes (bbox0) and the set of ground truth bounding boxes (bbox1).
 
     Parameters:
     -----------
