@@ -117,14 +117,15 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.VariableInputConv2d">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">VariableInputConv2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.VariableInputConv2d" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
-<p>The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
-- (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each</p>
-<blockquote>
-<div><ul class="simple">
+<p>The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:</p>
+<ul>
+<li><dl class="simple">
+<dt>(1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each</dt><dd><ul class="simple">
 <li><p>1 x N x R x C =&gt; N x 1 x R x C</p></li>
 </ul>
-</div></blockquote>
-<ul>
+</dd>
+</dl>
+</li>
 <li><ol class="arabic simple" start="2">
 <li><p>Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable</p></li>
 </ol>
@@ -199,11 +200,7 @@ registered hooks while the latter silently ignores them.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_help.convert_data">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">convert_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.convert_data" title="Link to this definition">¶</a></dt>
-<dd><p>Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable.</p>
-<blockquote>
-<div><p>It also outputs the raw data, reformmated into a list intsead of an image of grid cells.</p>
-</div></blockquote>
-<p>These outputs are differentiable.  The last one of these outputs is the score (data[…,-1]).</p>
+<dd><p>Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable. It also outputs the raw data, reformmated into a list intsead of an image of grid cells. These outputs are differentiable. The last one of these outputs is the score (data[…,-1]).</p>
 <section id="id6">
 <h1>Parameters:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h1>
 <dl class="simple">
@@ -338,7 +335,7 @@ registered hooks while the latter silently ignores them.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_help.iou">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">iou</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bbox0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nopairwise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.iou" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate pairwise iou between a set of estimated bounding boxes (bbox0) and the set of ground truth bounding boxes (bbox1)</p>
+<dd><p>Calculate pairwise iou between a set of estimated bounding boxes (bbox0) and the set of ground truth bounding boxes (bbox1).</p>
 <section id="id16">
 <h1>Parameters:<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h1>
 <dl class="simple">
