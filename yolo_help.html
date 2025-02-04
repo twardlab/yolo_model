@@ -117,15 +117,14 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.VariableInputConv2d">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">VariableInputConv2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.VariableInputConv2d" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
-<p>The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:</p>
-<ul>
-<li><dl class="simple">
-<dt>(1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each</dt><dd><ul class="simple">
+<p>The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
+- (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each</p>
+<blockquote>
+<div><ul class="simple">
 <li><p>1 x N x R x C =&gt; N x 1 x R x C</p></li>
 </ul>
-</dd>
-</dl>
-</li>
+</div></blockquote>
+<ul>
 <li><ol class="arabic simple" start="2">
 <li><p>Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable</p></li>
 </ol>
@@ -271,9 +270,9 @@ registered hooks while the latter silently ignores them.</p>
 <section id="id11">
 <h1>Returns:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h1>
 <dl class="simple">
-<dt><a href="#id20"><span class="problematic" id="id21">bboxes_</span></a><span class="classifier">torch.Tensor of size [N/2, 4]</span></dt><dd><p>A list of the best bounding boxes for each cell</p>
+<dt>bboxes_out<span class="classifier">torch.Tensor of size [N/2, 4]</span></dt><dd><p>A list of the best bounding boxes for each cell</p>
 </dd>
-<dt><a href="#id22"><span class="problematic" id="id23">scores_</span></a><span class="classifier">torch.Tensor of size [N/2, 1]</span></dt><dd><p>A list of the confidence for the corresponding bounding boxes in ‘<a href="#id24"><span class="problematic" id="id25">bboxes_</span></a>’</p>
+<dt>scores_out<span class="classifier">torch.Tensor of size [N/2, 1]</span></dt><dd><p>A list of the confidence for the corresponding bounding boxes in ‘bboxes_out’</p>
 </dd>
 </dl>
 </section>
