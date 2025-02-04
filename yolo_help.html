@@ -82,7 +82,20 @@
 <dt class="sig sig-object py" id="yolo_help.Net">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">Net</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nclasses</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.Net" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
-<p>A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of  variable shape.</p>
+<p>A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of variable shape.</p>
+<section id="parameters">
+<h1>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h1>
+<dl class="simple">
+<dt>nclasses<span class="classifier">int</span></dt><dd><p>Default - 3; The number of distinct classes in the dataset</p>
+</dd>
+</dl>
+</section>
+<section id="id1">
+<h1>Returns:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
+<dl class="simple">
+<dt>Net<span class="classifier">torch.nn.Module</span></dt><dd><p>A neural network which can take input images with any number of channels</p>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="yolo_help.Net.forward">
 <span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rpn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.Net.forward" title="Link to this definition">¶</a></dt>
@@ -97,6 +110,7 @@ registered hooks while the latter silently ignores them.</p>
 </div>
 </dd></dl>
 
+</section>
 </dd></dl>
 
 <dl class="py class">
@@ -135,15 +149,15 @@ registered hooks while the latter silently ignores them.</p>
 </li>
 </ul>
 <p>Note that this layer makes our overall network permutation invariant (i.e. if we input an RGB image, or a BGR image, the output would be exactly the same.</p>
-<section id="parameters">
-<h1>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h1>
+<section id="id2">
+<h1>Parameters:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>M<span class="classifier">int</span></dt><dd><p>The desired number of output channels, independent of the number of input channels</p>
 </dd>
 </dl>
 </section>
-<section id="id1">
-<h1>Returns:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
+<section id="id3">
+<h1>Returns:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h1>
 <p>out : torch.tensor of size 1 x M x R x C</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="yolo_help.VariableInputConv2d.forward">
@@ -166,15 +180,15 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.bbox_to_rectangles">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">bbox_to_rectangles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bbox</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.bbox_to_rectangles" title="Link to this definition">¶</a></dt>
 <dd><p>This function converts a set of bounding boxes of the form [cx,cy,w,h] to a set of rectangular objects for visualization purposes</p>
-<section id="id2">
-<h1>Parameters:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h1>
+<section id="id4">
+<h1>Parameters:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>bbox<span class="classifier">A N x 4 array[numpy.float64]</span></dt><dd><p>Contains the bbox info N bboxes of the form [xc,cy,w,h]</p>
 </dd>
 </dl>
 </section>
-<section id="id3">
-<h1>Returns:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h1>
+<section id="id5">
+<h1>Returns:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>out<span class="classifier">matplotlib.collections.PolyCollection</span></dt><dd><p>Contains N rectangles to be plotted later</p>
 </dd>
@@ -185,13 +199,13 @@ registered hooks while the latter silently ignores them.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_help.convert_data">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">convert_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.convert_data" title="Link to this definition">¶</a></dt>
-<dd><p>Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable</p>
+<dd><p>Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable.</p>
 <blockquote>
 <div><p>It also outputs the raw data, reformmated into a list intsead of an image of grid cells.</p>
 </div></blockquote>
 <p>These outputs are differentiable.  The last one of these outputs is the score (data[…,-1]).</p>
-<section id="id4">
-<h1>Parameters:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h1>
+<section id="id6">
+<h1>Parameters:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>out<span class="classifier">torch.Tensor</span></dt><dd><p>The output object from the primary YOLO neural network</p>
 </dd>
@@ -201,8 +215,8 @@ registered hooks while the latter silently ignores them.</p>
 </dd>
 </dl>
 </section>
-<section id="id5">
-<h1>Returns:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h1>
+<section id="id7">
+<h1>Returns:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>bboxes<span class="classifier">torch.Tensor of size N x 4</span></dt><dd><p>N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h]</p>
 </dd>
@@ -216,8 +230,8 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.get_assignment_inds">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">get_assignment_inds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.get_assignment_inds" title="Link to this definition">¶</a></dt>
 <dd><p>Assigns each training bounding box to a specific cell, and picks the bounding box from that cell with the best iou.</p>
-<section id="id6">
-<h1>Parameters:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h1>
+<section id="id8">
+<h1>Parameters:<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>bboxes<span class="classifier">torch.Tensor of size [N, 4]</span></dt><dd><p>N is the number of bounding boxes computed for a single image and is equal to (np.shape(I)[0] / stride) * (np.shape(I)[0] / stride) * net.B</p>
 </dd>
@@ -231,8 +245,8 @@ registered hooks while the latter silently ignores them.</p>
 </dd>
 </dl>
 </section>
-<section id="id7">
-<h1>Returns:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h1>
+<section id="id9">
+<h1>Returns:<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>assignment_inds<span class="classifier">numpy array of size X</span></dt><dd><p>The index of the bounding box from the ‘bboxes’ parameter cooresponding to the ith bounding box from the ‘bbox’ parameter</p>
 </dd>
@@ -246,8 +260,8 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.get_best_bounding_box_per_cell">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">get_best_bounding_box_per_cell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.get_best_bounding_box_per_cell" title="Link to this definition">¶</a></dt>
 <dd><p>Get the best bounding box for each cell output from the YOLO neural network.</p>
-<section id="id8">
-<h1>Parameters:<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h1>
+<section id="id10">
+<h1>Parameters:<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>bboxes<span class="classifier">torch.Tensor of size [N, 4]</span></dt><dd><p>N is the number of bounding boxes computed for a single image and is equal to (np.shape(I)[0] / stride) * (np.shape(I)[0] / stride) * net.B</p>
 </dd>
@@ -257,12 +271,12 @@ registered hooks while the latter silently ignores them.</p>
 </dd>
 </dl>
 </section>
-<section id="id9">
-<h1>Returns:<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h1>
+<section id="id11">
+<h1>Returns:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h1>
 <dl class="simple">
-<dt><a href="#id18"><span class="problematic" id="id19">bboxes_</span></a><span class="classifier">torch.Tensor of size [N/2, 4]</span></dt><dd><p>A list of the best bounding boxes for each cell</p>
+<dt><a href="#id20"><span class="problematic" id="id21">bboxes_</span></a><span class="classifier">torch.Tensor of size [N/2, 4]</span></dt><dd><p>A list of the best bounding boxes for each cell</p>
 </dd>
-<dt><a href="#id20"><span class="problematic" id="id21">scores_</span></a><span class="classifier">torch.Tensor of size [N/2, 1]</span></dt><dd><p>A list of the confidence for the corresponding bounding boxes in ‘<a href="#id22"><span class="problematic" id="id23">bboxes_</span></a>’</p>
+<dt><a href="#id22"><span class="problematic" id="id23">scores_</span></a><span class="classifier">torch.Tensor of size [N/2, 1]</span></dt><dd><p>A list of the confidence for the corresponding bounding boxes in ‘<a href="#id24"><span class="problematic" id="id25">bboxes_</span></a>’</p>
 </dd>
 </dl>
 </section>
@@ -272,8 +286,8 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.get_reg_targets">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">get_reg_targets</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">assignment_inds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.get_reg_targets" title="Link to this definition">¶</a></dt>
 <dd><p>What are the true bounding box parameters we want to predict.</p>
-<section id="id10">
-<h1>Parameters:<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h1>
+<section id="id12">
+<h1>Parameters:<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>assignment_inds<span class="classifier">numpy array of size X</span></dt><dd><p>The idx at position i corresponds to the bounding box output from the YOLO framework which most accurately encompasses bounding box ‘i’ in the ‘bbox’ (ground truth labels) parameter</p>
 </dd>
@@ -287,8 +301,8 @@ registered hooks while the latter silently ignores them.</p>
 </dd>
 </dl>
 </section>
-<section id="id11">
-<h1>Returns:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h1>
+<section id="id13">
+<h1>Returns:<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>shiftx<span class="classifier">numpy array of shape [X,]</span></dt><dd><p>Defines the shift in x needed to align bbox[i] with the corresponding best estimated bounding box</p>
 </dd>
@@ -306,8 +320,8 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.imshow">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">imshow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">I</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.imshow" title="Link to this definition">¶</a></dt>
 <dd><p>This function will normalize the image I and plot it on the axes object ax</p>
-<section id="id12">
-<h1>Parameters:<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h1>
+<section id="id14">
+<h1>Parameters:<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>I<span class="classifier">1 x N x N array[numpy.float64]</span></dt><dd><p>An image</p>
 </dd>
@@ -315,8 +329,8 @@ registered hooks while the latter silently ignores them.</p>
 </dd>
 </dl>
 </section>
-<section id="id13">
-<h1>Returns:<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h1>
+<section id="id15">
+<h1>Returns:<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h1>
 <p>None</p>
 </section>
 </dd></dl>
@@ -325,8 +339,8 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.iou">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">iou</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bbox0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nopairwise</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.iou" title="Link to this definition">¶</a></dt>
 <dd><p>Calculate pairwise iou between a set of estimated bounding boxes (bbox0) and the set of ground truth bounding boxes (bbox1)</p>
-<section id="id14">
-<h1>Parameters:<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h1>
+<section id="id16">
+<h1>Parameters:<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>bbox0<span class="classifier">torch.Tensor of size [N, 4]</span></dt><dd><p>N is the number of bounding boxes</p>
 </dd>
@@ -336,8 +350,8 @@ registered hooks while the latter silently ignores them.</p>
 </dd>
 </dl>
 </section>
-<section id="id15">
-<h1>Returns:<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h1>
+<section id="id17">
+<h1>Returns:<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>out<span class="classifier">Array of length N</span></dt><dd><p>An array containing the pairwise (or pointwise) IOU values between the elements bbox0 and bbox 1</p>
 </dd>
@@ -349,8 +363,8 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.train_yolo_model">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">train_yolo_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">J_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nepochs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cls_loss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">modelname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizername</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lossname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resume</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.train_yolo_model" title="Link to this definition">¶</a></dt>
 <dd><p>Train a neural network defined by the YOLO framework and other provided hyperparameters using the simulated dataset ‘groundtruth’.</p>
-<section id="id16">
-<h1>Parameters:<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h1>
+<section id="id18">
+<h1>Parameters:<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>J_path<span class="classifier">str</span></dt><dd><p>The file path to the image to be used during the validation portion of training</p>
 </dd>
@@ -370,8 +384,8 @@ registered hooks while the latter silently ignores them.</p>
 </dd>
 </dl>
 </section>
-<section id="id17">
-<h1>Returns:<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h1>
+<section id="id19">
+<h1>Returns:<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>net<span class="classifier">torch.nn.Module</span></dt><dd><p>A neural network which has been trained on a simulated dataset</p>
 </dd>
