@@ -7,15 +7,15 @@ from scipy.integrate import trapezoid
 
 
 
-def NMS(bboxes_, scores_, nms_threshold = 0.5):
+def NMS(bboxes, scores, nms_threshold = 0.5):
     """
     Perform non-maximum suppression on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.
 
     Parameters:
     -----------
-    bboxes_ : torch.Tensor of size [N, 4]
+    bboxes : torch.Tensor of size [N, 4]
         N corresponds to the number of bounding boxes
-    scores_ : torch.Tensor of size [N,4]
+    scores : torch.Tensor of size [N,4]
         N corresponds to the number of bboxes; The confidence scores corresponding to the
     nms_threshold : float
         The iou threshold used to remove candidate bounding boxes when comparing their spatial position with respect to the bounding box with the highest confidence during the current iteration
@@ -28,8 +28,8 @@ def NMS(bboxes_, scores_, nms_threshold = 0.5):
         The M scores corresponding to the bounding boxes defined in bboxes_out
     """
     # Sort the bboxes and scores in descending order based on score
-    bboxes_nms = [b for _ , b in sorted(zip(scores_, bboxes_), reverse = True)]
-    scores_nms = sorted(scores_, reverse = True)
+    bboxes_nms = [b for _ , b in sorted(zip(scores, bboxes), reverse = True)]
+    scores_nms = sorted(scores, reverse = True)
 
     bboxes_out = []
     scores_out = []
