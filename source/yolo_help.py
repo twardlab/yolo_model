@@ -22,7 +22,6 @@ class GroundTruthDataset(torch.utils.data.Dataset):
     reproducible : bool
         If True, set np.random.seed() to the integer index supplied
         
-    
     Returns:
     --------
     out_arr : 3 x N array
@@ -31,8 +30,6 @@ class GroundTruthDataset(torch.utils.data.Dataset):
         - out_arr[2] is a X x 1 array containing the categorical label for the cell within the corresponding bbox; 0 - smooth boundary, 1 - sharp boudnary; 2 - bumpy boundary
         
     """
-
-    dtype = torch.float32
     
     def __init__(self,N=256,M=64,nclasses=3,reproducible=False):
         M = 256 # denser
@@ -276,13 +273,15 @@ class Net(torch.nn.Module):
 
 class VariableInputConv2d(torch.nn.Module):
     """The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
-    - (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each
+    
+    (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each
         - 1 x N x R x C => N x 1 x R x C
-    - (2) Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable
+    (2) Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable
         - N x 1 x R x C => N x M x R x C
-    - (3) Take a softmax over all N channels and multiply
+    (3) Take a softmax over all N channels and multiply
         - N x M x R x C => 1 x M x R x C
-    - (4) Return the result with a fixed number of channels
+    (4) Return the result with a fixed number of channels
+    
     Note that this layer makes our overall network permutation invariant (i.e. if we input an RGB image, or a BGR image, the output would be exactly the same.
 
     Parameters:
@@ -498,7 +497,7 @@ def get_best_bounding_box_per_cell(bboxes,scores,B):
     bboxes_out = bboxes.reshape(B,-1,4)
     bboxes_out = torch.take_along_dim(bboxes_out,inds[None,:,None],0).squeeze()
 
-    return bboxes_,scores_
+    return bboxes_out, scores_out
 
 
 # TODO: Add more to the function description? + Confirm return argument definitions with Daniel

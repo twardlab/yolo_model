@@ -28,9 +28,7 @@ latex_documents = [
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-import os
 import sys
-# sys.path.append('/home/abenneck/Desktop/registration_docs/source')
 sys.path.append('/home/runner/work/yolo_model/yolo_model/source')
 
 

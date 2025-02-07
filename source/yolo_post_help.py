@@ -48,23 +48,26 @@ def NMS(bboxes, scores, nms_threshold = 0.5):
                     scores_nms.remove(s)
                     del b
         break
+
+    bboxes_out = torch.from_numpy(bboxes_out)
+    scores_out = torch.from_numpy(scores_out)
     
     return bboxes_out, scores_out
 
 
 
-def compute_pr_curves(gt_bboxes, pred_bboxes, pred_scores, verbose = False):
+def compute_pr_curves(all_gt_bboxes, all_pred_bboxes, all_pred_scores, verbose = False):
     """
-    Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidences for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints.
+    Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints.
 
     Parameters:
     -----------
-    gt_bboxes : torch.Tensor of shape [N,4]
-        The ground truth bounding boxes which correspond to the target objects in the original image.
-    pred_bboxes : torch.Tensor of shape [M,4]
-        The filtered bounding boxes which were output from the model 
-    pred_scores : torch.Tensor of shape [M,1]
-        The confidence scores corresponding to the bounding boxes in the parameter 'pred_boxes'
+    gt_bboxes : torch.Tensor of shape [X,N,4]
+        The ground truth bounding boxes which correspond to the target objects in the original image. X is the number of images in the original gt dataset and N is the number of gt bounding boxes for each image. Note that N may vary from image to image.
+    pred_bboxes : torch.Tensor of shape [X,M,4]
+        The filtered bounding boxes which were output from the model. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image 'x' in the gt dataset.
+    pred_scores : torch.Tensor of shape [X,M,1]
+        The confidence scores corresponding to the bounding boxes in the parameter 'pred_boxes'. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image 'x' in the gt dataset.
     verbose : bool
         Default - False; If True, print out the (tp, fp, fn) 3-tuple for every (iou, conf) threshold
         
@@ -89,30 +92,33 @@ def compute_pr_curves(gt_bboxes, pred_bboxes, pred_scores, verbose = False):
             if verbose:
                 print(f'Starting conf {conf_thresh}')
                 
-            bbox = gt_bboxes.copy().tolist()        
+            # bbox = gt_bboxes.copy().tolist()        
             
             tp = 0
             fp = 0
-            for bb0, s in zip(pred_bboxes, pred_scores):
-                if s < conf_thresh:
-                    fp += 1
-                    continue
-                
-                for bb1 in bbox:
-                    if iou(bb0,torch.FloatTensor(bb1)) > iou_thresh:
-                        tp += 1
-                        bbox.remove(bb1)
-                        break
-                    else:
+            for idx, pred_bboxes in enumerate(all_pred_bboxes):
+                pred_scores = all_scores[idx]
+                gt_bboxes = all_gt_bboxes[idx].copy().tolist()
+                for bb0, s in zip(pred_bboxes, pred_scores):
+                    if s < conf_thresh:
+                        fp += 1
                         continue
-                        
-            fn = len(bbox)
-            precision = tp / (tp + fp)
-            recall = tp / (tp + fn)
-            curr_pr_curve.append([precision, recall, conf_thresh])
-            
-            if verbose:
-                print(f'(tp, fp, fn) = ({tp}, {fp}, {fn})\n')
+                    
+                    for bb1 in gt_bboxes:
+                        if iou(bb0,torch.FloatTensor(bb1)) > iou_thresh:
+                            tp += 1
+                            bbox.remove(bb1)
+                            break
+                        else:
+                            continue
+                            
+                fn = len(gt_bboxes)
+                precision = tp / (tp + fp)
+                recall = tp / (tp + fn)
+                curr_pr_curve.append([precision, recall, conf_thresh])
+                
+                if verbose:
+                    print(f'(tp, fp, fn) = ({tp}, {fp}, {fn})\n')
     
         curr_pr_curve.append([1.0, 0.0, -1])
         all_pr_curves.append(curr_pr_curve)
