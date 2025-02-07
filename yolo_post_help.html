@@ -66,16 +66,16 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_post_help.compute_pr_curves">
-<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">compute_pr_curves</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gt_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pred_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pred_scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.compute_pr_curves" title="Link to this definition">¶</a></dt>
-<dd><p>Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidences for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints.</p>
+<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">compute_pr_curves</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">all_gt_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_pred_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_pred_scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.compute_pr_curves" title="Link to this definition">¶</a></dt>
+<dd><p>Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints.</p>
 <section id="id1">
 <h1>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
 <dl class="simple">
-<dt>gt_bboxes<span class="classifier">torch.Tensor of shape [N,4]</span></dt><dd><p>The ground truth bounding boxes which correspond to the target objects in the original image.</p>
+<dt>gt_bboxes<span class="classifier">torch.Tensor of shape [X,N,4]</span></dt><dd><p>The ground truth bounding boxes which correspond to the target objects in the original image. X is the number of images in the original gt dataset and N is the number of gt bounding boxes for each image. Note that N may vary from image to image.</p>
 </dd>
-<dt>pred_bboxes<span class="classifier">torch.Tensor of shape [M,4]</span></dt><dd><p>The filtered bounding boxes which were output from the model</p>
+<dt>pred_bboxes<span class="classifier">torch.Tensor of shape [X,M,4]</span></dt><dd><p>The filtered bounding boxes which were output from the model. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image ‘x’ in the gt dataset.</p>
 </dd>
-<dt>pred_scores<span class="classifier">torch.Tensor of shape [M,1]</span></dt><dd><p>The confidence scores corresponding to the bounding boxes in the parameter ‘pred_boxes’</p>
+<dt>pred_scores<span class="classifier">torch.Tensor of shape [X,M,1]</span></dt><dd><p>The confidence scores corresponding to the bounding boxes in the parameter ‘pred_boxes’. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image ‘x’ in the gt dataset.</p>
 </dd>
 <dt>verbose<span class="classifier">bool</span></dt><dd><p>Default - False; If True, print out the (tp, fp, fn) 3-tuple for every (iou, conf) threshold</p>
 </dd>

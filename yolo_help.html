@@ -70,11 +70,6 @@
 </ul>
 </dd>
 </dl>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="yolo_help.GroundTruthDataset.dtype">
-<span class="sig-name descname"><span class="pre">dtype</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">torch.float32</span></em><a class="headerlink" href="#yolo_help.GroundTruthDataset.dtype" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
 </section>
 </dd></dl>
 
@@ -117,37 +112,20 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="yolo_help.VariableInputConv2d">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">VariableInputConv2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.VariableInputConv2d" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
-<p>The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
-- (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each</p>
-<blockquote>
-<div><ul class="simple">
+<p>The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:</p>
+<dl class="simple">
+<dt>(1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each</dt><dd><ul class="simple">
 <li><p>1 x N x R x C =&gt; N x 1 x R x C</p></li>
 </ul>
-</div></blockquote>
-<ul>
-<li><ol class="arabic simple" start="2">
-<li><p>Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable</p></li>
-</ol>
-<blockquote>
-<div><ul class="simple">
-<li><p>N x 1 x R x C =&gt; N x M x R x C</p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><ol class="arabic simple" start="3">
-<li><p>Take a softmax over all N channels and multiply</p></li>
-</ol>
-<blockquote>
-<div><ul class="simple">
-<li><p>N x M x R x C =&gt; 1 x M x R x C</p></li>
-</ul>
-</div></blockquote>
-</li>
-<li><ol class="arabic simple" start="4">
+</dd>
+</dl>
+<ol class="arabic simple" start="2">
+<li><p>Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable
+- N x 1 x R x C =&gt; N x M x R x C</p></li>
+<li><p>Take a softmax over all N channels and multiply
+- N x M x R x C =&gt; 1 x M x R x C</p></li>
 <li><p>Return the result with a fixed number of channels</p></li>
 </ol>
-</li>
-</ul>
 <p>Note that this layer makes our overall network permutation invariant (i.e. if we input an RGB image, or a BGR image, the output would be exactly the same.</p>
 <section id="id2">
 <h1>Parameters:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h1>
@@ -400,10 +378,7 @@ registered hooks while the latter silently ignores them.</p>
   <div>
     <h3><a href="index.html">Table of Contents</a></h3>
     <ul>
-<li><a class="reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">GroundTruthDataset</span></code></a><ul>
-<li><a class="reference internal" href="#yolo_help.GroundTruthDataset.dtype"><code class="docutils literal notranslate"><span class="pre">GroundTruthDataset.dtype</span></code></a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">GroundTruthDataset</span></code></a></li>
 <li><a class="reference internal" href="#yolo_help.Net"><code class="docutils literal notranslate"><span class="pre">Net</span></code></a><ul>
 <li><a class="reference internal" href="#yolo_help.Net.forward"><code class="docutils literal notranslate"><span class="pre">Net.forward()</span></code></a></li>
 </ul>
