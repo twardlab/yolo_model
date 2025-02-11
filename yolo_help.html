@@ -93,16 +93,22 @@
 </dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="yolo_help.Net.forward">
-<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rpn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.Net.forward" title="Link to this definition">¶</a></dt>
-<dd><p>Define the computation performed at every call.</p>
-<p>Should be overridden by all subclasses.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Although the recipe for forward pass needs to be defined within
-this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
-instead of this since the former takes care of running the
-registered hooks while the latter silently ignores them.</p>
-</div>
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.Net.forward" title="Link to this definition">¶</a></dt>
+<dd><p>Forward method for the yolo network.</p>
+<section id="inputs">
+<h2>Inputs<a class="headerlink" href="#inputs" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>x<span class="classifier">torch.Tensor</span></dt><dd><p>Object is of size 1 x CH x ROW x COL. # of channels, rows, and columns are arbitrary. This differs from the original yolo paper, which requires a fixed number of channels, rows, and columns.</p>
+</dd>
+</dl>
+</section>
+<section id="outputs">
+<h2>Outputs<a class="headerlink" href="#outputs" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>x<span class="classifier">torch.Tensor</span></dt><dd><p>Object is of size 5 * bbox_per_cell (2) + num_classes (3) x ROW x COL, where ROW and COL are equal to the input image size divided by the network’s stride (8). The five numbers per cell are [cx, cy, scalex, scaley, confidence].</p>
+</dd>
+</dl>
+</section>
 </dd></dl>
 
 </section>
@@ -177,7 +183,7 @@ registered hooks while the latter silently ignores them.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_help.convert_data">
 <span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">convert_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.convert_data" title="Link to this definition">¶</a></dt>
-<dd><p>Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable. It also outputs the raw data, reformmated into a list intsead of an image of grid cells. These outputs are differentiable. The last one of these outputs is the score (data[…,-1]).</p>
+<dd><p>Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable. It also outputs the raw data, reformmated into a list intsead of an image of grid cells. These outputs are differentiable. The last one of these outputs is the score (data[…,-1]). Note that class probabilities are NOT output by this function.</p>
 <section id="id6">
 <h1>Parameters:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h1>
 <dl class="simple">
@@ -192,9 +198,9 @@ registered hooks while the latter silently ignores them.</p>
 <section id="id7">
 <h1>Returns:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h1>
 <dl class="simple">
-<dt>bboxes<span class="classifier">torch.Tensor of size N x 4</span></dt><dd><p>N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h]</p>
+<dt>bboxes<span class="classifier">torch.Tensor of size N x 4</span></dt><dd><p>N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,scalex,scaley]. There are no gradient computations done here. These bounding boxes are for visualization or downstream analysis.</p>
 </dd>
-<dt>data<span class="classifier">torch.Tensor of size N x 5</span></dt><dd><p>N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h,conf]</p>
+<dt>data<span class="classifier">torch.Tensor of size N x 5</span></dt><dd><p>N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h,conf]. There are gradient computations done here. These are for our loss function and, potentially, other downstream analysis.</p>
 </dd>
 </dl>
 </section>
@@ -241,16 +247,16 @@ registered hooks while the latter silently ignores them.</p>
 </dd>
 <dt>scores<span class="classifier">torch.Tensor of size [N,1]</span></dt><dd><p>The confidence for each corresponding box in the ‘bboxes’ parameter</p>
 </dd>
-<dt>B<span class="classifier">int</span></dt><dd><p>The number of bboxes generated by the YOLO neural network at each cell</p>
+<dt>B<span class="classifier">int</span></dt><dd><p>Default - 2; The number of bboxes generated by the YOLO neural network at each cell</p>
 </dd>
 </dl>
 </section>
 <section id="id11">
 <h1>Returns:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h1>
 <dl class="simple">
-<dt>bboxes_out<span class="classifier">torch.Tensor of size [N/2, 4]</span></dt><dd><p>A list of the best bounding boxes for each cell</p>
+<dt>bboxes_out<span class="classifier">torch.Tensor of size [N/B, 4]</span></dt><dd><p>A list of the best bounding boxes for each cell</p>
 </dd>
-<dt>scores_out<span class="classifier">torch.Tensor of size [N/2, 1]</span></dt><dd><p>A list of the confidence for the corresponding bounding boxes in ‘bboxes_out’</p>
+<dt>scores_out<span class="classifier">torch.Tensor of size [N/B, 1]</span></dt><dd><p>A list of the confidence for the corresponding bounding boxes in ‘bboxes_out’</p>
 </dd>
 </dl>
 </section>
@@ -335,13 +341,11 @@ registered hooks while the latter silently ignores them.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_help.train_yolo_model">
-<span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">train_yolo_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">J_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nepochs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cls_loss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">modelname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizername</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lossname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resume</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.train_yolo_model" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">yolo_help.</span></span><span class="sig-name descname"><span class="pre">train_yolo_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nepochs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cls_loss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">modelname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizername</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lossname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resume</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">J_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help.train_yolo_model" title="Link to this definition">¶</a></dt>
 <dd><p>Train a neural network defined by the YOLO framework and other provided hyperparameters using the simulated dataset ‘groundtruth’.</p>
 <section id="id18">
 <h1>Parameters:<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h1>
 <dl class="simple">
-<dt>J_path<span class="classifier">str</span></dt><dd><p>The file path to the image to be used during the validation portion of training</p>
-</dd>
 <dt>nepochs<span class="classifier">int</span></dt><dd><p>The number of epochs used to train the model</p>
 </dd>
 <dt>lr<span class="classifier">float</span></dt><dd><p>The learning rate used to train the model</p>
@@ -355,6 +359,8 @@ registered hooks while the latter silently ignores them.</p>
 <dt>lossname<span class="classifier">str</span></dt><dd><p>The file name of the losses computed during training</p>
 </dd>
 <dt>resume<span class="classifier">bool</span></dt><dd><p>Default - False; If True, resume the training of model ‘outdir/modelname’ or load the pretrained model saved at ‘outdir/modelname’</p>
+</dd>
+<dt>J_path<span class="classifier">str</span></dt><dd><p>Default - None; The file path to the image to be used during the validation portion of training</p>
 </dd>
 </dl>
 </section>

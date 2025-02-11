@@ -41,13 +41,13 @@
   <dl class="py function" id="module-yolo_post_help">
 <dt class="sig sig-object py" id="yolo_post_help.NMS">
 <span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">NMS</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nms_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.NMS" title="Link to this definition">¶</a></dt>
-<dd><p>Perform non-maximum suppression on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.</p>
+<dd><p>Perform non-maximum suppression (NMS) on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.</p>
 <section id="parameters">
 <h1>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h1>
 <dl class="simple">
 <dt>bboxes<span class="classifier">torch.Tensor of size [N, 4]</span></dt><dd><p>N corresponds to the number of bounding boxes</p>
 </dd>
-<dt>scores<span class="classifier">torch.Tensor of size [N,4]</span></dt><dd><p>N corresponds to the number of bboxes; The confidence scores corresponding to the</p>
+<dt>scores<span class="classifier">torch.Tensor of size [N, 1]</span></dt><dd><p>N corresponds to the number of bboxes; scores[i] corresponds to the confidence that bboxes[i] encompasses a target object</p>
 </dd>
 <dt>nms_threshold<span class="classifier">float</span></dt><dd><p>The iou threshold used to remove candidate bounding boxes when comparing their spatial position with respect to the bounding box with the highest confidence during the current iteration</p>
 </dd>
@@ -56,9 +56,9 @@
 <section id="returns">
 <h1>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h1>
 <dl class="simple">
-<dt>bboxes_out<span class="classifier">torch.Tensor of size [M,4]</span></dt><dd><p>M corresponds to the number of bounding boxes remaining after NMS</p>
+<dt>bboxes_out<span class="classifier">torch.Tensor of size [M, 4]</span></dt><dd><p>M corresponds to the number of bounding boxes remaining after NMS</p>
 </dd>
-<dt>scores_out<span class="classifier">torch .Tensor of size [M,1]</span></dt><dd><p>The M scores corresponding to the bounding boxes defined in bboxes_out</p>
+<dt>scores_out<span class="classifier">torch.Tensor of size [M, 1]</span></dt><dd><p>The M scores corresponding to the bounding boxes defined in bboxes_out</p>
 </dd>
 </dl>
 </section>
@@ -66,8 +66,8 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_post_help.compute_pr_curves">
-<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">compute_pr_curves</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">all_gt_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_pred_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_pred_scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.compute_pr_curves" title="Link to this definition">¶</a></dt>
-<dd><p>Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints.</p>
+<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">compute_pr_curves</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">all_gt_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_pred_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_pred_scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.compute_pr_curves" title="Link to this definition">¶</a></dt>
+<dd><p>Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints. This function will automatically resume the computations at the last (iou, conf) tuple if</p>
 <section id="id1">
 <h1>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
 <dl class="simple">
@@ -136,6 +136,32 @@
 </section>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="yolo_post_help.remove_low_conf_bboxes">
+<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">remove_low_conf_bboxes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conf_thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.remove_low_conf_bboxes" title="Link to this definition">¶</a></dt>
+<dd><p>Remove bounding boxes from the parameter ‘bboxes’ if the corresponding element in the parameter ‘scores’ is below conf_thresh.</p>
+<section id="id7">
+<h1>Parameters:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h1>
+<dl class="simple">
+<dt>bboxes<span class="classifier">torch.Tensor of size [N, 4]</span></dt><dd><p>N corresponds to the number of bounding boxes</p>
+</dd>
+<dt>scores<span class="classifier">torch.Tensor of size [N, 1]</span></dt><dd><p>N corresponds to the number of bboxes; scores[i] corresponds to the confidence that bboxes[i] encompasses a target object</p>
+</dd>
+<dt>conf_thresh<span class="classifier">float</span></dt><dd><p>If scores[i] is below this threshold, then remove bboxes[i] from the input</p>
+</dd>
+</dl>
+</section>
+<section id="id8">
+<h1>Returns:<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h1>
+<dl class="simple">
+<dt>bboxes_out<span class="classifier">torch.Tensor of size [M, 4]</span></dt><dd><p>M corresponds to the number of bounding boxes remaining after this filtering step</p>
+</dd>
+<dt>scores_out<span class="classifier">torch.Tensor of size [M, 1]</span></dt><dd><p>The M scores corresponding to the bounding boxes defined in bboxes_out</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
 
 
             <div class="clearer"></div>
@@ -151,6 +177,7 @@
 <li><a class="reference internal" href="#yolo_post_help.compute_pr_curves"><code class="docutils literal notranslate"><span class="pre">compute_pr_curves()</span></code></a></li>
 <li><a class="reference internal" href="#yolo_post_help.get_mAP"><code class="docutils literal notranslate"><span class="pre">get_mAP()</span></code></a></li>
 <li><a class="reference internal" href="#yolo_post_help.plot_pr_curves"><code class="docutils literal notranslate"><span class="pre">plot_pr_curves()</span></code></a></li>
+<li><a class="reference internal" href="#yolo_post_help.remove_low_conf_bboxes"><code class="docutils literal notranslate"><span class="pre">remove_low_conf_bboxes()</span></code></a></li>
 </ul>
 
   </div>
