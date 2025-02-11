@@ -8,7 +8,7 @@ Welcome to yolo_model's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Table of Contents:
 
    yolo_help
    yolo_post_help

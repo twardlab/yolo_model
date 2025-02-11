@@ -2,29 +2,56 @@ from yolo_help import *
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 from scipy.integrate import trapezoid
 
-
-
-def NMS(bboxes, scores, nms_threshold = 0.5):
+def remove_low_conf_bboxes(bboxes, scores, conf_thresh = 0.1):
     """
-    Perform non-maximum suppression on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.
+    Remove bounding boxes from the parameter 'bboxes' if the corresponding element in the parameter 'scores' is below conf_thresh.
 
     Parameters:
     -----------
     bboxes : torch.Tensor of size [N, 4]
         N corresponds to the number of bounding boxes
-    scores : torch.Tensor of size [N,4]
-        N corresponds to the number of bboxes; The confidence scores corresponding to the
+    scores : torch.Tensor of size [N, 1]
+        N corresponds to the number of bboxes; scores[i] corresponds to the confidence that bboxes[i] encompasses a target object
+    conf_thresh : float
+        If scores[i] is below this threshold, then remove bboxes[i] from the input
+
+    Returns:
+    --------
+    bboxes_out : torch.Tensor of size [M, 4]
+        M corresponds to the number of bounding boxes remaining after this filtering step
+    scores_out : torch.Tensor of size [M, 1]
+        The M scores corresponding to the bounding boxes defined in bboxes_out    
+    """
+
+    bboxes_out = [b for b,s in zip(bboxes,scores) if s > conf_thresh]
+    scores_out = [s for s in scores if s > conf_thresh]
+    
+    return bboxes_out, scores_out
+
+
+
+def NMS(bboxes, scores, nms_threshold = 0.5):
+    """
+    Perform non-maximum suppression (NMS) on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.
+
+    Parameters:
+    -----------
+    bboxes : torch.Tensor of size [N, 4]
+        N corresponds to the number of bounding boxes
+    scores : torch.Tensor of size [N, 1]
+        N corresponds to the number of bboxes; scores[i] corresponds to the confidence that bboxes[i] encompasses a target object
     nms_threshold : float
         The iou threshold used to remove candidate bounding boxes when comparing their spatial position with respect to the bounding box with the highest confidence during the current iteration
 
     Returns:
     --------
-    bboxes_out : torch.Tensor of size [M,4]
+    bboxes_out : torch.Tensor of size [M, 4]
         M corresponds to the number of bounding boxes remaining after NMS
-    scores_out : torch .Tensor of size [M,1]
+    scores_out : torch.Tensor of size [M, 1]
         The M scores corresponding to the bounding boxes defined in bboxes_out
     """
     # Sort the bboxes and scores in descending order based on score
@@ -49,16 +76,16 @@ def NMS(bboxes, scores, nms_threshold = 0.5):
                     del b
         break
 
-    bboxes_out = torch.from_numpy(bboxes_out)
-    scores_out = torch.from_numpy(scores_out)
+    bboxes_out = torch.stack(bboxes_out, dim=0)
+    scores_out = torch.stack(scores_out, dim=0)
     
     return bboxes_out, scores_out
 
 
 
-def compute_pr_curves(all_gt_bboxes, all_pred_bboxes, all_pred_scores, verbose = False):
+def compute_pr_curves(all_gt_bboxes, all_pred_bboxes, all_pred_scores, outdir, verbose = False):
     """
-    Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints.
+    Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints. This function will automatically resume the computations at the last (iou, conf) tuple if
 
     Parameters:
     -----------
@@ -79,49 +106,92 @@ def compute_pr_curves(all_gt_bboxes, all_pred_bboxes, all_pred_scores, verbose =
 
     iou_threshold  = [round(x,2) for x in list(np.arange(0.5,1.0,0.05))]
     conf_threshold = [round(x,2) for x in list(np.arange(0.01,1.0,0.01))]
+
+    # Resume computation if the file exists
+    fname = 'all_pr_curves.npz'
+    if os.path.exists(os.path.join(outdir, fname)):
+        pr_data = np.load(os.path.join(outdir, fname))
+        last_iou = pr_data['last_iou'].item()
+        all_pr_curves = list(pr_data['data'])
+        resume = True
+        
+        if verbose:
+            print(f'Loaded data stored at {os.path.join(outdir, fname)}. Last iou was {last_iou}')
+        
+        # If all computations have already been completed, return the pr curve data stored at os.path.join(outdir, fname)
+        if last_iou == iou_threshold[-1]:
+            return all_pr_curves
     
-    all_pr_curves = []
+    else:
+        all_pr_curves = []
+        resume = False
+
+    start_iou = time.time()
     for iou_thresh in iou_threshold:
+
+        # Either 'continue' current loop if data has already been generated, or define the current pr_curve
+        if (not resume) or (resume and (iou_thresh > last_iou)):
+            curr_pr_curve = [[0.0, 1.0, -1]]
+        else: # resume AND iou_thresh <= last_iou
+            print(f'Skipping iou {iou_thresh}')
+            continue
         
         if verbose:
             print(f'===== Starting iou {iou_thresh} =====')
             
-        curr_pr_curve = [[0.0, 1.0, -1]]
         for conf_thresh in conf_threshold:
-            
+
             if verbose:
                 print(f'Starting conf {conf_thresh}')
+                start = time.time()
                 
-            # bbox = gt_bboxes.copy().tolist()        
-            
             tp = 0
             fp = 0
+            fn = 0
+            start0 = time.time()
             for idx, pred_bboxes in enumerate(all_pred_bboxes):
-                pred_scores = all_scores[idx]
+                pred_scores = all_pred_scores[idx]
                 gt_bboxes = all_gt_bboxes[idx].copy().tolist()
+                n_boxes_remaining = len(pred_bboxes)
                 for bb0, s in zip(pred_bboxes, pred_scores):
                     if s < conf_thresh:
                         fp += 1
+                        n_boxes_remaining -= 1
                         continue
                     
                     for bb1 in gt_bboxes:
                         if iou(bb0,torch.FloatTensor(bb1)) > iou_thresh:
                             tp += 1
-                            bbox.remove(bb1)
+                            gt_bboxes.remove(bb1)
+                            n_boxes_remaining -= 1
                             break
                         else:
-                            continue
-                            
-                fn = len(gt_bboxes)
-                precision = tp / (tp + fp)
-                recall = tp / (tp + fn)
-                curr_pr_curve.append([precision, recall, conf_thresh])
+                            continue       
+                fn += len(gt_bboxes) # All gt_bboxes that have no corresponding pred_bbox
+                fp += n_boxes_remaining # All pred_bboxes that are above conf_thresh, but have no corresponding gt bbox
+                if idx % 2 == 0 and idx != 0:
+                    print(f'Finished images {idx-1}:{idx} / {len(all_pred_bboxes)} in {time.time() - start0:.2f}s')
+                    start0 = time.time()
+
+            precision = 0 if (tp+fp) == 0 else tp / (tp + fp)
+            recall = 0 if (tp+fn) == 0 else tp / (tp + fn)
+            curr_pr_curve.append([precision, recall, conf_thresh])
+            print(f'{tp} + {fn} = {tp+fn} ?= 2125')
+            print(f'{tp} + {fp} = {tp+fp} ?= 1398')
                 
-                if verbose:
-                    print(f'(tp, fp, fn) = ({tp}, {fp}, {fn})\n')
+
+            if verbose:
+                print(f'(tp, fp, fn) = ({tp}, {fp}, {fn}) across {len(all_pred_scores)} images')
+                print(f'Finished iter in {time.time() - start:.2f}s\n')
+                start = time.time()
     
         curr_pr_curve.append([1.0, 0.0, -1])
         all_pr_curves.append(curr_pr_curve)
+        np.savez(os.path.join(outdir, fname), data = all_pr_curves, last_iou = iou_thresh)
+
+        if verbose:
+            print(f'Finished iou {iou_thresh} in {time.time() - start_iou:.2f}s')
+            start_iou = time.time()
 
     return all_pr_curves
 

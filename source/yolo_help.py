@@ -152,10 +152,9 @@ class GroundTruthDataset(torch.utils.data.Dataset):
 
 
 
-# TODO: Add more to the docstring?
 class Net(torch.nn.Module):
     """
-    A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of variable shape.
+    A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of variable shape. 
 
     Parameters:
     -----------
@@ -169,20 +168,24 @@ class Net(torch.nn.Module):
     
     """
     def __init__(self, nclasses = 3):
+        """
+        Init method for the yolo network class. Most hyperparameters are hard-coded (See the comments within the below function)
+        
+        Parameters:
+        -----------
+        nclasses : int
+            Default - 3; The number of distinct classes in the dataset
+        """
         super().__init__()
         
-        self.chin = 16
-        self.ch0 = 32
-        # for now we are just doing the region proposal
-        # 2*k scores and 4*k regressors
+        self.chin = 16 # The number of channels are VariableInputConv2D() layer will map to
+        self.ch0 = 32 # The number of channels our first convolution layer will map to. Every other conv layer halves the resolution and doubles the number of channels.
         
-        self.padding_mode='reflect'
+        self.padding_mode='reflect' # Padding for convolution, reflect behaves nicely at boundaries
         
-        self.B = 2 # bounding boxes per block
+        self.B = 2 # bounding boxes per block (The original yolo model uses 2)
         self.C = nclasses # number of classes, conditioned on their being an object
-        self.chout = self.B*5 + self.C
-        # 5 numbers per box, cx, cy, width, height, confidence
-        # confidence is a predition of p(object)*IOU
+        self.chout = self.B*5 + self.C # 5 numbers per box, cx, cy, width, height, confidence (confidence is a predition of p(object)*IOU). AND 1 probability score per class.
         
         self.color = VariableInputConv2d(self.chin)
         
@@ -220,7 +223,21 @@ class Net(torch.nn.Module):
         self.stride = 8
         
         
-    def forward(self,x,rpn=True):
+    def forward(self,x):
+        """
+        Forward method for the yolo network.
+        
+        Inputs
+        ======
+        x : torch.Tensor 
+            Object is of size 1 x CH x ROW x COL. # of channels, rows, and columns are arbitrary. This differs from the original yolo paper, which requires a fixed number of channels, rows, and columns.
+            
+        Outputs
+        =======
+        x : torch.Tensor
+            Object is of size 5 * bbox_per_cell (2) + num_classes (3) x ROW x COL, where ROW and COL are equal to the input image size divided by the network's stride (8). The five numbers per cell are [cx, cy, scalex, scaley, confidence].
+
+        """
         
         # color         
         x = self.color(x)
@@ -350,7 +367,7 @@ def bbox_to_rectangles(bbox,**kwargs):
 
 def convert_data(out,B,stride):
     """
-    Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable. It also outputs the raw data, reformmated into a list intsead of an image of grid cells. These outputs are differentiable. The last one of these outputs is the score (data[...,-1]).
+    Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable. It also outputs the raw data, reformmated into a list intsead of an image of grid cells. These outputs are differentiable. The last one of these outputs is the score (data[...,-1]). Note that class probabilities are NOT output by this function. 
 
     Parameters:
     -----------
@@ -364,9 +381,9 @@ def convert_data(out,B,stride):
     Returns:
     --------
     bboxes : torch.Tensor of size N x 4
-        N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h]
+        N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,scalex,scaley]. There are no gradient computations done here. These bounding boxes are for visualization or downstream analysis.
     data : torch.Tensor of size N x 5
-        N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h,conf]
+        N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h,conf]. There are gradient computations done here. These are for our loss function and, potentially, other downstream analysis.
     
     """
     # Get the positions of the grid cells
@@ -467,7 +484,6 @@ def get_assignment_inds(bboxes,bbox,shape,stride,B):
     return assignment_inds, ious
 
 
-# TODO: Add more to the function description
 def get_best_bounding_box_per_cell(bboxes,scores,B):
     """
     Get the best bounding box for each cell output from the YOLO neural network. 
@@ -479,13 +495,13 @@ def get_best_bounding_box_per_cell(bboxes,scores,B):
     scores : torch.Tensor of size [N,1]
         The confidence for each corresponding box in the 'bboxes' parameter
     B : int
-        The number of bboxes generated by the YOLO neural network at each cell
+        Default - 2; The number of bboxes generated by the YOLO neural network at each cell
 
     Returns:
     --------
-    bboxes_out : torch.Tensor of size [N/2, 4]
+    bboxes_out : torch.Tensor of size [N/B, 4]
         A list of the best bounding boxes for each cell
-    scores_out : torch.Tensor of size [N/2, 1]
+    scores_out : torch.Tensor of size [N/B, 1]
         A list of the confidence for the corresponding bounding boxes in 'bboxes_out'
         
     """
@@ -500,7 +516,6 @@ def get_best_bounding_box_per_cell(bboxes,scores,B):
     return bboxes_out, scores_out
 
 
-# TODO: Add more to the function description? + Confirm return argument definitions with Daniel
 def get_reg_targets(assignment_inds,bbox,B,shape,stride):
     """What are the true bounding box parameters we want to predict.
 
@@ -634,14 +649,12 @@ def iou(bbox0,bbox1,nopairwise=False):
 
 
 
-def train_yolo_model(J_path, nepochs, lr, cls_loss, outdir, modelname, optimizername, lossname, resume = False):
+def train_yolo_model(nepochs, lr, cls_loss, outdir, modelname, optimizername, lossname, verbose = False, resume = False, J_path=None):
     """
     Train a neural network defined by the YOLO framework and other provided hyperparameters using the simulated dataset 'groundtruth'.
 
     Parameters:
     -----------
-    J_path : str
-        The file path to the image to be used during the validation portion of training
     nepochs : int
         The number of epochs used to train the model
     lr : float
@@ -656,6 +669,8 @@ def train_yolo_model(J_path, nepochs, lr, cls_loss, outdir, modelname, optimizer
         The file name of the losses computed during training
     resume : bool
         Default - False; If True, resume the training of model 'outdir/modelname' or load the pretrained model saved at 'outdir/modelname'
+    J_path : str
+        Default - None; The file path to the image to be used during the validation portion of training
     
     Returns:
     --------
@@ -667,33 +682,37 @@ def train_yolo_model(J_path, nepochs, lr, cls_loss, outdir, modelname, optimizer
     # Check to see that outdir exists and create outdir if it does not exist
     makedirs(outdir,exist_ok=True)
 
-    # TODO: Optional arguments?
     net = Net()
-    groundtruth = GroundTruthDataset(reproducible = True)
+    groundtruth = GroundTruthDataset()
     optimizer = torch.optim.Adam(net.parameters(),lr=lr)
     nclasses = 3
-    # End TODO
 
     # Load the target image to be used during the evaluation step of training
-    J = plt.imread(J_path)
-    J= J[...,:3]
-    if J.dtype == np.uint8:
-        J = J / 255.0
-    J = J.transpose((-1,0,1))
+    if J_path is not None:
+        J = plt.imread(J_path)
+        J= J[...,:3]
+        if J.dtype == np.uint8:
+            J = J / 255.0
+        J = J.transpose((-1,0,1))
 
     Esave = []    
     fig,ax = plt.subplots(2,3,figsize=(9,6)) 
     ax = ax.ravel()
     fig1,ax1 = plt.subplots(3,3,figsize=(9,9))
     fig1.subplots_adjust(left=0,right=1,bottom=0,top=1,hspace=0.1,wspace=0.1)
-    
+
     if resume:        
         net.load_state_dict(torch.load(join(outdir,modelname)))
         optimizer.load_state_dict(torch.load(join(outdir,optimizername)))
         #Esave,Ersave,Ecsave = torch.load(join(outdir,lossname))
         Esave = torch.load(join(outdir,lossname))[0]
+        if verbose:
+            print(f'Loaded predefined model from {outdir}/{modelname}')
     for e in range(nepochs):
-        start = time.time()
+        if verbose:
+            print(f'Starting epoch {e}')
+            start = time.time()
+
         if resume and e < len(Esave):
             continue
         count = 0
@@ -764,7 +783,6 @@ def train_yolo_model(J_path, nepochs, lr, cls_loss, outdir, modelname, optimizer
             colors = ( (p[0]*c0[...,None]) + (p[1]*c1[...,None]) + (p[2]*c2[...,None]) ).T.numpy()    
 
         bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,data[:,-1].clone().detach(),net.B)
-        # TODO: we need to select only one bounding box per cell (the one with the higher predicted IOU)
         ax[1].add_collection(bbox_to_rectangles(bboxes_,fc='none',ec=colors,ls='-',alpha=scores_))
         ax[1].set_title('Annotations')
         
@@ -789,35 +807,37 @@ def train_yolo_model(J_path, nepochs, lr, cls_loss, outdir, modelname, optimizer
         fig.canvas.draw()
         
         
+        if J_path is not None:
+            with torch.no_grad():
+                net.eval()
+                for r in range(3):
+                    for c in range(3):
+                        ax1[r,c].cla()
+                        sl = (slice(r*2000+2000,r*2000+2000+256),slice(c*2000+2000,c*2000+2000+256)) # Note: '2000' may need to be changed for different images. 
+                        out = net(torch.tensor(J[(slice(None),)+sl][None],dtype=torch.float32))
         
-        with torch.no_grad():
-            net.eval()
-            for r in range(3):
-                for c in range(3):
-                    ax1[r,c].cla()
-                    sl = (slice(r*2000+2000,r*2000+2000+256),slice(c*2000+2000,c*2000+2000+256))
-                    out = net(torch.tensor(J[(slice(None),)+sl][None],dtype=torch.float32))
-    
-                    # convert the data into bbox format
-                    bboxes,data = convert_data(out,net.B,net.stride)
-                    imshow(net.color.out.clone().detach()[0],ax1[r,c])
-    
-                    classprobs = out[:,-nclasses:].reshape(nclasses,-1)
-                    p = torch.softmax(classprobs.clone().detach(),0)
-                    c0 = torch.tensor([1.0,0.0,0.0])
-                    c1 = torch.tensor([0.0,1.0,0.0])
-                    colors = 'r'
-                    bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,data[:,-1].clone().detach(),net.B)
-                    alpha = scores_.clone().detach()
-                    alpha = alpha * (alpha>0.5)
-                    
-                    ax1[r,c].add_collection(bbox_to_rectangles(bboxes_,fc='none',ec=colors,ls='-',alpha=alpha))
-                    ax1[r,c].axis('off')
-            net.train()
-        fig1.canvas.draw()
-        if not e%10:
-            fig1.savefig(join(outdir,f'example_e_{e:06d}.png'))
+                        # convert the data into bbox format
+                        bboxes,data = convert_data(out,net.B,net.stride)
+                        imshow(net.color.out.clone().detach()[0],ax1[r,c])
         
+                        classprobs = out[:,-nclasses:].reshape(nclasses,-1)
+                        p = torch.softmax(classprobs.clone().detach(),0)
+                        c0 = torch.tensor([1.0,0.0,0.0])
+                        c1 = torch.tensor([0.0,1.0,0.0])
+                        colors = 'r'
+                        bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,data[:,-1].clone().detach(),net.B)
+                        alpha = scores_.clone().detach()
+                        alpha = alpha * (alpha>0.5)
+                        
+                        ax1[r,c].add_collection(bbox_to_rectangles(bboxes_,fc='none',ec=colors,ls='-',alpha=alpha))
+                        ax1[r,c].axis('off')
+                net.train()
+            fig1.canvas.draw()
+            if not e%10:
+                fig1.savefig(join(outdir,f'example_e_{e:06d}.png'))
+
+        if verbose:
+            print(f'Finished epoch {e} in {time.time() - start:.2f}s')        
         
         # save data
         torch.save(net.state_dict(),join(outdir,modelname))
@@ -825,5 +845,5 @@ def train_yolo_model(J_path, nepochs, lr, cls_loss, outdir, modelname, optimizer
         torch.save([Esave],join(outdir,lossname))  
 
     # print(f'{time.time() - start:.2f} seconds for epoch {e}')
-    start = time.time()
+    # start = time.time()
     return net
