@@ -31,7 +31,6 @@ jobs:
       run: |
         make -C docs/source clean
         make -C docs/source html
-        #sphinx-build -b html docs/ docs/_build/html
 
     # Deploy the newly generated html pages to the GitHub Pages associated with this repo
     - name: Deploy to GitHub Pages
