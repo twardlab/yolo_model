@@ -23,7 +23,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r /docs/source/requirements.txt  # All dependencies are in requirements.txt
+        pip install -r docs/source/requirements.txt  # All dependencies are in requirements.txt
         pip install sphinx sphinx-rtd-theme  # Example additional Sphinx packages
 
     # Build the Sphinx documentation and save all the html files
