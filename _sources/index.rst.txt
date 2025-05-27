@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to the YOLO model documentation!
-======================================
+========================================
 
 .. toctree::
    :maxdepth: 2
@@ -13,7 +13,6 @@ Welcome to the YOLO model documentation!
    yolo_help
    yolo_post_help
    yolo_example.ipynb
-
 
 Indices and tables
 ==================
