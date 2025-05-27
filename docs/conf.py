@@ -20,7 +20,9 @@ extensions = [
     'sphinxcontrib.htmlhelp'
 ]
 
+# Jupyter Notebook configurations
 nbsphinx_execute = 'never'
+nbsphinx_execute_arguments = ["--InlineBackend.figure_formats={'svg', 'pdf'}",]
 
 # Configuration for LaTeX output
 latex_documents = [
