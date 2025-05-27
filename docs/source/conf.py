@@ -32,7 +32,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 import sys
 sys.path.append('/home/runner/work/yolo_model/yolo_model/docs/source')
-sys.path.append('/home/runner/work/yolo_model/yolo_model/source')
+# sys.path.append('/home/runner/work/yolo_model/yolo_model/source')
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
