@@ -7,11 +7,14 @@ Welcome to the YOLO model documentation!
 ========================================
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Table of Contents
+   :maxdepth: 1
+   :caption: Python Scripts
 
    yolo_help
    yolo_post_help
+
+Jupyter Notebook Example Pipeline:
+==================================
 
 .. toctree::
    :maxdepth: 1
