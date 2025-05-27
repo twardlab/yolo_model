@@ -13,9 +13,6 @@ Welcome to the YOLO model documentation!
    yolo_help
    yolo_post_help
 
-Jupyter Notebook Example Pipeline:
-==================================
-
 .. toctree::
    :maxdepth: 1
    :caption: Example Jupyter Notebook
