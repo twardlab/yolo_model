@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Parameters: &#8212; yolo_model  documentation</title>
+    <title>YOLO Post-processing Functions: &#8212; yolo_model  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/nature.css?v=279e0f84" />
     <script src="_static/documentation_options.js?v=5929fcd5"></script>
@@ -13,8 +13,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Parameters for Initialization:" href="yolo_help.html" /> 
+    <link rel="search" title="Search" href="search.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="Related">
       <h3>Navigation</h3>
@@ -22,14 +21,8 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
-          <a href="yolo_help.html" title="Parameters for Initialization:"
-             accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">yolo_model  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Parameters:</a></li> 
+        <li class="nav-item nav-item-this"><a href="">YOLO Post-processing Functions:</a></li> 
       </ul>
     </div>  
 
@@ -38,130 +31,9 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <dl class="py function" id="module-yolo_post_help">
-<dt class="sig sig-object py" id="yolo_post_help.NMS">
-<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">NMS</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nms_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.NMS" title="Link to this definition">¶</a></dt>
-<dd><p>Perform non-maximum suppression (NMS) on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.</p>
-<section id="parameters">
-<h1>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>bboxes<span class="classifier">torch.Tensor of size [N, 4]</span></dt><dd><p>N corresponds to the number of bounding boxes</p>
-</dd>
-<dt>scores<span class="classifier">torch.Tensor of size [N, 1]</span></dt><dd><p>N corresponds to the number of bboxes; scores[i] corresponds to the confidence that bboxes[i] encompasses a target object</p>
-</dd>
-<dt>nms_threshold<span class="classifier">float</span></dt><dd><p>The iou threshold used to remove candidate bounding boxes when comparing their spatial position with respect to the bounding box with the highest confidence during the current iteration</p>
-</dd>
-</dl>
+  <section id="yolo-post-processing-functions">
+<h1>YOLO Post-processing Functions:<a class="headerlink" href="#yolo-post-processing-functions" title="Link to this heading">¶</a></h1>
 </section>
-<section id="returns">
-<h1>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>bboxes_out<span class="classifier">torch.Tensor of size [M, 4]</span></dt><dd><p>M corresponds to the number of bounding boxes remaining after NMS</p>
-</dd>
-<dt>scores_out<span class="classifier">torch.Tensor of size [M, 1]</span></dt><dd><p>The M scores corresponding to the bounding boxes defined in bboxes_out</p>
-</dd>
-</dl>
-</section>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="yolo_post_help.compute_pr_curves">
-<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">compute_pr_curves</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">all_gt_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_pred_bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_pred_scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.compute_pr_curves" title="Link to this definition">¶</a></dt>
-<dd><p>Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints. This function will automatically resume the computations at the last (iou, conf) tuple if</p>
-<section id="id1">
-<h1>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>gt_bboxes<span class="classifier">torch.Tensor of shape [X,N,4]</span></dt><dd><p>The ground truth bounding boxes which correspond to the target objects in the original image. X is the number of images in the original gt dataset and N is the number of gt bounding boxes for each image. Note that N may vary from image to image.</p>
-</dd>
-<dt>pred_bboxes<span class="classifier">torch.Tensor of shape [X,M,4]</span></dt><dd><p>The filtered bounding boxes which were output from the model. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image ‘x’ in the gt dataset.</p>
-</dd>
-<dt>pred_scores<span class="classifier">torch.Tensor of shape [X,M,1]</span></dt><dd><p>The confidence scores corresponding to the bounding boxes in the parameter ‘pred_boxes’. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image ‘x’ in the gt dataset.</p>
-</dd>
-<dt>verbose<span class="classifier">bool</span></dt><dd><p>Default - False; If True, print out the (tp, fp, fn) 3-tuple for every (iou, conf) threshold</p>
-</dd>
-</dl>
-</section>
-<section id="id2">
-<h1>Returns:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>all_pr_curves<span class="classifier">list of shape [10,101,3]</span></dt><dd><p>Each element of this list is defined by 101 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh).</p>
-</dd>
-</dl>
-</section>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="yolo_post_help.get_mAP">
-<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">get_mAP</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">all_pr_curves</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.get_mAP" title="Link to this definition">¶</a></dt>
-<dd><p>Given a set of PR curves at various IOU thresholds, compute the mean average precision across all the provided PR curves. This is done by taking the mean of the average precision of each PR curves, which is computed using the trapezoid method from the scipy.integrate package.</p>
-<section id="id3">
-<h1>Parameters:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>all_pr_curves<span class="classifier">list of shape [10,101,3]</span></dt><dd><p>Each element of this list is defined by 100 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh). This parameter is intended to be the output from the compute_pr_curves() function in this same package.</p>
-</dd>
-</dl>
-</section>
-<section id="id4">
-<h1>Returns:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>mAP<span class="classifier">float</span></dt><dd><p>The mean average precision metric which quantifies the performance of a model specialized in the object segmentation task and ranges from [0,1]</p>
-</dd>
-</dl>
-</section>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="yolo_post_help.plot_pr_curves">
-<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">plot_pr_curves</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">all_pr_curves</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condense</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.plot_pr_curves" title="Link to this definition">¶</a></dt>
-<dd><p>Given one or more sets of (precision, recall, confidence) 3-tuples, generate either 1 (condense=True) or 10 (condense=False) PR curves visualizing the provided data, parameterized by confidence.</p>
-<section id="id5">
-<h1>Parameters:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>all_pr_curves<span class="classifier">list of shape [10,101,3]</span></dt><dd><p>Each element of this list is defined by 100 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh). This parameter is intended to be the output from the compute_pr_curves() function in this same package.</p>
-</dd>
-<dt>save_path<span class="classifier">string</span></dt><dd><p>Default - ‘’; If provided, the figure generated by this function will be saved at the corresponding location</p>
-</dd>
-<dt>condense<span class="classifier">bool</span></dt><dd><p>Default - True; If True, will plot every PR curve on the same figure and generate a legend which relates the plots with their corresponding iou_threshold value. If False, will generate a separate plot for each PR curve within the figure.</p>
-</dd>
-</dl>
-</section>
-<section id="id6">
-<h1>Returns:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>fig<span class="classifier">matplotlib.figure</span></dt><dd><p>A figure containing all of the PR curves stored in the parameter ‘all_pr_curves’</p>
-</dd>
-<dt>ax<span class="classifier">matplotlib.axes</span></dt><dd><p>A single axis containing the plotted data of all 10 PR curves or a set of 10 axes containing the plotted data of each corresponding PR curve</p>
-</dd>
-</dl>
-</section>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="yolo_post_help.remove_low_conf_bboxes">
-<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">remove_low_conf_bboxes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conf_thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.remove_low_conf_bboxes" title="Link to this definition">¶</a></dt>
-<dd><p>Remove bounding boxes from the parameter ‘bboxes’ if the corresponding element in the parameter ‘scores’ is below conf_thresh.</p>
-<section id="id7">
-<h1>Parameters:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>bboxes<span class="classifier">torch.Tensor of size [N, 4]</span></dt><dd><p>N corresponds to the number of bounding boxes</p>
-</dd>
-<dt>scores<span class="classifier">torch.Tensor of size [N, 1]</span></dt><dd><p>N corresponds to the number of bboxes; scores[i] corresponds to the confidence that bboxes[i] encompasses a target object</p>
-</dd>
-<dt>conf_thresh<span class="classifier">float</span></dt><dd><p>If scores[i] is below this threshold, then remove bboxes[i] from the input</p>
-</dd>
-</dl>
-</section>
-<section id="id8">
-<h1>Returns:<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h1>
-<dl class="simple">
-<dt>bboxes_out<span class="classifier">torch.Tensor of size [M, 4]</span></dt><dd><p>M corresponds to the number of bounding boxes remaining after this filtering step</p>
-</dd>
-<dt>scores_out<span class="classifier">torch.Tensor of size [M, 1]</span></dt><dd><p>The M scores corresponding to the bounding boxes defined in bboxes_out</p>
-</dd>
-</dl>
-</section>
-</dd></dl>
-
 
 
             <div class="clearer"></div>
@@ -170,22 +42,6 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
         <div class="sphinxsidebarwrapper">
-  <div>
-    <h3><a href="index.html">Table of Contents</a></h3>
-    <ul>
-<li><a class="reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">NMS()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_post_help.compute_pr_curves"><code class="docutils literal notranslate"><span class="pre">compute_pr_curves()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_post_help.get_mAP"><code class="docutils literal notranslate"><span class="pre">get_mAP()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_post_help.plot_pr_curves"><code class="docutils literal notranslate"><span class="pre">plot_pr_curves()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_post_help.remove_low_conf_bboxes"><code class="docutils literal notranslate"><span class="pre">remove_low_conf_bboxes()</span></code></a></li>
-</ul>
-
-  </div>
-  <div>
-    <h4>Previous topic</h4>
-    <p class="topless"><a href="yolo_help.html"
-                          title="previous chapter">Parameters for Initialization:</a></p>
-  </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
@@ -213,14 +69,8 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              >index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
-          <a href="yolo_help.html" title="Parameters for Initialization:"
-             >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">yolo_model  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">Parameters:</a></li> 
+        <li class="nav-item nav-item-this"><a href="">YOLO Post-processing Functions:</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
