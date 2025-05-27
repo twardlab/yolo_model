@@ -3,16 +3,16 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to yolo_model's documentation!
+Welcome to the YOLO model documentation!
 ======================================
 
 .. toctree::
    :maxdepth: 2
    :caption: Table of Contents:
 
-   yolo_help
-   yolo_post_help
-   yolo_example.ipynb
+   source/yolo_help
+   source/yolo_post_help
+   source/yolo_example.ipynb
 
 
 Indices and tables
