@@ -17,7 +17,7 @@ Welcome to the YOLO model documentation!
    :maxdepth: 1
    :caption: Example Jupyter Notebook
 
-   yolo_example
+   notebooks/yolo_example.ipynb
 
 Indices and tables
 ==================
