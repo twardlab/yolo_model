@@ -1,6 +1,6 @@
 # Ignore files with the following extensions when pushing to the repo
-*.png
-*checkpoint*
-*pycache*
-*.pkl
-*.npz
+**/*.png
+**/*checkpoint*
+**/*pycache*
+**/*.pkl
+**/*.npz
