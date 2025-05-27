@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>YOLO &#8212; yolo_model  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="YOLO Post-processing Functions:" href="../yolo_post_help.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../yolo_post_help.html" title="YOLO Post-processing Functions:"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">YOLO</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="YOLO">
+<h1>YOLO<a class="headerlink" href="#YOLO" title="Link to this heading">¶</a></h1>
+<p>In yolo (you only look once) we will have B bounding boxes per pixel, and the pixels are large and cover the whole image.</p>
+<p>The pixel in which the center of an object lies is responsible for detecting the object.</p>
+<p>Each of the bounding boxes output is 5 numbers, (x,y) (the center, not corner) width, height, confidence.</p>
+<p>Confidence is a prediction of IOU</p>
+<p>Additionally, each cell predicts a probability distribution over class labels.</p>
+</section>
+<section id="Color-module">
+<h1>Color module<a class="headerlink" href="#Color-module" title="Link to this heading">¶</a></h1>
+<p>We can use my attention mechanism to give some sort of a color module.</p>
+<p>Say I have a variable number of colors N, and I want to map to a fixed number M.</p>
+<p>We get M convolution filters.</p>
+<p>We filter each image with each filter. This gives an N x M array of images.</p>
+<p>We then apply a softmax to it. We then do matrix multiplication.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import numpy as np
+import matplotlib.pyplot as plt
+import torch
+import os
+import sys
+import pickle
+import time
+import random
+
+# %matplotlib notebook
+%matplotlib widget
+
+seed = 42
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+
+# Include location of Python source scripts
+sys.path.append(os.path.join(os.getcwd(),&#39;source&#39;))
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Data-Exploration">
+<h1>Data Exploration<a class="headerlink" href="#Data-Exploration" title="Link to this heading">¶</a></h1>
+<section id="Initalize-global-variables">
+<h2>Initalize global variables<a class="headerlink" href="#Initalize-global-variables" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>nclasses = 3
+dtype = torch.float32
+cwd = os.getcwd()
+pwd = os.path.join(os.path.split(cwd)[0])
+
+print(f&#39;cwd: {cwd}&#39;)
+print(f&#39;pwd: {pwd}&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+cwd: /home/abenneck/.local/share/Trash/files/yolo_model.2/source
+pwd: /home/abenneck/.local/share/Trash/files/yolo_model.2
+</pre></div></div>
+</div>
+</section>
+<section id="Initialize-a-dataset-of-simulated-images-and-visualze-a-GT-example">
+<h2>Initialize a dataset of simulated images and visualze a GT example<a class="headerlink" href="#Initialize-a-dataset-of-simulated-images-and-visualze-a-GT-example" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import GroundTruthDataset
+
+groundtruth = GroundTruthDataset()
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import bbox_to_rectangles, imshow
+
+I,bbox,cl = groundtruth[0]
+fig,ax = plt.subplots()
+imshow(I,ax,cmap=&#39;gray&#39;)
+polys = bbox_to_rectangles(bbox,fc=&#39;none&#39;)
+polys.set_edgecolor(plt.cm.jet(cl*255//(nclasses-1)))
+ax.add_collection(polys)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;matplotlib.collections.PolyCollection at 0x7d133ad3bc70&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "d66ce4783dd541839ee07f7f568a8027", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+</section>
+</section>
+<section id="The-YOLO-Model">
+<h1>The YOLO Model<a class="headerlink" href="#The-YOLO-Model" title="Link to this heading">¶</a></h1>
+<section id="Variable-Input-Layer-Example">
+<h2>Variable Input Layer Example<a class="headerlink" href="#Variable-Input-Layer-Example" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import VariableInputConv2d
+
+
+layer = VariableInputConv2d(3)
+fig,ax = plt.subplots(1,3)
+I,bbox,cls = groundtruth[0]
+imshow(I,ax[0])
+
+r = torch.randperm(I.shape[0])
+out1 = layer(torch.tensor(I,dtype=dtype)[None]).clone().detach()[0]
+out2 = layer(torch.tensor(I,dtype=dtype)[r][None]).clone().detach()[0]
+imshow(out1,ax[1])
+imshow(out2,ax[2])
+# note the order of components doesn&#39;t matter
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "3c0a507d087c4e798460d1503cda5a85", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+</section>
+<section id="Initalize-a-neural-network-following-the-YOLO-framework">
+<h2>Initalize a neural network following the YOLO framework<a class="headerlink" href="#Initalize-a-neural-network-following-the-YOLO-framework" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import Net
+
+net = Net()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Visualize-example-output-from-model">
+<h2>Visualize example output from model<a class="headerlink" href="#Visualize-example-output-from-model" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import convert_data
+
+out = net(torch.tensor(I[None],dtype=dtype))
+B = net.B
+stride = net.stride
+
+bboxes,data = convert_data(out,B,stride)
+
+fig,ax = plt.subplots()
+x = torch.arange(out.shape[-1])*stride + (stride-1)/2
+y = torch.arange(out.shape[-2])*stride + (stride-1)/2
+YX = torch.stack(torch.meshgrid(y,x,indexing=&#39;ij&#39;),0)
+ax.imshow(I[0],cmap=&#39;gray&#39;)
+ax.scatter(YX[1].ravel(),YX[0].ravel(),s=1,alpha=0.5)
+x = bboxes[...,0]
+y = bboxes[...,1]
+w = bboxes[...,2]
+h = bboxes[...,3]
+c = data[...,-1]
+predicted_rectangles = bbox_to_rectangles(torch.stack( (x.ravel(),y.ravel(),w.ravel(),h.ravel()) ).T,fc=&#39;none&#39;,ec=&#39;b&#39;,alpha=c.clone().detach()*0.5)
+ax.add_collection(predicted_rectangles,)
+
+true_rectangles = bbox_to_rectangles(bbox,fc=&#39;none&#39;,ec=&#39;r&#39;)
+ax.add_collection(true_rectangles,)
+fig.legend([&#39;pred_center&#39;,&#39;pred_bbox&#39;,&#39;gt_bbox&#39;])
+fig.canvas.draw()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "20f5f5b2cbd7447dbf0ebf75d9c1881a", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+</section>
+<section id="Add-predicted-bounding-boxes-to-above-figure">
+<h2>Add predicted bounding boxes to above figure<a class="headerlink" href="#Add-predicted-bounding-boxes-to-above-figure" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import get_assignment_inds
+
+
+# transform the true bounding boxes
+# to do this first we need an assignment to a given cell
+shape = out.shape
+B = net.B
+
+assignment_inds,ious = get_assignment_inds(bboxes,bbox,shape,stride,B)
+bboxes_assigned = bboxes[assignment_inds]
+x = bboxes_assigned[...,0]
+y = bboxes_assigned[...,1]
+w = bboxes_assigned[...,2]
+h = bboxes_assigned[...,3]
+c = data[assignment_inds,-1]
+predicted_rectangles = bbox_to_rectangles(torch.stack( (x.ravel(),y.ravel(),w.ravel(),h.ravel()) ).T,fc=&#39;none&#39;,ec=&#39;g&#39;,alpha=c.clone().detach())
+ax.add_collection(predicted_rectangles,)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;matplotlib.collections.PolyCollection at 0x7d1214347760&gt;
+</pre></div></div>
+</div>
+</section>
+</section>
+<section id="Model-Training">
+<h1>Model Training<a class="headerlink" href="#Model-Training" title="Link to this heading">¶</a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import train_yolo_model
+
+nepochs = 9854
+lr = 1e-4
+cls_loss = torch.nn.CrossEntropyLoss(reduction=&#39;sum&#39;)
+resume = True # if True, will load a saved model
+
+modelname = &#39;modelsave.pt&#39;
+optimizername = &#39;optimizersave.pt&#39;
+lossname = &#39;loss.pt&#39;
+outdir_model = os.path.join(cwd,&#39;outputs&#39;,&#39;models&#39;,f&#39;nepochs_{nepochs}&#39;)
+
+net = train_yolo_model(nepochs, lr, cls_loss, outdir_model, modelname, optimizername, lossname, verbose=True, resume=resume)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Post-Processing">
+<h1>Post-Processing<a class="headerlink" href="#Post-Processing" title="Link to this heading">¶</a></h1>
+<section id="Filter-candidate-bboxes-(best_bbox_per_cell-+-NMS)">
+<h2>Filter candidate bboxes (best_bbox_per_cell + NMS)<a class="headerlink" href="#Filter-candidate-bboxes-(best_bbox_per_cell-+-NMS)" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import get_best_bounding_box_per_cell
+from yolo_post_help import NMS, remove_low_conf_bboxes
+
+def filter_model_outputs(outdir, net, best_bbox_filter = False, low_conf_filter = False, nms_filter = False):
+    if not os.path.exists(outdir):
+        print(f&#39;Making new directory {outdir}&#39;)
+        os.makedirs(outdir)
+
+    if os.path.exists(os.path.join(outdir, &#39;all_gt_bbox.pkl&#39;)):
+        # Save the gt_bbox, pred_bbox, and pred_score info for downstream analysis
+        with open(os.path.join(outdir,&#39;all_gt_bbox.pkl&#39;),&#39;rb&#39;) as f:
+            all_gt_bbox = pickle.load(f)
+        with open(os.path.join(outdir,&#39;all_pred_bbox.pkl&#39;),&#39;rb&#39;) as f:
+            all_pred_bbox = pickle.load(f)
+        with open(os.path.join(outdir,&#39;all_scores.pkl&#39;),&#39;rb&#39;) as f:
+            all_scores = pickle.load(f)
+        with open(os.path.join(outdir,&#39;all_images.pkl&#39;),&#39;rb&#39;) as f:
+            all_images = pickle.load(f)
+        print(f&#39;Loaded 4 files from {outdir}&#39;)
+    else:
+        all_pred_bbox = []
+        all_scores = []
+        all_gt_bbox = []
+        all_images = []
+        nimages_pq = 100
+
+        groundtruth = GroundTruthDataset(reproducible = True)
+        for i, gt in enumerate(groundtruth):
+            # Quantify the model&#39;s performance against &#39;nimages_pq&#39; simulated gt images
+            if i &gt;= nimages_pq:
+                break
+
+            # Initialize gt objects (bbox: [cx, cy, w, h, conf])
+            I,bbox,cls = gt
+            print(f&#39;=== Starting groundtruth[{i}] ({len(bbox)} bboxes) ===&#39;)
+
+            # Get model outputs for the ith image in the gt dataset
+            out = net(torch.tensor(I,dtype=dtype)[None])
+            bboxes,data = convert_data(out,net.B,net.stride)
+            scores = data[:,-1]
+            print(f&#39;{len(bboxes)} bboxes output from model&#39;)
+            bboxes_, scores_ = bboxes, scores
+
+            # Reduces # of guesses by factor of 2
+            if best_bbox_filter:
+                start = time.time()
+                bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,scores.clone().detach(),net.B)
+                print(f&#39;{len(bboxes_)} bboxes after getting best bbox per cell; Finished in {time.time() - start:.2f}s&#39;)
+
+            # Remove bounding boxes below some conf threshold
+            if low_conf_filter:
+                start = time.time()
+                bboxes_, scores_ = remove_low_conf_bboxes(bboxes_, scores_)
+                print(f&#39;{len(bboxes_)} bboxes after removing low conf bboxes; Finished in {time.time() - start:.2f}s&#39;)
+
+            # Perform NMS on filtered guesses (Reduce by a factor of ~2
+            if nms_filter:
+                start = time.time()
+                bboxes_,scores_ = NMS(bboxes_, scores_, nms_threshold = 0.9)
+                print(f&#39;{len(bboxes_)} bboxes after NMS; Finished in {time.time() - start:.2f}s\n&#39;)
+
+            # Append outputs from current image to all outputs for downstream performance quantification and visualization
+            all_gt_bbox.append(bbox)
+            all_pred_bbox.append(bboxes_)
+            all_scores.append(scores_)
+            all_images.append(I)
+
+        # Save the gt_bbox, pred_bbox, and pred_score info for downstream analysis
+        with open(os.path.join(outdir,&#39;all_gt_bbox.pkl&#39;),&#39;wb&#39;) as f:
+            pickle.dump(all_gt_bbox,f)
+        with open(os.path.join(outdir,&#39;all_pred_bbox.pkl&#39;),&#39;wb&#39;) as f:
+            pickle.dump(all_pred_bbox,f)
+        with open(os.path.join(outdir,&#39;all_scores.pkl&#39;),&#39;wb&#39;) as f:
+            pickle.dump(all_scores,f)
+        with open(os.path.join(outdir,&#39;all_images.pkl&#39;),&#39;wb&#39;) as f:
+            pickle.dump(all_images,f)
+        print(f&#39;Saved output .pkl files to {outdir}&#39;)
+
+    return all_pred_bbox, all_scores, all_gt_bbox, all_images
+
+# Load filtered outputs, or generate new ones if none exist in outdir
+outdir_data = os.path.join(cwd,&#39;outputs&#39;,&#39;data&#39;,f&#39;nepochs_{nepochs}_raw&#39;)
+all_pred_bbox, all_scores, all_gt_bbox, all_images = filter_model_outputs(outdir_data, net)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Compare-GT-bounding-boxes-with-filtered-estimated-bounding-boxes">
+<h2>Compare GT bounding boxes with filtered estimated bounding boxes<a class="headerlink" href="#Compare-GT-bounding-boxes-with-filtered-estimated-bounding-boxes" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>nrow = 50
+ncol = 2
+fig, axs = plt.subplots(nrow, ncol, layout = &#39;tight&#39;)
+i,j = 0,0
+
+for idx, I in enumerate(all_images):
+    pred_bb = all_pred_bbox[idx]
+    pred_s = all_scores[idx]
+    gt_bb = all_gt_bbox[idx]
+
+    imshow(I, axs[i,j], cmap = &#39;gray&#39;)
+    gt_polys = bbox_to_rectangles(np.asarray(gt_bb),fc=&#39;none&#39;)
+    gt_polys.set_edgecolor(&#39;blue&#39;)
+    axs[i,j].add_collection(gt_polys)
+
+    # imshow(I,axs[i,j],cmap=&#39;gray&#39;)
+    pred_polys = bbox_to_rectangles(np.asarray(pred_bb),fc=&#39;none&#39;)
+    pred_polys.set_edgecolor(&#39;red&#39;)
+    axs[i,j].add_collection(pred_polys)
+
+    j += 1
+
+    if j &gt; ncol - 1:
+        j = 0
+        i += 1
+
+fig.legend([&#39;gt&#39;,&#39;pred&#39;])
+fig.set_size_inches(ncol*3,nrow*3)
+plt.show()
+</pre></div>
+</div>
+</div>
+<section id="PR-Curve-Generation">
+<h3>PR Curve Generation<a class="headerlink" href="#PR-Curve-Generation" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import importlib as imp
+import yolo_post_help
+imp.reload(yolo_post_help)
+from yolo_post_help import compute_pr_curves, plot_pr_curves, get_mAP
+
+all_pred_bbox, all_scores, all_gt_bbox, all_images = filter_model_outputs(outdir_data, net)
+all_pred_bbox, all_scores, all_gt_bbox, all_images = [all_pred_bbox[0]], [all_scores[0]], [all_gt_bbox[0]], [all_images[0]]
+
+out = compute_pr_curves(all_gt_bbox, all_pred_bbox, all_scores, outdir_data, verbose = True)
+fig, axs = plot_pr_curves(out)
+fig, axs = plot_pr_curves(out, condense = False)
+mAP = get_mAP(out)
+print(f&#39;mAP: {mAP}&#39;)
+
+# TODO: Only compute (p,r) if there is a score below conf_thresh. Otherwise, all tp/fp/fn labels remain the same (Should save &lt;10min on first 10)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>all_pred = [[0.112,0.8,0.61],[0.4,0.1],[0.99]]
+all_pred_ravel = np.asarray([elem for small_arr in all_pred for elem in small_arr])
+conf_threshold = [round(x,2) for x in list(np.arange(0.01,1.0,0.01))]
+# np.asarray(conf_threshold) &gt; np.min(all_pred_ravel)
+min_score_below_conf = conf_threshold &lt; np.min(all_pred_ravel)
+<br/></pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>np.min(all_pred_ravel)
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="Daniel's-PR-Code">
+<h2>Daniel’s PR Code<a class="headerlink" href="#Daniel's-PR-Code" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># from yolo_help import iou
+
+# fig,ax = plt.subplots(2,2)
+# ax = ax.ravel()
+# ax1 = ax[1]
+# ax2 = ax[2]
+# ax3 = ax[3]
+# ax = ax[0]
+# hfig = display(fig,display_id=True)
+# groundtruth = GroundTruthDataset(reproducible = True)
+
+# iouthresh = 0.7
+# thresholds = np.linspace(0,1,100)
+# # we consider all the detections made by our model
+# tp = np.zeros(len(thresholds)) # our model output matches a true bbox (and no other output matches it better)
+# fp = np.zeros(len(thresholds)) # our model output is not the best match for a true bbox
+# tppfn = np.zeros(len(thresholds)) # denominator in recall is just the number of true boxes
+# for i, gt in enumerate(groundtruth):
+
+#     ax.cla()
+#     I,bbox,cls = gt
+#     imshow(I,ax)
+
+#     gtrect = bbox_to_rectangles(bbox,facecolor=&#39;none&#39;,ec=&#39;b&#39;)
+#     ax.add_collection(gtrect)
+#     with torch.no_grad():
+#         out = net(torch.tensor(I[None],dtype=dtype))
+
+#     bboxes,data = convert_data(out,net.B,net.stride)
+#     scores = data[:,-1]
+#     bboxes_,scores_ = bboxes,scores
+#     prrect = bbox_to_rectangles(bboxes_,facecolor=&#39;none&#39;,ec=&#39;r&#39;,ls=&#39;:&#39;,alpha=scores_)
+#     ax.add_collection(prrect)
+
+#     # loop through the ground truth
+#     for j,t in enumerate(thresholds):
+#         if torch.any(scores_&gt;t):
+#             bboxes__ = bboxes_[scores_&gt;t]
+#             # we need to find which ones in bboxes__ are matched ot which ones in in bbox
+#             # and we need to know how many are left over in each set
+#             # we need to make sure that this assignment is 1-1, or we&#39;re essentially double coun
+
+#             ious = iou(bboxes__,bbox)
+
+#             # for each true bbox, find the besta match
+#             inds = torch.argmax(ious,0)
+#             maxious = torch.amax(ious,0)
+
+#             # count a true positive if the above maxious are greater than the thresh
+#             # there can be at most len(bbox)
+#             ind0 = np.argmax(ious,0)
+#             ind1 = np.argmax(ious,1)
+#             # only count the goodinds
+#             goodinds = ind1[ind0] == torch.arange(len(ind0))
+#             ntp = (maxious[goodinds]&gt;iouthresh).sum()
+#             tp[j] += ntp
+
+
+#             # every single other detection is a false positive
+#             # if it was output by my model and exceeded the score threshold
+#             # sometimes this is less than 0!
+#             nfp = len(bboxes_[scores_&gt;t])-ntp
+#             fp[j] += nfp
+#             # true positive plus false positive is the total number of detections
+#             # then we just need the total numberof true ones for recall (true positive + false negative)
+#             tppfn[j] += bbox.shape[0]
+#         else:
+#             # if t == 1, then there will be no scores &gt; t and the above will give errors
+
+#             tp[j] += 0
+#             fp[j] += 0
+#             tppfn[j] += bbox.shape[0]
+#             # recall will be 0,
+#             # precision will be 0/0
+
+#     precision = tp / (tp+fp)
+#     precision[np.isnan(precision)] = 1
+#     recall = tp / tppfn
+#     mean_precision = np.abs(np.sum( np.diff(recall)*(precision[1:]+precision[:-1])/2 ))
+#     ax1.cla()
+#     ax1.plot(recall,precision,marker=&#39;.&#39;)
+#     ax1.scatter(recall[0],precision[0],c=&#39;r&#39;)
+#     ax1.scatter(recall[-1],precision[-1],c=&#39;g&#39;)
+#     ax1.set_xlim(0,1)
+#     ax1.set_ylim(0,1)
+#     ax1.set_xlabel(&#39;Recall&#39;)
+#     ax1.set_ylabel(&#39;Precision&#39;)
+
+#     ax2.cla()
+#     ax2.set_title(&#39;Total TP over epoch&#39;)
+#     ax2.plot(tp,marker=&#39;.&#39;)
+
+#     ax3.cla()
+#     ax3.set_title(&#39;Total FP over epoch&#39;)
+#     ax3.plot(fp,marker=&#39;.&#39;)
+
+#     fig.canvas.draw()
+#     hfig.update(fig)
+<br/></pre></div>
+</div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">YOLO</a></li>
+<li><a class="reference internal" href="#Color-module">Color module</a></li>
+<li><a class="reference internal" href="#Data-Exploration">Data Exploration</a><ul>
+<li><a class="reference internal" href="#Initalize-global-variables">Initalize global variables</a></li>
+<li><a class="reference internal" href="#Initialize-a-dataset-of-simulated-images-and-visualze-a-GT-example">Initialize a dataset of simulated images and visualze a GT example</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#The-YOLO-Model">The YOLO Model</a><ul>
+<li><a class="reference internal" href="#Variable-Input-Layer-Example">Variable Input Layer Example</a></li>
+<li><a class="reference internal" href="#Initalize-a-neural-network-following-the-YOLO-framework">Initalize a neural network following the YOLO framework</a></li>
+<li><a class="reference internal" href="#Visualize-example-output-from-model">Visualize example output from model</a></li>
+<li><a class="reference internal" href="#Add-predicted-bounding-boxes-to-above-figure">Add predicted bounding boxes to above figure</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Model-Training">Model Training</a></li>
+<li><a class="reference internal" href="#Post-Processing">Post-Processing</a><ul>
+<li><a class="reference internal" href="#Filter-candidate-bboxes-(best_bbox_per_cell-+-NMS)">Filter candidate bboxes (best_bbox_per_cell + NMS)</a></li>
+<li><a class="reference internal" href="#Compare-GT-bounding-boxes-with-filtered-estimated-bounding-boxes">Compare GT bounding boxes with filtered estimated bounding boxes</a><ul>
+<li><a class="reference internal" href="#PR-Curve-Generation">PR Curve Generation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Daniel's-PR-Code">Daniel’s PR Code</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="../yolo_post_help.html"
+                          title="previous chapter">YOLO Post-processing Functions:</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/notebooks/yolo_example.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../yolo_post_help.html" title="YOLO Post-processing Functions:"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">YOLO</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Andrew Bennecke, Daniel Tward.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

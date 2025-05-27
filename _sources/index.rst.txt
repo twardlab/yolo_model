@@ -8,10 +8,10 @@ Welcome to the YOLO model documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Table of Contents:
+   :caption: Table of Contents
 
-   scripts/yolo_help
-   scripts/yolo_post_help
+   yolo_help
+   yolo_post_help
    notebooks/yolo_example.ipynb
 
 Indices and tables

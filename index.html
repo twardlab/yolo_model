@@ -12,8 +12,11 @@
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="YOLO Main Functions:" href="yolo_help.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="Related">
       <h3>Navigation</h3>
@@ -21,6 +24,9 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="yolo_help.html" title="YOLO Main Functions:"
+             accesskey="N">next</a> |</li>
         <li class="nav-item nav-item-0"><a href="#">yolo_model  documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Welcome to the YOLO model documentation!</a></li> 
       </ul>
@@ -34,6 +40,32 @@
   <section id="welcome-to-the-yolo-model-documentation">
 <h1>Welcome to the YOLO model documentation!<a class="headerlink" href="#welcome-to-the-yolo-model-documentation" title="Link to this heading">¶</a></h1>
 <div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="yolo_help.html">YOLO Main Functions:</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yolo_post_help.html">YOLO Post-processing Functions:</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/yolo_example.html">YOLO</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/yolo_example.html#Color-module">Color module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/yolo_example.html#Data-Exploration">Data Exploration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Initalize-global-variables">Initalize global variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Initialize-a-dataset-of-simulated-images-and-visualze-a-GT-example">Initialize a dataset of simulated images and visualze a GT example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/yolo_example.html#The-YOLO-Model">The YOLO Model</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Variable-Input-Layer-Example">Variable Input Layer Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Initalize-a-neural-network-following-the-YOLO-framework">Initalize a neural network following the YOLO framework</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Visualize-example-output-from-model">Visualize example output from model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Add-predicted-bounding-boxes-to-above-figure">Add predicted bounding boxes to above figure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/yolo_example.html#Model-Training">Model Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/yolo_example.html#Post-Processing">Post-Processing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Filter-candidate-bboxes-(best_bbox_per_cell-+-NMS)">Filter candidate bboxes (best_bbox_per_cell + NMS)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Compare-GT-bounding-boxes-with-filtered-estimated-bounding-boxes">Compare GT bounding boxes with filtered estimated bounding boxes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/yolo_example.html#Daniel's-PR-Code">Daniel’s PR Code</a></li>
+</ul>
+</li>
+</ul>
 </div>
 </section>
 <section id="indices-and-tables">
@@ -59,6 +91,11 @@
 <li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
 </ul>
 
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="yolo_help.html"
+                          title="next chapter">YOLO Main Functions:</a></p>
   </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
@@ -87,6 +124,9 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              >index</a></li>
+        <li class="right" >
+          <a href="yolo_help.html" title="YOLO Main Functions:"
+             >next</a> |</li>
         <li class="nav-item nav-item-0"><a href="#">yolo_model  documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Welcome to the YOLO model documentation!</a></li> 
       </ul>
