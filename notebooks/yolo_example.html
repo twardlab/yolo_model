@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>YOLO &#8212; yolo_model  documentation</title>
+    <title>YOLO Network Jupyter Notebook Example &#8212; yolo_model  documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/nature.css?v=279e0f84" />
     <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -32,7 +32,7 @@
           <a href="../yolo_post_help.html" title="YOLO Post-processing Functions:"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">YOLO</a></li> 
+        <li class="nav-item nav-item-this"><a href="">YOLO Network Jupyter Notebook Example</a></li> 
       </ul>
     </div>  
 
@@ -41,21 +41,18 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="YOLO">
-<h1>YOLO<a class="headerlink" href="#YOLO" title="Link to this heading">¶</a></h1>
-<p>In yolo (you only look once) we will have B bounding boxes per pixel, and the pixels are large and cover the whole image.</p>
-<p>The pixel in which the center of an object lies is responsible for detecting the object.</p>
-<p>Each of the bounding boxes output is 5 numbers, (x,y) (the center, not corner) width, height, confidence.</p>
-<p>Confidence is a prediction of IOU</p>
-<p>Additionally, each cell predicts a probability distribution over class labels.</p>
+  <section id="YOLO-Network-Jupyter-Notebook-Example">
+<h1>YOLO Network Jupyter Notebook Example<a class="headerlink" href="#YOLO-Network-Jupyter-Notebook-Example" title="Link to this heading">¶</a></h1>
+<p>In yolo (you only look once) we will have B bounding boxes per pixel. Additionally, the pixels are large and cover the whole image. The pixel in which the center of an object lies is responsible for detecting the object.</p>
+<p>Each of the bounding boxes output is defined with 5 numbers: x_center, y_center, width, height, confidence. Confidence is a prediction of IOU</p>
+<p>Moreover, each cell predicts a probability distribution over class labels.</p>
 </section>
 <section id="Color-module">
 <h1>Color module<a class="headerlink" href="#Color-module" title="Link to this heading">¶</a></h1>
-<p>We can use my attention mechanism to give some sort of a color module.</p>
-<p>Say I have a variable number of colors N, and I want to map to a fixed number M.</p>
-<p>We get M convolution filters.</p>
-<p>We filter each image with each filter. This gives an N x M array of images.</p>
-<p>We then apply a softmax to it. We then do matrix multiplication.</p>
+<p>Say we have a variable number of colors N, and we want to map to a fixed number of channels M.</p>
+<p>We get M convolution filters and we filter each image with each filter, giving us an N x M array of images.</p>
+<p>We then apply a softmax to it.</p>
+<p>We then do matrix multiplication.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
@@ -601,7 +598,7 @@ min_score_below_conf = conf_threshold &lt; np.min(all_pred_ravel)
   <div>
     <h3><a href="../index.html">Table of Contents</a></h3>
     <ul>
-<li><a class="reference internal" href="#">YOLO</a></li>
+<li><a class="reference internal" href="#">YOLO Network Jupyter Notebook Example</a></li>
 <li><a class="reference internal" href="#Color-module">Color module</a></li>
 <li><a class="reference internal" href="#Data-Exploration">Data Exploration</a><ul>
 <li><a class="reference internal" href="#Initalize-global-variables">Initalize global variables</a></li>
@@ -667,7 +664,7 @@ min_score_below_conf = conf_threshold &lt; np.min(all_pred_ravel)
           <a href="../yolo_post_help.html" title="YOLO Post-processing Functions:"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">YOLO</a></li> 
+        <li class="nav-item nav-item-this"><a href="">YOLO Network Jupyter Notebook Example</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
