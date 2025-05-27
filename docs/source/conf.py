@@ -20,6 +20,8 @@ extensions = [
     'sphinxcontrib.htmlhelp'
 ]
 
+nbsphinx_execute = 'never'
+
 # Configuration for LaTeX output
 latex_documents = [
     ('index', 'yolo_help.tex', project, author, 'manual'),
