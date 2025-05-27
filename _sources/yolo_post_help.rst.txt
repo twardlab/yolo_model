@@ -1,7 +1,7 @@
 YOLO Post-processing Functions:
 ===============================
 
-.. automodule:: yolo_post_help
+.. automodule:: scripts/yolo_post_help
    :members:
    :undoc-members:
    :show-inheritance:

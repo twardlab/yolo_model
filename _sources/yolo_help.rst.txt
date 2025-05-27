@@ -1,7 +1,7 @@
 YOLO Main Functions:
 ====================
 
-.. automodule:: yolo_help
+.. automodule:: scripts/yolo_help
    :members:
    :undoc-members:
    :show-inheritance:
