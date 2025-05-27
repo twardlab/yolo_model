@@ -12,6 +12,7 @@ Welcome to yolo_model's documentation!
 
    yolo_help
    yolo_post_help
+   yolo_example
 
 
 Indices and tables
