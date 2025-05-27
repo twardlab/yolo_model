@@ -14,7 +14,7 @@ Welcome to the YOLO model documentation!
    yolo_post_help
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Example Jupyter Notebook
 
    notebooks/yolo_example.ipynb
