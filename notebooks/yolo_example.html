@@ -75,7 +75,7 @@ np.random.seed(seed)
 random.seed(seed)
 
 # Include location of Python source scripts
-sys.path.append(os.path.join(os.getcwd(),&#39;source&#39;))
+sys.path.append(os.path.join(os.path.join(os.path.split(os.getcwd())[0]),&#39;scripts&#39;))
 </pre></div>
 </div>
 </div>
@@ -103,8 +103,8 @@ print(f&#39;pwd: {pwd}&#39;)
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-cwd: /home/abenneck/.local/share/Trash/files/yolo_model.2/source
-pwd: /home/abenneck/.local/share/Trash/files/yolo_model.2
+cwd: /home/abenneck/Desktop/yolo_model/docs/notebooks
+pwd: /home/abenneck/Desktop/yolo_model/docs
 </pre></div></div>
 </div>
 </section>
@@ -141,14 +141,14 @@ ax.add_collection(polys)
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-&lt;matplotlib.collections.PolyCollection at 0x7d133ad3bc70&gt;
+&lt;matplotlib.collections.PolyCollection at 0x73a80cba0eb0&gt;
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "d66ce4783dd541839ee07f7f568a8027", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "2f78102adb75428abaad8c674c5b67dc", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 </section>
 </section>
@@ -181,7 +181,7 @@ imshow(out2,ax[2])
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "3c0a507d087c4e798460d1503cda5a85", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "b2f4a3ef963e456f9fee5044ff4f8f27", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 </section>
 <section id="Initalize-a-neural-network-following-the-YOLO-framework">
@@ -236,13 +236,13 @@ fig.canvas.draw()
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "20f5f5b2cbd7447dbf0ebf75d9c1881a", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "08c972adcca54478b8f867fd554f2105", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 </section>
 <section id="Add-predicted-bounding-boxes-to-above-figure">
 <h2>Add predicted bounding boxes to above figure<a class="headerlink" href="#Add-predicted-bounding-boxes-to-above-figure" title="Link to this heading">¶</a></h2>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import get_assignment_inds
@@ -266,12 +266,12 @@ ax.add_collection(predicted_rectangles,)
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-&lt;matplotlib.collections.PolyCollection at 0x7d1214347760&gt;
+&lt;matplotlib.collections.PolyCollection at 0x73a6b0029a80&gt;
 </pre></div></div>
 </div>
 </section>
