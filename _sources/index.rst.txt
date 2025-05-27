@@ -10,9 +10,9 @@ Welcome to the YOLO model documentation!
    :maxdepth: 2
    :caption: Table of Contents:
 
-   source/yolo_help
-   source/yolo_post_help
-   source/yolo_example.ipynb
+   yolo_help
+   yolo_post_help
+   yolo_example.ipynb
 
 
 Indices and tables
