@@ -4,3 +4,4 @@
 **/*pycache*
 **/*.pkl
 **/*.npz
+**/*.npy
