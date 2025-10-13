@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Load a pretrained model and apply it to a test image &#8212; yolo_model  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Load a pretrained model and apply it to a test image</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import sys
+sys.path.append(&#39;/home/abenneck/Desktop/emlddmm&#39;)
+import emlddmm
+
+seg_name = &#39;/nafs/dtward/dong/upenn_atlas/UPenn_labels_reoriented_origin.vtk&#39;
+xS,S,_,_ = emlddmm.read_data(seg_name)
+res = [xS_i[1]-xS_i[0] for xS_i in xS]
+res
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+[20.0, 20.0, 20.0]
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
+import matplotlib.pyplot as plt
+import os
+import time
+import numpy as np
+import random
+from matplotlib.patches import Rectangle
+import tifffile
+from torch.utils.data import DataLoader
+
+import importlib as imp
+import sys
+
+
+import yolo_tiles
+imp.reload(yolo_tiles)
+from yolo_tiles import img_to_tiles, apply_model_to_tiles, load_test_image, preprocess, tileDataset, remove_bbox_in_overlap
+
+sys.path.append(&#39;/home/abenneck/Desktop/yolo_model/docs/scripts&#39;)
+import yolo_help
+imp.reload(yolo_help)
+from yolo_help import bbox_to_rectangles, imshow, convert_data, Net, get_best_bounding_box_per_cell
+
+import yolo_post_help
+imp.reload(yolo_post_help)
+from yolo_post_help import remove_low_conf_bboxes, postprocess, bb_to_rec
+</pre></div>
+</div>
+</div>
+<section id="Load-a-pretrained-model-and-apply-it-to-a-test-image">
+<h1>Load a pretrained model and apply it to a test image<a class="headerlink" href="#Load-a-pretrained-model-and-apply-it-to-a-test-image" title="Link to this heading">¶</a></h1>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load and extract tiles from a simulated image
+# img, ncell = load_test_image(500,500)
+# padded_img, tiles = img_to_tiles(img)
+
+# Load and extract tiles from a real image
+img = plt.imread(&#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;)
+padded_img, tiles = img_to_tiles(img, upper_threshold_bg = 210)
+
+# Apply model to tiles + apply bbox edge filtering
+outdir_model = os.path.join(&#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854&#39;)
+modelname = &#39;modelsave.pt&#39;
+model_path = os.path.join(outdir_model,modelname)
+out_original = apply_model_to_tiles(tiles, model_path, padded_img.shape[0], padded_img.shape[1], verbose=True)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished tiles 100:200/1496 in 6.06s
+Finished tiles 400:500/1496 in 25.43s
+Finished tiles 500:600/1496 in 10.20s
+Finished tiles 600:700/1496 in 10.62s
+Finished tiles 700:800/1496 in 9.96s
+Finished tiles 800:900/1496 in 10.67s
+Finished tiles 900:1000/1496 in 10.41s
+Finished tiles 1100:1200/1496 in 18.30s
+Finished tiles 1200:1300/1496 in 7.67s
+Finished applying model to entire image in 112.34s with 920/1496 (0.6149732620320856:.3f) tiles marked as foreground
+</pre></div></div>
+</div>
+<section id="Apply-postprocessing-+-Plot-model-output">
+<h2>Apply postprocessing + Plot model output<a class="headerlink" href="#Apply-postprocessing-+-Plot-model-output" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># start0 = time.time()
+# net = Net()
+# B = net.B
+# stride = net.stride
+# pads = (np.array(padded_img.shape) - np.array(img.shape))/2
+# out_ = postprocess(out, B, stride, pads)
+# print(f&#39;Finished postprocessing in {time.time()-start0:.2f}s&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start = time.time()
+
+net = Net()
+B = net.B
+stride = net.stride
+
+fig, axs = plt.subplots(1,2)
+
+# Display the model results after the OLD workflow
+img = plt.imread(&#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;)
+padded_img, tiles = img_to_tiles(img, upper_threshold_bg = 210)
+
+axs[0].imshow(padded_img)
+bboxes, data = convert_data(out_original[None], B, stride)
+scores =  torch.Tensor(data[:,-1])
+bboxes, scores = get_best_bounding_box_per_cell(bboxes, scores, B)
+predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc=&#39;none&#39;,ec=&#39;lime&#39;,alpha=scores)
+axs[0].add_collection(predicted_rectangles)
+axs[0].set_title(&#39;Original postprocessing&#39;)
+axs[0].set_xlim([4200,4300])
+axs[0].set_ylim([4300,4200])
+
+# Display the model results after the NEW workflow
+img_path = &#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;
+out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
+out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+out = np.load(out_path)
+out = out.transpose((1,2,0))
+# axs[1].imshow(padded_img)
+pads = (np.array(padded_img.shape) - np.array(img.shape))/2
+axs[1].imshow(img)
+scores = out[:,:,4].ravel()
+predicted_rectangles = bb_to_rec(out, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1].add_collection(predicted_rectangles)
+axs[1].set_title(&#39;New postprocessing&#39;)
+axs[1].set_xlim([4200-pads[1], 4300-pads[1]])
+axs[1].set_ylim([4300-pads[0], 4200-pads[0]])
+
+fig.set_size_inches((8,4))
+
+print(f&#39;Finished entire image in {time.time()-start:.2f}s&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished entire image in 102.14s
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_pipeline_6_1.png" src="../_images/notebooks_yolo_pipeline_6_1.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[69]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(f&#39;Old bb count {len(bboxes)} vs New bb count {len(scores)}&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Old bb count 1181616 vs New bb count 4618656
+</pre></div></div>
+</div>
+<section id="Real-Data-Processing">
+<h3>Real Data Processing<a class="headerlink" href="#Real-Data-Processing" title="Link to this heading">¶</a></h3>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[40]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
+net = Net()
+net.load_state_dict(torch.load(model_path))
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[40]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;All keys matched successfully&gt;
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[41]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load a target image
+start_total = time.time()
+img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+# model_path = &#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854/modelsave.pt&#39;
+model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
+next_idx = 666
+
+net = Net()
+B = net.B
+stride = net.stride
+
+for idx, fname in enumerate(sorted(os.listdir(img_dir))):
+
+    if idx &lt; next_idx:
+        continue
+
+    # Load input image
+    img_path = os.path.join(img_dir, fname)
+    img = tifffile.imread(img_path)
+
+    # img_path = &#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;
+    # img = plt.imread(img_path)
+    # img = np.transpose(img, (2,0,1))
+    # img = img[0]
+
+    # Preprocess using gamma correction + upsampling
+    start = time.time()
+    img_up = preprocess(img)
+    print(f&#39;Finished preprocessing in {time.time()-start:.2f}s&#39;)
+
+    # Extract tiles from the preprocessed input image
+    padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04, verbose=True)
+
+    # Apply model to tiles + apply bbox edge filtering
+    print(&#39;Applying model to tiles . . .&#39;)
+    out = apply_model_to_tiles(tiles, model_path, padded_img.shape[0], padded_img.shape[1], verbose=True)
+
+    # Convert the raw model output into a more useful data structure
+    print(&#39;Postprocessing . . .&#39;)
+    pads = (np.array(padded_img.shape) - np.array(img_up.shape))/2
+    out = torch.tensor(out.clone().detach(), dtype=torch.float32)
+    out = postprocess(out, B, stride, pads, up_factor=2, verbose=True)
+
+    # Save the processed output
+    out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
+    # out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+    out_path = f&#39;/home/abenneck/Desktop/yolo_model/{out_fname}_instance&#39;
+    np.save(out_path, out)
+
+    print(f&#39;Saved the outputs for image {idx}/{len(os.listdir(img_dir))} in {time.time()-start_total:.2f}s\n&#39;)
+    start_total = time.time()
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished preprocessing in 2.49s
+Finished extracting all tiles in 7.70s
+Applying model to tiles . . .
+Finished tiles 0:700/5082 in 1.27s
+Finished tiles 700:900/5082 in 1.40s
+Finished tiles 900:1100/5082 in 1.62s
+Finished tiles 1100:1300/5082 in 1.96s
+Finished tiles 1300:1400/5082 in 0.77s
+Finished tiles 1400:1500/5082 in 1.19s
+Finished tiles 1500:1600/5082 in 0.72s
+Finished tiles 1600:1700/5082 in 1.22s
+Finished tiles 1700:1800/5082 in 0.78s
+Finished tiles 1800:1900/5082 in 1.24s
+Finished tiles 1900:2000/5082 in 0.85s
+Unexpected exception formatting exception. Falling back to standard exception
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Traceback (most recent call last):
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/IPython/core/interactiveshell.py&#34;, line 3526, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+  File &#34;/tmp/ipykernel_1032732/966848539.py&#34;, line 36, in &lt;module&gt;
+    out = apply_model_to_tiles(tiles, model_path, padded_img.shape[0], padded_img.shape[1], verbose=True)
+  File &#34;/home/abenneck/Desktop/yolo_model/yolo_tiles.py&#34;, line 330, in apply_model_to_tiles
+    out = net((torch.tensor(I[None],dtype=dtype)))
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/torch/nn/modules/module.py&#34;, line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/torch/nn/modules/module.py&#34;, line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File &#34;/home/abenneck/Desktop/yolo_model/docs/scripts/yolo_help.py&#34;, line 246, in forward
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/torch/nn/modules/module.py&#34;, line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/torch/nn/modules/module.py&#34;, line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/torch/nn/modules/batchnorm.py&#34;, line 171, in forward
+    return F.batch_norm(
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/torch/nn/functional.py&#34;, line 2478, in batch_norm
+    return torch.batch_norm(
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/IPython/core/interactiveshell.py&#34;, line 2120, in showtraceback
+    stb = self.InteractiveTB.structured_traceback(
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/IPython/core/ultratb.py&#34;, line 1435, in structured_traceback
+    return FormattedTB.structured_traceback(
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/IPython/core/ultratb.py&#34;, line 1326, in structured_traceback
+    return VerboseTB.structured_traceback(
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/IPython/core/ultratb.py&#34;, line 1173, in structured_traceback
+    formatted_exception = self.format_exception_as_a_whole(etype, evalue, etb, number_of_lines_of_context,
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/IPython/core/ultratb.py&#34;, line 1088, in format_exception_as_a_whole
+    frames.append(self.format_record(record))
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/IPython/core/ultratb.py&#34;, line 970, in format_record
+    frame_info.lines, Colors, self.has_colors, lvals
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/IPython/core/ultratb.py&#34;, line 792, in lines
+    return self._sd.lines
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/stack_data/utils.py&#34;, line 145, in cached_property_wrapper
+    value = obj.__dict__[self.func.__name__] = self.func(obj)
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/stack_data/core.py&#34;, line 734, in lines
+    pieces = self.included_pieces
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/stack_data/utils.py&#34;, line 145, in cached_property_wrapper
+    value = obj.__dict__[self.func.__name__] = self.func(obj)
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/stack_data/core.py&#34;, line 681, in included_pieces
+    pos = scope_pieces.index(self.executing_piece)
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/stack_data/utils.py&#34;, line 145, in cached_property_wrapper
+    value = obj.__dict__[self.func.__name__] = self.func(obj)
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/stack_data/core.py&#34;, line 660, in executing_piece
+    return only(
+  File &#34;/home/abenneck/.local/lib/python3.10/site-packages/executing/executing.py&#34;, line 116, in only
+    raise NotOneValueFound(&#39;Expected one value, found 0&#39;)
+executing.executing.NotOneValueFound: Expected one value, found 0
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[74]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img_path = &#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;
+out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
+out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+data = np.load(out_path)
+data = torch.Tensor(data)
+
+# data_t = data.transpose((1,2,0))
+data_t = torch.permute(data, (1,2,0))
+print(data.shape)
+print(data_t.shape)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+torch.Size([8, 1896, 2436])
+torch.Size([1896, 2436, 8])
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start = time.time()
+
+# TODO: Adjust tiles to original input dimensions for visualization purposes?
+addTiles = False
+plotBbox = True
+setBounds = True
+
+img_idx = 666
+img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+fname = sorted(os.listdir(img_dir))[img_idx]
+img_path = os.path.join(img_dir, fname)
+
+img = tifffile.imread(img_path)
+img_up = preprocess(img)
+if plotBbox:
+    padded_img, tiles = img_to_tiles(img, lower_threshold_bg = 0.04, verbose=True)
+else:
+    padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04, verbose=True)
+tile_dim = tiles[0][&#39;img&#39;].shape[0]
+
+fig, axs = plt.subplots(1,2)
+
+# if plotBbox:
+#     for ax in axs:
+#         ax.imshow(preprocess(img, upsample=False))
+# else:
+#     for ax in axs:
+#         ax.imshow(padded_img)
+for ax in axs:
+    ax.imshow(preprocess(img, upsample=False))
+
+out_fname = fname.split(&#39;.&#39;)[0] + &#39;.npy&#39;
+# out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+out_path = f&#39;/home/abenneck/Desktop/yolo_model/{out_fname}&#39;
+ec = &#39;m&#39; if &#39;home&#39; in out_path else &#39;lime&#39;
+out = torch.Tensor(np.load(out_path))
+
+if addTiles:
+    print(&#39;Adding tiles . . .&#39;)
+    start = time.time()
+    for tile in tiles:
+        p = tile[&#39;p&#39;]
+        bg = tile[&#39;bg&#39;]
+        color = &#39;k&#39; if bg else &#39;w&#39;
+        for ax in axs:
+            rec = Rectangle(p[::-1],tile_dim,tile_dim, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.2)
+            ax.add_patch(rec)
+    print(f&#39;Finished plotting tiles in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+
+if plotBbox:
+    print(&#39;Plotting bboxes . . .&#39;)
+    # Filter out extra bboxes
+    start = time.time()
+    scores = out[:,:,-4].ravel()
+    predicted_rectangles = bb_to_rec(out,fc=&#39;none&#39;,ec=ec,alpha=scores)
+    axs[1].add_collection(predicted_rectangles)
+    axs[1].set_title(f&#39;{len(scores)} predictions&#39;)
+    print(f&#39;Finished plotting bboxes in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+
+if setBounds:
+    for ax in axs:
+        ax.set_xlim([4000,4100])
+        ax.set_ylim([7200,7100])
+
+print(f&#39;Finished entire image in {time.time()-start:.2f}s&#39;)
+
+fig.canvas.draw()
+# plt.savefig(f&#39;/home/abenneck/Desktop/yolo_model/tiles_{img_idx}.png&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished extracting all tiles in 1.78s
+Plotting bboxes . . .
+Finished plotting bboxes in 78.41s, 3935136 boxes present
+Finished entire image in 78.42s
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_pipeline_12_1.png" src="../_images/notebooks_yolo_pipeline_12_1.png" />
+</div>
+</div>
+</section>
+<section id="Batch-Mode">
+<h3>Batch Mode<a class="headerlink" href="#Batch-Mode" title="Link to this heading">¶</a></h3>
+</section>
+</section>
+<section id="Load-+-preprocess-image,-Initialize-DataLoader">
+<h2>Load + preprocess image, Initialize DataLoader<a class="headerlink" href="#Load-+-preprocess-image,-Initialize-DataLoader" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img_idx = 500
+img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+fname = sorted(os.listdir(img_dir))[img_idx]
+img_path = os.path.join(img_dir, fname)
+img = tifffile.imread(img_path)
+img_up = preprocess(img)
+padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04)
+pads = (np.array(padded_img.shape) - np.array(img_up.shape))/2
+
+nrow_t = int(np.max([tile[&#39;r_idx&#39;] for tile in tiles])) + 1
+ncol_t = int(np.max([tile[&#39;c_idx&#39;] for tile in tiles])) + 1
+
+ds = tileDataset(tiles)
+dl = DataLoader(ds, batch_size = ncol_t, shuffle=False)
+
+print(f&#39;{nrow_t} x {ncol_t} tiles&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+77 x 66 tiles
+</pre></div></div>
+</div>
+</section>
+<section id="Compare-outputs-in-'batch-mode'-and-in-'tile-mode'">
+<h2>Compare outputs in ‘batch mode’ and in ‘tile mode’<a class="headerlink" href="#Compare-outputs-in-'batch-mode'-and-in-'tile-mode'" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model_path = os.path.join(&#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854&#39;)
+model_path = os.path.join(model_path,&#39;modelsave.pt&#39;)
+dtype = torch.float32
+net = Net()
+net.load_state_dict(torch.load(model_path))
+net.eval()
+
+B = net.B
+stride = net.stride
+
+ds_factor = 8
+tile_dim = 256
+bbox_dim = 5
+num_classes = 3
+img_dim0 = padded_img.shape[0]
+img_dim1 = padded_img.shape[1]
+boundary_cond = (16,16)
+ndim = 2
+
+# Apply model to &#39;nrow_t&#39; several of tiles
+start_batch = time.time()
+recon_batch = np.zeros((bbox_dim*B+num_classes, int(img_dim0/ds_factor), int(img_dim1/ds_factor)))
+print(&#39;Starting batch mode . . .&#39;)
+for i_batch, batch in enumerate(dl):
+    imgs, meta_data = batch
+    if np.all(np.array(meta_data[&#39;bg&#39;])):
+        print(f&#39;Skipping batch {i_batch}/{nrow_t}&#39;)
+        continue
+    else:
+        start = time.time()
+        out = net(imgs)
+        for idx, elem in enumerate(out):
+            out_i = remove_bbox_in_overlap(elem[None].clone().detach(), B, stride, tile_dim, boundary_cond = boundary_cond)
+            p0 = meta_data[&#39;p&#39;][0][idx]
+            p1 = meta_data[&#39;p&#39;][1][idx]
+            recon_batch[:,int(p0/ds_factor):int((p0+tile_dim)/ds_factor), int(p1/ds_factor):int((p1+tile_dim)/ds_factor)] = out_i[0].detach().numpy()
+        print(f&#39;Finished batch {i_batch}/{nrow_t} in {time.time()-start:.2f}s&#39;)
+        start = time.time()
+
+recon_batch = torch.tensor(recon_batch, dtype=torch.float32)
+recon_batch = postprocess(recon_batch, B, stride, pads, up_factor=2, verbose=True)
+print(f&#39;Finished ALL batches in {time.time()-start_batch:.2f}s\n&#39;)
+
+
+start_tile = time.time()
+# Apply model to tiles + apply bbox edge filtering
+print(&#39;Applying model to tiles . . .&#39;)
+out = apply_model_to_tiles(tiles, model_path, padded_img.shape[0], padded_img.shape[1], verbose=True)
+
+# Convert the raw model output into a more useful data structure
+print(&#39;Postprocessing . . .&#39;)
+pads = (np.array(padded_img.shape) - np.array(img_up.shape))/2
+out = torch.tensor(out.clone().detach(), dtype=torch.float32)
+recon_tile = postprocess(out, B, stride, pads, up_factor=2, verbose=True)
+print(f&#39;Finished ALL tiles in {time.time()-start_tile:.2f}s\n&#39;)
+
+# Save the processed output
+# out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
+# out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+# out_path = f&#39;/home/abenneck/Desktop/yolo_model/{out_fname}&#39;
+# np.save(out_path, out)
+
+# print(f&#39;Saved the outputs for image {idx}/{len(os.listdir(img_dir))} in {time.time()-start_total:.2f}s\n&#39;)
+start_total = time.time()
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Starting batch mode . . .
+Skipping batch 0/77
+Skipping batch 1/77
+Skipping batch 2/77
+Skipping batch 3/77
+Skipping batch 4/77
+Skipping batch 5/77
+Skipping batch 6/77
+Finished batch 7/77 in 1.87s
+Finished batch 8/77 in 2.35s
+Finished batch 9/77 in 2.28s
+Finished batch 10/77 in 2.26s
+Finished batch 11/77 in 2.30s
+Finished batch 12/77 in 2.29s
+Finished batch 13/77 in 2.28s
+Finished batch 14/77 in 2.25s
+Finished batch 15/77 in 2.34s
+Finished batch 16/77 in 2.22s
+Finished batch 17/77 in 2.39s
+Finished batch 18/77 in 2.24s
+Finished batch 19/77 in 2.33s
+Finished batch 20/77 in 2.28s
+Finished batch 21/77 in 2.27s
+Finished batch 22/77 in 2.43s
+Finished batch 23/77 in 2.40s
+Finished batch 24/77 in 2.34s
+Finished batch 25/77 in 2.37s
+Finished batch 26/77 in 2.40s
+Finished batch 27/77 in 2.33s
+Finished batch 28/77 in 2.36s
+Finished batch 29/77 in 2.33s
+Finished batch 30/77 in 2.31s
+Finished batch 31/77 in 2.31s
+Finished batch 32/77 in 2.31s
+Finished batch 33/77 in 2.36s
+Finished batch 34/77 in 2.22s
+Finished batch 35/77 in 2.35s
+Finished batch 36/77 in 2.39s
+Finished batch 37/77 in 2.45s
+Finished batch 38/77 in 2.31s
+Finished batch 39/77 in 2.26s
+Finished batch 40/77 in 2.34s
+Finished batch 41/77 in 2.37s
+Finished batch 42/77 in 2.32s
+Finished batch 43/77 in 2.38s
+Finished batch 44/77 in 2.36s
+Finished batch 45/77 in 2.26s
+Finished batch 46/77 in 2.25s
+Finished batch 47/77 in 2.31s
+Finished batch 48/77 in 2.29s
+Finished batch 49/77 in 2.35s
+Skipping batch 50/77
+Skipping batch 51/77
+Skipping batch 52/77
+Skipping batch 53/77
+Skipping batch 54/77
+Skipping batch 55/77
+Skipping batch 56/77
+Skipping batch 57/77
+Skipping batch 58/77
+Skipping batch 59/77
+Skipping batch 60/77
+Skipping batch 61/77
+Skipping batch 62/77
+Skipping batch 63/77
+Skipping batch 64/77
+Skipping batch 65/77
+Skipping batch 66/77
+Skipping batch 67/77
+Skipping batch 68/77
+Skipping batch 69/77
+Skipping batch 70/77
+Skipping batch 71/77
+Skipping batch 72/77
+Skipping batch 73/77
+Skipping batch 74/77
+Skipping batch 75/77
+Skipping batch 76/77
+Finished postprocessing in 0.24s
+Finished ALL batches in 100.21s
+
+Applying model to tiles . . .
+Finished tiles 0:1100/5082 in 3.14s
+Finished tiles 1100:1300/5082 in 1.61s
+Finished tiles 1300:1500/5082 in 1.65s
+Finished tiles 1500:1600/5082 in 0.58s
+Finished tiles 1600:1800/5082 in 1.83s
+Finished tiles 1800:2000/5082 in 1.97s
+Finished tiles 2000:2200/5082 in 2.05s
+Finished tiles 2200:2400/5082 in 1.98s
+Finished tiles 2400:2600/5082 in 1.87s
+Finished tiles 2600:2800/5082 in 1.74s
+Finished tiles 2800:3000/5082 in 1.55s
+Finished tiles 3000:3200/5082 in 1.25s
+Finished applying model to entire image in 21.61s with 1264/5082 (0.249) tiles marked as foreground
+Postprocessing . . .
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/tmp/ipykernel_1064076/4064794034.py:53: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  out = torch.tensor(out.clone().detach(), dtype=torch.float32)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished postprocessing in 0.24s
+Finished ALL tiles in 21.93s
+
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def tiles_to_orig(tiles, pads):
+    tiles_out = []
+    for tile in tiles:
+        I = tile[&#39;img&#39;]
+        p = tile[&#39;p&#39;]
+        bg = tile[&#39;bg&#39;]
+        r_idx = tile[&#39;r_idx&#39;]
+        c_idx = tile[&#39;c_idx&#39;]
+
+        # Shift the anchor point by the padded amount on each ax
+        # p -= pads
+
+        # Reduce anchor point by upsampling factor
+        p = np.asarray(p)/2
+
+        new_tile = {&#39;img&#39;:None, &#39;p&#39;:list(p), &#39;bg&#39;:bg, &#39;r_idx&#39;:r_idx, &#39;c_idx&#39;:c_idx}
+        tiles_out.append(new_tile)
+
+    return tiles_out
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start = time.time()
+
+plotBbox = True
+addTiles = False
+setBounds = True
+
+img_idx = 500
+img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+fname = sorted(os.listdir(img_dir))[img_idx]
+img_path = os.path.join(img_dir, fname)
+img_plot = preprocess(img, upsample=False)
+tiles_plot = tiles_to_orig(tiles, pads)
+
+fig, ax = plt.subplots(1,2)
+for ax_i in ax:
+    ax_i.imshow(img_plot)
+
+if addTiles:
+    print(&#39;Adding tiles . . .&#39;)
+    start = time.time()
+    for tile in tiles_plot:
+        p = tile[&#39;p&#39;]
+        bg = tile[&#39;bg&#39;]
+        color = &#39;k&#39; if bg else &#39;w&#39;
+        rec = Rectangle(p[::-1],tile_dim,tile_dim, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.25)
+        ax[0].add_patch(rec)
+        rec = Rectangle(p[::-1],tile_dim,tile_dim, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.25)
+        ax[1].add_patch(rec)
+    print(f&#39;Finished plotting tiles in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+
+if plotBbox:
+    print(&#39;Plotting bboxes . . .&#39;)
+    start = time.time()
+    scores = recon_batch[:,:,-4].ravel()
+    predicted_rectangles = bb_to_rec(recon_batch,fc=&#39;none&#39;,ec=&#39;lime&#39;,alpha=scores)
+    ax[0].add_collection(predicted_rectangles)
+    ax[0].set_title(f&#39;recon_batch: {len(scores)} predictions&#39;)
+    print(f&#39;Finished plotting bboxes0 in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+
+    start = time.time()
+    scores = recon_tile[:,:,-4].ravel()
+    predicted_rectangles = bb_to_rec(recon_tile,fc=&#39;none&#39;,ec=&#39;lime&#39;,alpha=scores)
+    ax[1].add_collection(predicted_rectangles)
+    ax[1].set_title(f&#39;recon_tile: {len(scores)} predictions&#39;)
+    print(f&#39;Finished plotting bboxes1 in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+
+if setBounds:
+    for ax_i in ax:
+        ax_i.set_xlim([3900,4000])
+        ax_i.set_ylim([5100,5000])
+        # ax_i.set_xlim([0,200])
+        # ax_i.set_ylim([200,0])
+
+# ax[0].set_xlim([4000,4100])
+# ax[0].set_ylim([6200,6100])
+# ax[1].set_xlim([4000,4100])
+# ax[1].set_ylim([6200,6100])
+
+print(f&#39;Finished entire image in {time.time()-start:.2f}s&#39;)
+
+fig.set_size_inches(8,4)
+fig.canvas.draw()
+# plt.savefig(f&#39;/home/abenneck/Desktop/yolo_model/tiles_{img_idx}.png&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Plotting bboxes . . .
+Finished plotting bboxes0 in 73.11s, 3935136 boxes present
+Finished plotting bboxes1 in 62.41s, 3935136 boxes present
+Finished entire image in 62.42s
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_pipeline_19_1.png" src="../_images/notebooks_yolo_pipeline_19_1.png" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Load a pretrained model and apply it to a test image</a><ul>
+<li><a class="reference internal" href="#Apply-postprocessing-+-Plot-model-output">Apply postprocessing + Plot model output</a><ul>
+<li><a class="reference internal" href="#Real-Data-Processing">Real Data Processing</a></li>
+<li><a class="reference internal" href="#Batch-Mode">Batch Mode</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Load-+-preprocess-image,-Initialize-DataLoader">Load + preprocess image, Initialize DataLoader</a></li>
+<li><a class="reference internal" href="#Compare-outputs-in-'batch-mode'-and-in-'tile-mode'">Compare outputs in ‘batch mode’ and in ‘tile mode’</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/notebooks/yolo_pipeline.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Load a pretrained model and apply it to a test image</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Andrew Bennecke, Daniel Tward.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>
