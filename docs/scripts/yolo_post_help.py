@@ -2,13 +2,18 @@ from yolo_help import *
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 from scipy.integrate import trapezoid
 
-def postprocess(out, B, stride, pads, ds_factor = 8, up_factor = None, verbose = False):
+def postprocess(out, B, stride, pads, ds_factor = 8, up_factor = None, n_bb = 5, verbose = False):
     """
-
+    Converts the raw output from a YOLO network into a more meaningful data structure through the following steps:
+    (1) Remove B-1 bboxes, keeping the one with highest confidence
+    (2) Apply a sigmoid function to normalize the confidence values of each bbox
+    (3) Convert raw output into units and positions of the (upsampled) input image
+    (4) Remove padding which was added during the tile extraction step
+    (5) If upsampling was performed in the preprocessing step, "downsample" the bbox scalars
+    (6) Permute the output from [8,R,C] to [R,C,8] for simpler downstream analysis
 
     Parameters:
     -----------
@@ -24,6 +29,15 @@ def postprocess(out, B, stride, pads, ds_factor = 8, up_factor = None, verbose =
         Default - 8; The factor by which the model output is shrunk relative to the original image size
     up_factor : int
         Default - None; The factor used to upsample the original image prior to padding
+    n_bb : int
+        Default - 5; The number of scalars which define a single bbox
+    verbose: bool
+        Default - False; If True, print out the time taken to run through the entire function.
+
+    Returns:
+    --------
+    out_ : torch.Tensor of shape [N/4, M/4, 8]
+        The processed output from an original grayscale or RGB image of size [N,M]
     """
 
     start = time.time()

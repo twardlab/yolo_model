@@ -13,6 +13,15 @@ sys.path.append('/home/abenneck/Desktop/yolo_model/docs/scripts')
 from yolo_help import Net
 
 class tileDataset(Dataset):
+    """
+    Used to initialize a custom DataLoader for applying the model to tiles in batch mode instead of individually. 
+
+    Parameters:
+    -----------
+    tiles : list of dict
+        A list of dictionaries where each element contains the pixel values and meta-data for a single tile. This is the 'tiles' object output from the function img_to_tiles(...)
+    
+    """
     def __init__(self, tiles):
         self.images = [tile['img'] for tile in tiles]
         self.all_p  = [tile['p'] for tile in tiles]
@@ -51,9 +60,11 @@ def preprocess(img, gamma = True, upsample = True):
     img_up : array of shape [N*2, M*2]
         A normalized, gamma corrected, upsampled version of the input image 
     """
-    # Normalize + gamma correction on input image
+    # Normalize input image
+    img = img[None] / np.max(img,axis=(-1,-2),keepdims=True)
+
+    # Gamma correction on input image
     if gamma:
-        img = img[None] / np.max(img,axis=(-1,-2),keepdims=True)
         img = img**0.5
         if not upsample:
             return img[0]
@@ -107,7 +118,7 @@ def load_test_image(img_dim0, img_dim1, spacing=16, r=4):
                 total_bbox += 1
     return img, total_bbox
 
-def img_to_tiles(img, outdir='', min_overlap = 32, tile_dim = 256, upper_threshold_bg = np.inf, lower_threshold_bg = -np.inf,verbose = False):
+def img_to_tiles(img, outdir='', min_overlap = 32, tile_dim = 256, upper_threshold_bg = np.inf, lower_threshold_bg = -np.inf, verbose = False):
     """
     Convert an image into a set of tiles. Tiles will be of the shape [tile_dim, tile_dim, :] and overlap with each adjacent tile by 'min_overlap' pixels.
 
@@ -259,7 +270,7 @@ def apply_model_to_tiles(tiles, model_path, img_dim0, img_dim1, out_path='', bat
     Returns:
     --------
     recon : torch.Tensor()
-        The reconstructed model output where each element corresponds to a specific point in the original image. The 13 values in each element of the reconstruction ([cx0, cy0, w0, h0, conf0, cx1, cy1, w1, h1, conf1, cl0, cl1, cl2]) can be interpreted as follows. There are 2 predicted bounding boxes centered at (cx0, cy0) and (cx1,cy1) with their corresponding width, height, and confidence values defined by (w0, h0, conf0) and (w1, h1, conf1), respectively. cl0, cl1, and cl2 are the class probabilities and define the likelihood that a cell can be categorized as having a smooth, sharp, or bumpy boundary, respectively.
+        The reconstructed model output where each element corresponds to a specific pixel in the original image. The 13 values in each element of the reconstruction ([cx0, cy0, w0, h0, conf0, cx1, cy1, w1, h1, conf1, cl0, cl1, cl2]) can be interpreted as follows. There are 2 predicted bounding boxes centered at (cx0, cy0) and (cx1,cy1) with their corresponding width, height, and confidence values defined by (w0, h0, conf0) and (w1, h1, conf1), respectively. cl0, cl1, and cl2 are the class probabilities and define the likelihood that a cell can be categorized as having a smooth, sharp, or bumpy boundary, respectively.
     """
     start = time.time()
     start_total = time.time()
@@ -356,7 +367,7 @@ def apply_model_to_tiles(tiles, model_path, img_dim0, img_dim1, out_path='', bat
 
 def count_bbox(out):
     """
-    Count the numebr of bounding boxes output by the YOLO model.
+    Count the number of bounding boxes output by the YOLO model.
 
     Parameters:
     -----------
