@@ -6,6 +6,105 @@ import os
 
 from scipy.integrate import trapezoid
 
+def postprocess(out, B, stride, pads, ds_factor = 8, up_factor = None, verbose = False):
+    """
+
+
+    Parameters:
+    -----------
+    out : torch.Tensor
+        The output object from the primary YOLO neural network
+    B : int
+        The number of bounding boxes per block that the model will output.  (Automatically defined when initializing the network)
+    stride : int
+        The number of pixels to pass over when convolving the input image in each layer (Automatically defined when initializing the network)
+    pad : array of int
+        List of the thickness of the padding along each axis in units of pixels
+    ds_factor : int
+        Default - 8; The factor by which the model output is shrunk relative to the original image size
+    up_factor : int
+        Default - None; The factor used to upsample the original image prior to padding
+    """
+
+    start = time.time()
+
+    # Choose bbox with highest confidence from all B bboxes at each grid cell
+    n_bb = 5 # The number of parameters that define a single bbox
+    best_bb_idx = np.array(n_bb*np.argmax(out[(n_bb-1):n_bb*B:n_bb], axis=0)[None, ...] + np.arange(n_bb)[:, None, None], dtype=int)
+    # best_bb_idx  = np.argmax(out[(n_bb-1):n_bb*B:n_bb], axis=0)[None, ...] # Chooses either bb0 or bb1 based on the bb with higher confidence
+    # best_bb_idx *= n_bb # Modify the [0,1] indeces, so they now correspond to the first idx corresponding to relevant bb in 'out'
+    # best_bb_idx += np.arange(n_bb)[:, None, None] # Expand the indeces to include all n_bb scalars associated with the corresponding bb in 'out'
+
+    # NOTE: This line concats the best bbox info with ALL the remaining data from 'out'. This is currently just 3 class probabilities, but may need to be changed in the future
+    out_ = np.concatenate([np.take_along_axis(out[:n_bb*B], best_bb_idx, axis=0), out[n_bb*B:]], axis=0)
+    out_ = torch.tensor(out_, dtype=torch.float32)
+    
+    # Normalize confidence using the sigmoid function
+    out_[4] = torch.sigmoid(out_[4])
+    
+    # Convert bbox format from [cx, cy, w, h] => [left, right, top, bottom]
+    x = torch.arange(out.shape[-1])*stride + (stride-1)/2
+    y = torch.arange(out.shape[-2])*stride + (stride-1)/2
+    YX = torch.stack(torch.meshgrid(y,x,indexing='ij'),0)
+    w = torch.exp(out_[2])*stride
+    h = torch.exp(out_[3])*stride
+    
+    left = (torch.sigmoid(out_[0])-0.5)*stride + YX[1] - w/2
+    top = (torch.sigmoid(out_[1])-0.5)*stride + YX[0] - h/2
+    right = left + w
+    bottom = top + h
+
+    # Redefine bbox definition + shift by the padding
+    out_[0] = left - pads[1]
+    out_[1] = top - pads[0]
+    out_[2] = right - pads[1]
+    out_[3] = bottom - pads[0]
+
+    # Remove padding, so that model outputs can be placed directly over the unpadded (potentially upsampled) image
+    out_ = out_[:, int(pads[0]/ds_factor) : (out.shape[1]-int(pads[0]/ds_factor)), int(pads[1]/ds_factor): (out.shape[2]-int(pads[1]/ds_factor))]
+
+    # If the original image was upsampled before being padded, convert output to the pre-upsampled units
+    if up_factor != None:
+        out_[:4] = out_[:4] / up_factor        
+
+    # Reshape 'out', so that the data can be accessed via out[r,c] instead of out[:,r,c]
+    out_ = torch.permute(out_, (1,2,0))
+
+    if verbose:
+        print(f'Finished postprocessing in {time.time()-start:.2f}s')
+
+    return out_
+
+def bb_to_rec(out, pos = [0,1,2,3], **kwargs):
+    """
+    This function converts the model output into a set of bounding boxes to be plotted
+    
+    Parameters:
+    -----------
+    out : torch.Tensor
+        The output object from the primary YOLO neural network after the best bbox per cell has been selected and the coordinate values have been reformated in the postprocessing stage.
+    pos : ndarray of int
+        The indeces corresponding to the [left, top, right, bottom] points at out[i,j]
+
+    Returns:
+    --------
+    out : matplotlib.collections.PolyCollection 
+        Contains N rectangles to be plotted later
+    
+    """
+    left = torch.Tensor(out[:,:,pos[0]].ravel())
+    top = torch.Tensor(out[:,:,pos[1]].ravel())
+    right = torch.Tensor(out[:,:,pos[2]].ravel())
+    bottom = torch.Tensor(out[:,:,pos[3]].ravel())
+    
+    p0 = torch.stack( (left, top), dim=1)
+    p1 = torch.stack( (right, top), dim=1)
+    p2 = torch.stack( (right, bottom), dim=1)
+    p3 = torch.stack( (left, bottom), dim=1)
+    p = torch.stack( (p0,p1,p2,p3),dim=-2)
+    
+    return PolyCollection(p, **kwargs)
+
 def remove_low_conf_bboxes(bboxes, scores, conf_thresh = 0.1):
     """
     Remove bounding boxes from the parameter 'bboxes' if the corresponding element in the parameter 'scores' is below conf_thresh.
@@ -30,11 +129,11 @@ def remove_low_conf_bboxes(bboxes, scores, conf_thresh = 0.1):
     bboxes_out = [b for b,s in zip(bboxes,scores) if s > conf_thresh]
     scores_out = [s for s in scores if s > conf_thresh]
     
-    return bboxes_out, scores_out
+    return torch.stack(bboxes_out,dim=0), torch.stack(scores_out,dim=0)
 
 
 
-def NMS(bboxes, scores, nms_threshold = 0.5):
+def NMS(bboxes, scores, nms_threshold = 0.8):
     """
     Perform non-maximum suppression (NMS) on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.
 
@@ -55,7 +154,10 @@ def NMS(bboxes, scores, nms_threshold = 0.5):
         The M scores corresponding to the bounding boxes defined in bboxes_out
     """
     # Sort the bboxes and scores in descending order based on score
-    bboxes_nms = [b for _ , b in sorted(zip(scores, bboxes), reverse = True)]
+    def bb_sort(bbox):
+        return bbox[0]
+    
+    bboxes_nms = [b for _ , b in sorted(list(zip(scores, bboxes)), key=bb_sort, reverse = True)]
     scores_nms = sorted(scores, reverse = True)
 
     bboxes_out = []
