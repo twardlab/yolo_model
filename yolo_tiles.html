@@ -70,7 +70,7 @@
 <section id="returns">
 <h2>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h2>
 <dl class="simple">
-<dt>recon<span class="classifier">torch.Tensor()</span></dt><dd><p>The reconstructed model output where each element corresponds to a specific point in the original image. The 13 values in each element of the reconstruction ([cx0, cy0, w0, h0, conf0, cx1, cy1, w1, h1, conf1, cl0, cl1, cl2]) can be interpreted as follows. There are 2 predicted bounding boxes centered at (cx0, cy0) and (cx1,cy1) with their corresponding width, height, and confidence values defined by (w0, h0, conf0) and (w1, h1, conf1), respectively. cl0, cl1, and cl2 are the class probabilities and define the likelihood that a cell can be categorized as having a smooth, sharp, or bumpy boundary, respectively.</p>
+<dt>recon<span class="classifier">torch.Tensor()</span></dt><dd><p>The reconstructed model output where each element corresponds to a specific pixel in the original image. The 13 values in each element of the reconstruction ([cx0, cy0, w0, h0, conf0, cx1, cy1, w1, h1, conf1, cl0, cl1, cl2]) can be interpreted as follows. There are 2 predicted bounding boxes centered at (cx0, cy0) and (cx1,cy1) with their corresponding width, height, and confidence values defined by (w0, h0, conf0) and (w1, h1, conf1), respectively. cl0, cl1, and cl2 are the class probabilities and define the likelihood that a cell can be categorized as having a smooth, sharp, or bumpy boundary, respectively.</p>
 </dd>
 </dl>
 </section>
@@ -79,7 +79,7 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_tiles.count_bbox">
 <span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">count_bbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.count_bbox" title="Link to this definition">¶</a></dt>
-<dd><p>Count the numebr of bounding boxes output by the YOLO model.</p>
+<dd><p>Count the number of bounding boxes output by the YOLO model.</p>
 <section id="id1">
 <h2>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
 <dl class="simple">
@@ -214,6 +214,14 @@
 <dt class="sig sig-object py" id="yolo_tiles.tileDataset">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">tileDataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tiles</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.tileDataset" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></p>
+<p>Used to initialize a custom DataLoader for applying the model to tiles in batch mode instead of individually.</p>
+<section id="id11">
+<h2>Parameters:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>tiles<span class="classifier">list of dict</span></dt><dd><p>A list of dictionaries where each element contains the pixel values and meta-data for a single tile. This is the ‘tiles’ object output from the function img_to_tiles(…)</p>
+</dd>
+</dl>
+</section>
 </dd></dl>
 
 </section>

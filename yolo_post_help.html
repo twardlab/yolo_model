@@ -166,8 +166,15 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="yolo_post_help.postprocess">
-<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">postprocess</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pads</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ds_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">up_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.postprocess" title="Link to this definition">¶</a></dt>
-<dd><section id="id9">
+<span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">postprocess</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pads</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ds_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">up_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.postprocess" title="Link to this definition">¶</a></dt>
+<dd><p>Converts the raw output from a YOLO network into a more meaningful data structure through the following steps:
+(1) Remove B-1 bboxes, keeping the one with highest confidence
+(2) Apply a sigmoid function to normalize the confidence values of each bbox
+(3) Convert raw output into units and positions of the (upsampled) input image
+(4) Remove padding which was added during the tile extraction step
+(5) If upsampling was performed in the preprocessing step, “downsample” the bbox scalars
+(6) Permute the output from [8,R,C] to [R,C,8] for simpler downstream analysis</p>
+<section id="id9">
 <h2>Parameters:<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h2>
 <dl class="simple">
 <dt>out<span class="classifier">torch.Tensor</span></dt><dd><p>The output object from the primary YOLO neural network</p>
@@ -182,6 +189,17 @@
 </dd>
 <dt>up_factor<span class="classifier">int</span></dt><dd><p>Default - None; The factor used to upsample the original image prior to padding</p>
 </dd>
+<dt>n_bb<span class="classifier">int</span></dt><dd><p>Default - 5; The number of scalars which define a single bbox</p>
+</dd>
+<dt>verbose: bool</dt><dd><p>Default - False; If True, print out the time taken to run through the entire function.</p>
+</dd>
+</dl>
+</section>
+<section id="id10">
+<h2>Returns:<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt><a href="#id13"><span class="problematic" id="id14">out_</span></a><span class="classifier">torch.Tensor of shape [N/4, M/4, 8]</span></dt><dd><p>The processed output from an original grayscale or RGB image of size [N,M]</p>
+</dd>
 </dl>
 </section>
 </dd></dl>
@@ -190,8 +208,8 @@
 <dt class="sig sig-object py" id="yolo_post_help.remove_low_conf_bboxes">
 <span class="sig-prename descclassname"><span class="pre">yolo_post_help.</span></span><span class="sig-name descname"><span class="pre">remove_low_conf_bboxes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bboxes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conf_thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_post_help.remove_low_conf_bboxes" title="Link to this definition">¶</a></dt>
 <dd><p>Remove bounding boxes from the parameter ‘bboxes’ if the corresponding element in the parameter ‘scores’ is below conf_thresh.</p>
-<section id="id10">
-<h2>Parameters:<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h2>
+<section id="id11">
+<h2>Parameters:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h2>
 <dl class="simple">
 <dt>bboxes<span class="classifier">torch.Tensor of size [N, 4]</span></dt><dd><p>N corresponds to the number of bounding boxes</p>
 </dd>
@@ -201,8 +219,8 @@
 </dd>
 </dl>
 </section>
-<section id="id11">
-<h2>Returns:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h2>
+<section id="id12">
+<h2>Returns:<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h2>
 <dl class="simple">
 <dt>bboxes_out<span class="classifier">torch.Tensor of size [M, 4]</span></dt><dd><p>M corresponds to the number of bounding boxes remaining after this filtering step</p>
 </dd>

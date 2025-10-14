@@ -2,7 +2,7 @@
  "cells": [
   {
    "cell_type": "code",
-   "execution_count": 13,
+   "execution_count": 1,
    "id": "83f851ca-e1b5-4c81-9a75-8e954700fbac",
    "metadata": {},
    "outputs": [],
@@ -34,12 +34,12 @@
     "import importlib as imp\n",
     "import sys\n",
     "\n",
+    "sys.path.append('/home/abenneck/Desktop/yolo_tiles/docs/scripts')\n",
     "\n",
     "import yolo_tiles\n",
     "imp.reload(yolo_tiles)\n",
     "from yolo_tiles import img_to_tiles, apply_model_to_tiles, load_test_image, preprocess, remove_bbox_in_overlap\n",
     "\n",
-    "sys.path.append('/home/abenneck/Desktop/yolo_model/docs/scripts')\n",
     "import yolo_help\n",
     "imp.reload(yolo_help)\n",
     "from yolo_help import bbox_to_rectangles, imshow, convert_data, Net, get_best_bounding_box_per_cell\n",

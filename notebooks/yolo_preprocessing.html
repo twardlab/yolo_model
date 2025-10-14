@@ -38,7 +38,7 @@
           <div class="body" role="main">
             
   <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># import numpy as np
@@ -68,12 +68,12 @@ import tifffile
 import importlib as imp
 import sys
 
+sys.path.append(&#39;/home/abenneck/Desktop/yolo_tiles/docs/scripts&#39;)
 
 import yolo_tiles
 imp.reload(yolo_tiles)
 from yolo_tiles import img_to_tiles, apply_model_to_tiles, load_test_image, preprocess, remove_bbox_in_overlap
 
-sys.path.append(&#39;/home/abenneck/Desktop/yolo_model/docs/scripts&#39;)
 import yolo_help
 imp.reload(yolo_help)
 from yolo_help import bbox_to_rectangles, imshow, convert_data, Net, get_best_bounding_box_per_cell

@@ -37,8 +37,8 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+  <div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -68,21 +68,6 @@ imp.reload(yolo_post_help)
 from yolo_post_help import remove_low_conf_bboxes, postprocess, bb_to_rec
 </pre></div>
 </div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">ImportError</span>                               Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[3], line 25</span>
-<span class="ansi-green-intense-fg ansi-bold">     23</span> <span class="ansi-bold" style="color: rgb(0,135,0)">import</span> <span class="ansi-bold" style="color: rgb(0,0,255)">yolo_post_help</span>
-<span class="ansi-green-intense-fg ansi-bold">     24</span> imp<span style="color: rgb(98,98,98)">.</span>reload(yolo_post_help)
-<span class="ansi-green-fg">---&gt; 25</span> <span class="ansi-bold" style="color: rgb(0,135,0)">from</span> <span class="ansi-bold" style="color: rgb(0,0,255)">yolo_post_help</span> <span class="ansi-bold" style="color: rgb(0,135,0)">import</span> remove_low_conf_bboxes, postprocess, bb_to_rec
-
-<span class="ansi-red-fg">ImportError</span>: cannot import name &#39;postprocess&#39; from &#39;yolo_post_help&#39; (/home/abenneck/Desktop/yolo_tiles/docs/scripts/yolo_post_help.py)
-</pre></div></div>
 </div>
 <section id="Load-a-pretrained-model-and-apply-it-to-a-test-image">
 <h1>Load a pretrained model and apply it to a test image<a class="headerlink" href="#Load-a-pretrained-model-and-apply-it-to-a-test-image" title="Link to this heading">¶</a></h1>
@@ -381,19 +366,20 @@ executing.executing.NotOneValueFound: Expected one value, found 0
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[74]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img_path = &#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;
-out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
-out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
-data = np.load(out_path)
-data = torch.Tensor(data)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># img_path = &#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;
+# img_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/&#39;
+# out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
+# out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+# data = np.load(out_path)
+# data = torch.Tensor(data)
 
-# data_t = data.transpose((1,2,0))
-data_t = torch.permute(data, (1,2,0))
-print(data.shape)
-print(data_t.shape)
+# # data_t = data.transpose((1,2,0))
+# data_t = torch.permute(data, (1,2,0))
+# print(data.shape)
+# print(data_t.shape)
 </pre></div>
 </div>
 </div>
@@ -402,12 +388,27 @@ print(data_t.shape)
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-torch.Size([8, 1896, 2436])
-torch.Size([1896, 2436, 8])
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">FileNotFoundError</span>                         Traceback (most recent call last)
+Cell <span class="ansi-green-fg">In[7], line 4</span>
+<span class="ansi-green-intense-fg ansi-bold">      2</span> out_fname <span style="color: rgb(98,98,98)">=</span> (img_path<span style="color: rgb(98,98,98)">.</span>split(<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">/</span><span style="color: rgb(175,0,0)">&#39;</span>)[<span style="color: rgb(98,98,98)">-</span><span style="color: rgb(98,98,98)">1</span>])<span style="color: rgb(98,98,98)">.</span>split(<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">.</span><span style="color: rgb(175,0,0)">&#39;</span>)[<span style="color: rgb(98,98,98)">0</span>] <span style="color: rgb(98,98,98)">+</span> <span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">.npy</span><span style="color: rgb(175,0,0)">&#39;</span>
+<span class="ansi-green-intense-fg ansi-bold">      3</span> out_path <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>out_fname<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>
+<span class="ansi-green-fg">----&gt; 4</span> data <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">np</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">load</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">out_path</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">      5</span> data <span style="color: rgb(98,98,98)">=</span> torch<span style="color: rgb(98,98,98)">.</span>Tensor(data)
+<span class="ansi-green-intense-fg ansi-bold">      7</span> <span style="color: rgb(95,135,135)"># data_t = data.transpose((1,2,0))</span>
+
+File <span class="ansi-green-fg">~/.local/lib/python3.10/site-packages/numpy/lib/npyio.py:427</span>, in <span class="ansi-cyan-fg">load</span><span class="ansi-blue-fg">(file, mmap_mode, allow_pickle, fix_imports, encoding, max_header_size)</span>
+<span class="ansi-green-intense-fg ansi-bold">    425</span>     own_fid <span style="color: rgb(98,98,98)">=</span> <span class="ansi-bold" style="color: rgb(0,135,0)">False</span>
+<span class="ansi-green-intense-fg ansi-bold">    426</span> <span class="ansi-bold" style="color: rgb(0,135,0)">else</span>:
+<span class="ansi-green-fg">--&gt; 427</span>     fid <span style="color: rgb(98,98,98)">=</span> stack<span style="color: rgb(98,98,98)">.</span>enter_context(<span class="ansi-yellow-bg" style="color: rgb(0,135,0)">open</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">os_fspath</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">file</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#34;</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">rb</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#34;</span><span class="ansi-yellow-bg">)</span>)
+<span class="ansi-green-intense-fg ansi-bold">    428</span>     own_fid <span style="color: rgb(98,98,98)">=</span> <span class="ansi-bold" style="color: rgb(0,135,0)">True</span>
+<span class="ansi-green-intense-fg ansi-bold">    430</span> <span style="color: rgb(95,135,135)"># Code to distinguish from NumPy binary files and pickles.</span>
+
+<span class="ansi-red-fg">FileNotFoundError</span>: [Errno 2] No such file or directory: &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/section_000197_30800.npy&#39;
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start = time.time()
@@ -417,7 +418,7 @@ addTiles = False
 plotBbox = True
 setBounds = True
 
-img_idx = 666
+img_idx = 1500
 img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
 fname = sorted(os.listdir(img_dir))[img_idx]
 img_path = os.path.join(img_dir, fname)
@@ -442,9 +443,10 @@ for ax in axs:
     ax.imshow(preprocess(img, upsample=False))
 
 out_fname = fname.split(&#39;.&#39;)[0] + &#39;.npy&#39;
-# out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
-out_path = f&#39;/home/abenneck/Desktop/yolo_model/{out_fname}&#39;
-ec = &#39;m&#39; if &#39;home&#39; in out_path else &#39;lime&#39;
+out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+# out_path = f&#39;/home/abenneck/Desktop/yolo_model/{out_fname}&#39;
+# ec = &#39;m&#39; if &#39;home&#39; in out_path else &#39;lime&#39;
+ec = &#39;lime&#39;
 out = torch.Tensor(np.load(out_path))
 
 if addTiles:
@@ -471,8 +473,8 @@ if plotBbox:
 
 if setBounds:
     for ax in axs:
-        ax.set_xlim([4000,4100])
-        ax.set_ylim([7200,7100])
+        ax.set_xlim([2000,2100])
+        ax.set_ylim([5200,5100])
 
 print(f&#39;Finished entire image in {time.time()-start:.2f}s&#39;)
 
@@ -486,10 +488,10 @@ fig.canvas.draw()
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Finished extracting all tiles in 1.78s
+Finished extracting all tiles in 1.71s
 Plotting bboxes . . .
-Finished plotting bboxes in 78.41s, 3935136 boxes present
-Finished entire image in 78.42s
+Finished plotting bboxes in 64.54s, 3935136 boxes present
+Finished entire image in 64.55s
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
