@@ -187,35 +187,42 @@ class Net(torch.nn.Module):
         self.chout = self.B*5 + self.C # 5 numbers per box, cx, cy, width, height, confidence (confidence is a predition of p(object)*IOU). AND 1 probability score per class.
         
         self.color = VariableInputConv2d(self.chin)
+
+        self.bn_kwargs = {'track_running_stats':False, 'affine':True}
         
-        self.bn = torch.nn.BatchNorm2d # i also set track running stats to false, so eval mode will be the same as train mode
+        # self.bn = torch.nn.BatchNorm2d # i also set track running stats to false, so eval mode will be the same as train mode
+        self.bn = torch.nn.InstanceNorm2d # i also set track running stats to false, so eval mode will be the same as train mode
         #self.bn = BatchNorm2dRunningOnly
         
         self.c0 = torch.nn.Conv2d(self.chin,self.ch0,3,1,1,padding_mode=self.padding_mode) # no downsampling
-        self.b0 = self.bn(self.ch0,track_running_stats=False)
+        self.b0 = self.bn(self.ch0,**self.bn_kwargs)
         self.c0a = torch.nn.Conv2d(self.ch0,self.ch0,3,1,1,padding_mode=self.padding_mode)
-        self.b0a = self.bn(self.ch0,track_running_stats=False)
+        self.b0a = self.bn(self.ch0,**self.bn_kwargs)
         
         self.c1 = torch.nn.Conv2d(self.ch0,self.ch0*2,3,2,1,padding_mode=self.padding_mode)
-        self.b1 = self.bn(self.ch0*2,track_running_stats=False)
+        self.b1 = self.bn(self.ch0*2,**self.bn_kwargs)
         self.c1a = torch.nn.Conv2d(self.ch0*2,self.ch0*2,3,1,1,padding_mode=self.padding_mode)
-        self.b1a = self.bn(self.ch0*2,track_running_stats=False)
+        self.b1a = self.bn(self.ch0*2,**self.bn_kwargs)
         
         self.c2 = torch.nn.Conv2d(self.ch0*2,self.ch0*4,3,2,1,padding_mode=self.padding_mode)
-        self.b2 = self.bn(self.ch0*4,track_running_stats=False)
+        self.b2 = self.bn(self.ch0*4,**self.bn_kwargs)
         self.c2a = torch.nn.Conv2d(self.ch0*4,self.ch0*4,3,1,1,padding_mode=self.padding_mode)
-        self.b2a = self.bn(self.ch0*4,track_running_stats=False)
+        self.b2a = self.bn(self.ch0*4,**self.bn_kwargs)
         
         
         
         self.c3 = torch.nn.Conv2d(self.ch0*4,self.ch0*8,3,2,1,padding_mode=self.padding_mode)
-        self.b3 = self.bn(self.ch0*8,track_running_stats=False)
+        self.b3 = self.bn(self.ch0*8,**self.bn_kwargs)
         self.c3a = torch.nn.Conv2d(self.ch0*8,self.ch0*8,3,1,1,padding_mode=self.padding_mode)
-        self.b3a = self.bn(self.ch0*8,track_running_stats=False)
+        self.b3a = self.bn(self.ch0*8,**self.bn_kwargs)
         
         
         self.c4 = torch.nn.Conv2d(self.ch0*8,self.chout,1,1,padding_mode=self.padding_mode)
         
+
+        
+        # the total stride is important for interpretting the bounding box in the rpn
+        self.stride = 8        
 
         
         # the total stride is important for interpretting the bounding box in the rpn
@@ -286,30 +293,30 @@ class Net(torch.nn.Module):
         return x
         
 
-
 class VariableInputConv2d(torch.nn.Module):
-    """The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
+    ''' Note the assumption here is that we have batch size one, so I can work with the batch dimension.
+    This version adds a few extra convolutions.
     
-    (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each
-        - 1 x N x R x C => N x 1 x R x C
-    (2) Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable
-        - N x 1 x R x C => N x M x R x C
-    (3) Take a softmax over all N channels and multiply
-        - N x M x R x C => 1 x M x R x C
-    (4) Return the result with a fixed number of channels
+    We only process 1 image at a time, so we can use the batch dimension.
     
-    Note that this layer makes our overall network permutation invariant (i.e. if we input an RGB image, or a BGR image, the output would be exactly the same.
-
-    Parameters:
-    -----------
-    M : int
-        The desired number of output channels, independent of the number of input channels
-
-    Returns:
-    --------
-    out : torch.tensor of size 1 x M x R x C
+    Step 1: move channel dimension to batch dimension.  Now we have N samples, with one channel each.
     
-    """
+    Step 2: apply some convolutions and relus, to end up with an N x M array of images. Where M is fixed, 
+            and N is variable.
+    
+    Step 3: Take a softmax of the result over the N channels.  Now matrix multiply, and N x M array, with a N x 1 array,
+            to get an M x 1 array (where M is fixed).
+    
+    Step 4: Return the result which is a fixed number of channels.
+    
+    What's nice is it is permutation invariant.  So if we input an RGB image, or a BGR image, the result would be exactly the same.
+    We don't need to have the channels in any specific order.
+    
+    WORKING TODO
+    Change so it supports a batch dimension
+    This requires every image in a batch to have the same number of channels, but I think its okay
+    
+    '''
     def __init__(self,M):
         super().__init__()
         self.M = M
@@ -319,19 +326,79 @@ class VariableInputConv2d(torch.nn.Module):
         
         
     def forward(self,x):
-        # move the batch dim, make the size N x 1 x R x C
-        x = x[0,:,None]
+        #print(x.shape)
+        # move the batch dim, make the size N x 1 (NO! not any more)
+        nbatch = x.shape[0]
+        nchannels = x.shape[1] # this is variable, but will be the same for every image in a batch
         
-        # apply the conv layer, make the size N x M x R x C
-        cx = torch.relu(self.c0(x))
+        
+        #print(x.shape)
+        # reshape B x N into (BN) x 1
+        x_ = x.reshape( nbatch*nchannels, 1,x.shape[-2],x.shape[-1] )
+        #print(x_.shape)
+        cx = torch.relu(self.c0(x_))
+        # after the first layer we now have (BN) x M
+        #print(cx.shape)
         cx = torch.relu(self.c1(cx))
+        # after the second layer again (BN) x M
         cx = self.c2(cx)
-        cx = torch.softmax(cx*100,0)
+        #print(cx.shape)
+        # now reshape it to B X N X M        
+        cx = cx.reshape(nbatch,nchannels,self.M,x.shape[-2],x.shape[-1])
+        #print(cx.shape)
+        cx = torch.softmax(cx*100,1)
+        #print(cx.shape)
         
-        # now matrix multiply
-        out = torch.sum(x*cx,0,keepdims=True)
+        # now matrix multiply over the N axis
+        out = torch.sum(x[:,:,None]*cx,1,keepdims=False)
         self.out = out
         return out
+
+# class VariableInputConv2d(torch.nn.Module):
+#     """The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
+    
+#     (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each
+#         - 1 x N x R x C => N x 1 x R x C
+#     (2) Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable
+#         - N x 1 x R x C => N x M x R x C
+#     (3) Take a softmax over all N channels and multiply
+#         - N x M x R x C => 1 x M x R x C
+#     (4) Return the result with a fixed number of channels
+    
+#     Note that this layer makes our overall network permutation invariant (i.e. if we input an RGB image, or a BGR image, the output would be exactly the same.
+
+#     Parameters:
+#     -----------
+#     M : int
+#         The desired number of output channels, independent of the number of input channels
+
+#     Returns:
+#     --------
+#     out : torch.tensor of size 1 x M x R x C
+    
+#     """
+#     def __init__(self,M):
+#         super().__init__()
+#         self.M = M
+#         self.c0  = torch.nn.Conv2d(1,M,3,1,1)
+#         self.c1  = torch.nn.Conv2d(M,M,3,1,1)
+#         self.c2  = torch.nn.Conv2d(M,M,3,1,1)
+        
+        
+#     def forward(self,x):
+#         # move the batch dim, make the size N x 1 x R x C
+#         x = x[0,:,None]
+        
+#         # apply the conv layer, make the size N x M x R x C
+#         cx = torch.relu(self.c0(x))
+#         cx = torch.relu(self.c1(cx))
+#         cx = self.c2(cx)
+#         cx = torch.softmax(cx*100,0)
+        
+#         # now matrix multiply
+#         out = torch.sum(x*cx,0,keepdims=True)
+#         self.out = out
+#         return out
         
 
 
