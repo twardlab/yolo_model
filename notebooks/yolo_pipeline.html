@@ -38,7 +38,7 @@
           <div class="body" role="main">
             
   <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -366,21 +366,56 @@ executing.executing.NotOneValueFound: Expected one value, found 0
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># img_path = &#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;
-# img_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/&#39;
-# out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
-# out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
-# data = np.load(out_path)
-# data = torch.Tensor(data)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># # Load a target image
+# start_total = time.time()
+# img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+# model_path = &#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854/modelsave.pt&#39;
+# # model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
+# idx = 500
 
-# # data_t = data.transpose((1,2,0))
-# data_t = torch.permute(data, (1,2,0))
-# print(data.shape)
-# print(data_t.shape)
-</pre></div>
+# net = Net()
+# net.load_state_dict(torch.load(model_path))
+# net.eval()
+# B = net.B
+# stride = net.stride
+
+# # Load input image
+# fname = sorted(os.listdir(img_dir))[idx]
+# img_path = os.path.join(img_dir, fname)
+# img = tifffile.imread(img_path)
+
+# # Preprocess using gamma correction + upsampling
+# start = time.time()
+# img_up = preprocess(img)
+# print(f&#39;Finished preprocessing in {time.time()-start:.2f}s&#39;)
+
+# # Extract tiles from the preprocessed input image
+# padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04, verbose=True)
+
+
+
+# # # Apply model to tiles + apply bbox edge filtering
+# # print(&#39;Applying model to tiles . . .&#39;)
+# # out = apply_model_to_tiles(tiles, model_path, padded_img.shape[0], padded_img.shape[1], verbose=True)
+
+# # # Convert the raw model output into a more useful data structure
+# # print(&#39;Postprocessing . . .&#39;)
+# # pads = (np.array(padded_img.shape) - np.array(img_up.shape))/2
+# # out = torch.tensor(out.clone().detach(), dtype=torch.float32)
+# # out = postprocess(out, B, stride, pads, up_factor=2, verbose=True)
+
+# # # Save the processed output
+# # out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
+# # # out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+# # out_path = f&#39;/home/abenneck/Desktop/yolo_model/{out_fname}_instance&#39;
+# # # np.save(out_path, out)
+
+# # print(f&#39;Saved the outputs for image {idx}/{len(os.listdir(img_dir))} in {time.time()-start_total:.2f}s\n&#39;)
+# # start_total = time.time()
+<br/></pre></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -388,24 +423,53 @@ executing.executing.NotOneValueFound: Expected one value, found 0
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">FileNotFoundError</span>                         Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[7], line 4</span>
-<span class="ansi-green-intense-fg ansi-bold">      2</span> out_fname <span style="color: rgb(98,98,98)">=</span> (img_path<span style="color: rgb(98,98,98)">.</span>split(<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">/</span><span style="color: rgb(175,0,0)">&#39;</span>)[<span style="color: rgb(98,98,98)">-</span><span style="color: rgb(98,98,98)">1</span>])<span style="color: rgb(98,98,98)">.</span>split(<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">.</span><span style="color: rgb(175,0,0)">&#39;</span>)[<span style="color: rgb(98,98,98)">0</span>] <span style="color: rgb(98,98,98)">+</span> <span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">.npy</span><span style="color: rgb(175,0,0)">&#39;</span>
-<span class="ansi-green-intense-fg ansi-bold">      3</span> out_path <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>out_fname<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>
-<span class="ansi-green-fg">----&gt; 4</span> data <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">np</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">load</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">out_path</span><span class="ansi-yellow-bg">)</span>
-<span class="ansi-green-intense-fg ansi-bold">      5</span> data <span style="color: rgb(98,98,98)">=</span> torch<span style="color: rgb(98,98,98)">.</span>Tensor(data)
-<span class="ansi-green-intense-fg ansi-bold">      7</span> <span style="color: rgb(95,135,135)"># data_t = data.transpose((1,2,0))</span>
-
-File <span class="ansi-green-fg">~/.local/lib/python3.10/site-packages/numpy/lib/npyio.py:427</span>, in <span class="ansi-cyan-fg">load</span><span class="ansi-blue-fg">(file, mmap_mode, allow_pickle, fix_imports, encoding, max_header_size)</span>
-<span class="ansi-green-intense-fg ansi-bold">    425</span>     own_fid <span style="color: rgb(98,98,98)">=</span> <span class="ansi-bold" style="color: rgb(0,135,0)">False</span>
-<span class="ansi-green-intense-fg ansi-bold">    426</span> <span class="ansi-bold" style="color: rgb(0,135,0)">else</span>:
-<span class="ansi-green-fg">--&gt; 427</span>     fid <span style="color: rgb(98,98,98)">=</span> stack<span style="color: rgb(98,98,98)">.</span>enter_context(<span class="ansi-yellow-bg" style="color: rgb(0,135,0)">open</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">os_fspath</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">file</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#34;</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">rb</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#34;</span><span class="ansi-yellow-bg">)</span>)
-<span class="ansi-green-intense-fg ansi-bold">    428</span>     own_fid <span style="color: rgb(98,98,98)">=</span> <span class="ansi-bold" style="color: rgb(0,135,0)">True</span>
-<span class="ansi-green-intense-fg ansi-bold">    430</span> <span style="color: rgb(95,135,135)"># Code to distinguish from NumPy binary files and pickles.</span>
-
-<span class="ansi-red-fg">FileNotFoundError</span>: [Errno 2] No such file or directory: &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/section_000197_30800.npy&#39;
+Finished preprocessing in 2.53s
+Finished extracting all tiles in 6.94s
 </pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># img_up = preprocess(img)
+# pads = (np.array(padded_img.shape) - np.array(img_up.shape))/2
+# pads
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+array([53., 87.])
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># nrow_t = tiles[0][&#39;c_idx&#39;]+1
+# ncol_t = tiles[0][&#39;r_idx&#39;]+1
+
+# # for idx, tile in enumerate(tiles):
+# #     p = tile[&#39;p&#39;]
+
+# #     if (p[0]-pads[0])/2 &lt; 4000 and (p[0]-pads[0])/2 &gt; 3900 and (p[1]-pads[1])/2 &lt; 5100 and (p[1]-pads[1])/2 &gt; 5000:
+# #         print(idx)
+# #         # break
+
+# idx_start = 2727
+# fig, ax = plt.subplots(8,1)
+# for idx in range(8):
+#     p = tiles[idx_start+idx][&#39;p&#39;]
+#     ax[idx].imshow(tiles[idx_start + idx][&#39;img&#39;])
+#     ax[idx].set_title(f&#39;p: {(p[0]-pads[0])/2}, {(p[1]-pads[1])/2}&#39;)
+
+# fig.set_size_inches(4,32)
+</pre></div>
+</div>
 </div>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
@@ -498,7 +562,7 @@ Finished entire image in 64.55s
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_pipeline_11_1.png" src="../_images/notebooks_yolo_pipeline_11_1.png" />
+<img alt="../_images/notebooks_yolo_pipeline_13_1.png" src="../_images/notebooks_yolo_pipeline_13_1.png" />
 </div>
 </div>
 </section>
@@ -626,49 +690,49 @@ Skipping batch 3/77
 Skipping batch 4/77
 Skipping batch 5/77
 Skipping batch 6/77
-Finished batch 7/77 in 1.87s
-Finished batch 8/77 in 2.35s
-Finished batch 9/77 in 2.28s
-Finished batch 10/77 in 2.26s
-Finished batch 11/77 in 2.30s
-Finished batch 12/77 in 2.29s
-Finished batch 13/77 in 2.28s
-Finished batch 14/77 in 2.25s
-Finished batch 15/77 in 2.34s
-Finished batch 16/77 in 2.22s
-Finished batch 17/77 in 2.39s
-Finished batch 18/77 in 2.24s
-Finished batch 19/77 in 2.33s
-Finished batch 20/77 in 2.28s
-Finished batch 21/77 in 2.27s
-Finished batch 22/77 in 2.43s
-Finished batch 23/77 in 2.40s
-Finished batch 24/77 in 2.34s
-Finished batch 25/77 in 2.37s
-Finished batch 26/77 in 2.40s
-Finished batch 27/77 in 2.33s
-Finished batch 28/77 in 2.36s
-Finished batch 29/77 in 2.33s
-Finished batch 30/77 in 2.31s
-Finished batch 31/77 in 2.31s
-Finished batch 32/77 in 2.31s
-Finished batch 33/77 in 2.36s
-Finished batch 34/77 in 2.22s
-Finished batch 35/77 in 2.35s
-Finished batch 36/77 in 2.39s
-Finished batch 37/77 in 2.45s
-Finished batch 38/77 in 2.31s
-Finished batch 39/77 in 2.26s
-Finished batch 40/77 in 2.34s
-Finished batch 41/77 in 2.37s
-Finished batch 42/77 in 2.32s
-Finished batch 43/77 in 2.38s
-Finished batch 44/77 in 2.36s
-Finished batch 45/77 in 2.26s
-Finished batch 46/77 in 2.25s
-Finished batch 47/77 in 2.31s
-Finished batch 48/77 in 2.29s
-Finished batch 49/77 in 2.35s
+Finished batch 7/77 in 1.74s
+Finished batch 8/77 in 2.06s
+Finished batch 9/77 in 2.07s
+Finished batch 10/77 in 2.20s
+Finished batch 11/77 in 2.19s
+Finished batch 12/77 in 2.13s
+Finished batch 13/77 in 2.08s
+Finished batch 14/77 in 2.10s
+Finished batch 15/77 in 2.06s
+Finished batch 16/77 in 2.12s
+Finished batch 17/77 in 2.17s
+Finished batch 18/77 in 2.14s
+Finished batch 19/77 in 2.14s
+Finished batch 20/77 in 2.11s
+Finished batch 21/77 in 2.12s
+Finished batch 22/77 in 2.10s
+Finished batch 23/77 in 2.16s
+Finished batch 24/77 in 2.13s
+Finished batch 25/77 in 2.16s
+Finished batch 26/77 in 2.14s
+Finished batch 27/77 in 2.04s
+Finished batch 28/77 in 2.14s
+Finished batch 29/77 in 2.12s
+Finished batch 30/77 in 2.07s
+Finished batch 31/77 in 2.19s
+Finished batch 32/77 in 2.25s
+Finished batch 33/77 in 2.06s
+Finished batch 34/77 in 2.14s
+Finished batch 35/77 in 2.09s
+Finished batch 36/77 in 2.06s
+Finished batch 37/77 in 2.10s
+Finished batch 38/77 in 2.23s
+Finished batch 39/77 in 2.09s
+Finished batch 40/77 in 2.18s
+Finished batch 41/77 in 2.16s
+Finished batch 42/77 in 2.14s
+Finished batch 43/77 in 2.14s
+Finished batch 44/77 in 2.18s
+Finished batch 45/77 in 2.19s
+Finished batch 46/77 in 2.21s
+Finished batch 47/77 in 2.18s
+Finished batch 48/77 in 2.27s
+Finished batch 49/77 in 2.19s
 Skipping batch 50/77
 Skipping batch 51/77
 Skipping batch 52/77
@@ -696,23 +760,23 @@ Skipping batch 73/77
 Skipping batch 74/77
 Skipping batch 75/77
 Skipping batch 76/77
-Finished postprocessing in 0.24s
-Finished ALL batches in 100.21s
+Finished postprocessing in 0.25s
+Finished ALL batches in 92.32s
 
 Applying model to tiles . . .
-Finished tiles 0:1100/5082 in 3.14s
-Finished tiles 1100:1300/5082 in 1.61s
-Finished tiles 1300:1500/5082 in 1.65s
+Finished tiles 0:1100/5082 in 3.12s
+Finished tiles 1100:1300/5082 in 1.63s
+Finished tiles 1300:1500/5082 in 1.63s
 Finished tiles 1500:1600/5082 in 0.58s
-Finished tiles 1600:1800/5082 in 1.83s
-Finished tiles 1800:2000/5082 in 1.97s
-Finished tiles 2000:2200/5082 in 2.05s
-Finished tiles 2200:2400/5082 in 1.98s
-Finished tiles 2400:2600/5082 in 1.87s
+Finished tiles 1600:1800/5082 in 1.85s
+Finished tiles 1800:2000/5082 in 1.99s
+Finished tiles 2000:2200/5082 in 2.06s
+Finished tiles 2200:2400/5082 in 1.99s
+Finished tiles 2400:2600/5082 in 1.86s
 Finished tiles 2600:2800/5082 in 1.74s
-Finished tiles 2800:3000/5082 in 1.55s
-Finished tiles 3000:3200/5082 in 1.25s
-Finished applying model to entire image in 21.61s with 1264/5082 (0.249) tiles marked as foreground
+Finished tiles 2800:3000/5082 in 1.58s
+Finished tiles 3000:3200/5082 in 1.24s
+Finished applying model to entire image in 21.65s with 1264/5082 (0.249) tiles marked as foreground
 Postprocessing . . .
 </pre></div></div>
 </div>
@@ -721,7 +785,7 @@ Postprocessing . . .
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-/tmp/ipykernel_1064076/4064794034.py:53: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/tmp/ipykernel_3419949/4064794034.py:53: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   out = torch.tensor(out.clone().detach(), dtype=torch.float32)
 </pre></div></div>
 </div>
@@ -730,13 +794,13 @@ Postprocessing . . .
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Finished postprocessing in 0.24s
-Finished ALL tiles in 21.93s
+Finished postprocessing in 0.22s
+Finished ALL tiles in 21.95s
 
 </pre></div></div>
 </div>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def tiles_to_orig(tiles, pads):
@@ -749,7 +813,7 @@ Finished ALL tiles in 21.93s
         c_idx = tile[&#39;c_idx&#39;]
 
         # Shift the anchor point by the padded amount on each ax
-        # p -= pads
+        p -= pads
 
         # Reduce anchor point by upsampling factor
         p = np.asarray(p)/2
@@ -762,13 +826,13 @@ Finished ALL tiles in 21.93s
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start = time.time()
 
 plotBbox = True
-addTiles = False
+addTiles = True
 setBounds = True
 
 img_idx = 500
@@ -789,9 +853,9 @@ if addTiles:
         p = tile[&#39;p&#39;]
         bg = tile[&#39;bg&#39;]
         color = &#39;k&#39; if bg else &#39;w&#39;
-        rec = Rectangle(p[::-1],tile_dim,tile_dim, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.25)
+        rec = Rectangle(p[::-1],tile_dim/2,tile_dim/2, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.05)
         ax[0].add_patch(rec)
-        rec = Rectangle(p[::-1],tile_dim,tile_dim, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.25)
+        rec = Rectangle(p[::-1],tile_dim/2,tile_dim/2, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.05)
         ax[1].add_patch(rec)
     print(f&#39;Finished plotting tiles in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
 
@@ -806,7 +870,10 @@ if plotBbox:
 
     start = time.time()
     scores = recon_tile[:,:,-4].ravel()
-    predicted_rectangles = bb_to_rec(recon_tile,fc=&#39;none&#39;,ec=&#39;lime&#39;,alpha=scores)
+    ec = [&#39;red&#39; if s==0 else &#39;lime&#39; for s in scores]
+    scores = [1 if s==0 else s for s in scores]
+    # ec = &#39;lime&#39;
+    predicted_rectangles = bb_to_rec(recon_tile,fc=&#39;none&#39;,ec=ec,alpha=scores)
     ax[1].add_collection(predicted_rectangles)
     ax[1].set_title(f&#39;recon_tile: {len(scores)} predictions&#39;)
     print(f&#39;Finished plotting bboxes1 in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
@@ -815,8 +882,8 @@ if setBounds:
     for ax_i in ax:
         ax_i.set_xlim([3900,4000])
         ax_i.set_ylim([5100,5000])
-        # ax_i.set_xlim([0,200])
-        # ax_i.set_ylim([200,0])
+        # ax_i.set_xlim([7300,7400])
+        # ax_i.set_ylim([8600,8500])
 
 # ax[0].set_xlim([4000,4100])
 # ax[0].set_ylim([6200,6100])
@@ -836,33 +903,78 @@ fig.canvas.draw()
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
+Adding tiles . . .
+Finished plotting tiles in 4.35s, 3935136 boxes present
 Plotting bboxes . . .
-Finished plotting bboxes0 in 73.11s, 3935136 boxes present
-Finished plotting bboxes1 in 62.41s, 3935136 boxes present
-Finished entire image in 62.42s
+Finished plotting bboxes0 in 74.71s, 3935136 boxes present
+Finished plotting bboxes1 in 151.20s, 3935136 boxes present
+Finished entire image in 151.21s
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_pipeline_18_1.png" src="../_images/notebooks_yolo_pipeline_18_1.png" />
+<img alt="../_images/notebooks_yolo_pipeline_20_1.png" src="../_images/notebooks_yolo_pipeline_20_1.png" />
 </div>
 </div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>torch.sigmoid(torch.Tensor([-np.inf, -1000, -100, -89, -88]))
 </pre></div>
 </div>
 </div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+tensor([0., 0., 0., 0.])
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img_plot.shape
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+(8587, 7321)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fig,ax = plt.subplots()
+ax.imshow(img_plot)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;matplotlib.image.AxesImage at 0x725e9c306380&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_pipeline_23_1.png" src="../_images/notebooks_yolo_pipeline_23_1.png" />
 </div>
 </div>
 </section>
