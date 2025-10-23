@@ -253,7 +253,7 @@ def apply_model_to_tiles(tiles, model_path, img_dim0, img_dim1, out_path='', bat
     Parameters:
     -----------
     tiles : list(dict)
-        A list containing all the tiles which comprise 'padded_img'. Each element is a dictionary containing 5 values: (1) The pixel values of the tile, (2) The anchor point for the tile used in reconstruction, (3) A boolean which defines the tile as background or foreground, (4) The row idx of the tile in the whole iamge, and (5) The col idx of the tile in the whole iamge
+        A list containing all the tiles which comprise 'padded_img'. Each element is a dictionary containing 5 values: (1) The pixel values of the tile, (2) The anchor point for the tile used in reconstruction, (3) A boolean which defines the tile as background or foreground, (4) The row idx of the tile in the whole image, and (5) The col idx of the tile in the whole iamge
     model_path : str
         The location of the weights for the pretrained model
     img_dim0 : int
@@ -282,6 +282,7 @@ def apply_model_to_tiles(tiles, model_path, img_dim0, img_dim1, out_path='', bat
     net.eval()
     B = net.B
     stride = net.stride
+    conf_idx = -4
     
     # Define dimensions of the input image
     if len(np.shape(tiles[0]['img'])) == 3:
@@ -299,7 +300,9 @@ def apply_model_to_tiles(tiles, model_path, img_dim0, img_dim1, out_path='', bat
     ds_factor = 8
     bbox_dim = 5
     num_classes = 3
-    recon = np.zeros((bbox_dim*B+num_classes, int(img_dim0/ds_factor), int(img_dim1/ds_factor)))
+    # recon = np.zeros((bbox_dim*B+num_classes, int(img_dim0/ds_factor), int(img_dim1/ds_factor)))
+    # (10/17/25) Now conf of background bboxes will be 0 after postprocessing
+    recon = np.ones((bbox_dim*B+num_classes, int(img_dim0/ds_factor), int(img_dim1/ds_factor)))*(-np.inf)
 
     non_bg_tile = 0
 
@@ -348,7 +351,14 @@ def apply_model_to_tiles(tiles, model_path, img_dim0, img_dim1, out_path='', bat
                 out = remove_bbox_in_overlap(out, B, stride, tile_dim, boundary_cond = boundary_cond)
                 
                 # Append model output to reconstruction
-                recon[:,int(p[0]/ds_factor):int((p[0]+tile_dim)/ds_factor), int(p[1]/ds_factor):int((p[1]+tile_dim)/ds_factor)] = out[0].detach().numpy()
+                tile_out = out[0].detach().numpy()
+                # tile_out_NMS = NMS_tile(tile_out)
+                t0_start = int(p[0]/ds_factor)
+                t0_end = int((p[0]+tile_dim)/ds_factor)
+                t1_start = int(p[1]/ds_factor)
+                t1_end = int((p[1]+tile_dim)/ds_factor)
+                recon[:, t0_start:t0_end, t1_start:t1_end] = np.where(tile_out[-4,:,:] > recon[-4, t0_start:t0_end, t1_start:t1_end], tile_out, recon[:, t0_start:t0_end, t1_start:t1_end])
+                # recon[:,int(p[0]/ds_factor):int((p[0]+tile_dim)/ds_factor), int(p[1]/ds_factor):int((p[1]+tile_dim)/ds_factor)] = out[0].detach().numpy()
     
                 non_bg_tile += 1
                 if verbose and idx % 100 == 0:
