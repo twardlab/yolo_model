@@ -1,7 +1,7 @@
 YOLO tile mode Functions:
 ===============================
 
-.. automodule:: ds_yolo_output
+.. automodule:: yolo_tiles
    :members:
    :undoc-members:
    :show-inheritance:

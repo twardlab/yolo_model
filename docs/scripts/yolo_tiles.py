@@ -352,7 +352,7 @@ def apply_model_to_tiles(tiles, model_path, img_dim0, img_dim1, out_path='', bat
                 
                 # Append model output to reconstruction
                 tile_out = out[0].detach().numpy()
-                # tile_out_NMS = NMS_tile(tile_out)
+                # tile_out = NMS_tile(tile_out)
                 t0_start = int(p[0]/ds_factor)
                 t0_end = int((p[0]+tile_dim)/ds_factor)
                 t1_start = int(p[1]/ds_factor)
