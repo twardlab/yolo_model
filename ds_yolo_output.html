@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>YOLO tile mode Functions: &#8212; yolo_model  documentation</title>
+    <title>Downsample YOLO Outputs: &#8212; yolo_model  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/nature.css?v=279e0f84" />
     <script src="_static/documentation_options.js?v=5929fcd5"></script>
@@ -33,7 +33,7 @@
           <a href="yolo_tiles.html" title="YOLO tile mode Functions:"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">yolo_model  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">YOLO tile mode Functions:</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Downsample YOLO Outputs:</a></li> 
       </ul>
     </div>  
 
@@ -42,186 +42,62 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="module-yolo_tiles">
-<span id="yolo-tile-mode-functions"></span><h1>YOLO tile mode Functions:<a class="headerlink" href="#module-yolo_tiles" title="Link to this heading">¶</a></h1>
+  <section id="module-ds_yolo_output">
+<span id="downsample-yolo-outputs"></span><h1>Downsample YOLO Outputs:<a class="headerlink" href="#module-ds_yolo_output" title="Link to this heading">¶</a></h1>
 <dl class="py function">
-<dt class="sig sig-object py" id="yolo_tiles.apply_model_to_tiles">
-<span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">apply_model_to_tiles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tiles</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_dim0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_dim1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.apply_model_to_tiles" title="Link to this definition">¶</a></dt>
-<dd><p>Apply a pretrained YOLO model to each element of ‘tiles’. Stitch together each of these model outputs in order to create a processed version of the original (padded) input image. Save this reconstructed output at ‘out_path’.</p>
-<section id="parameters">
-<h2>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>tiles<span class="classifier">list(dict)</span></dt><dd><p>A list containing all the tiles which comprise ‘padded_img’. Each element is a dictionary containing 5 values: (1) The pixel values of the tile, (2) The anchor point for the tile used in reconstruction, (3) A boolean which defines the tile as background or foreground, (4) The row idx of the tile in the whole image, and (5) The col idx of the tile in the whole iamge</p>
+<dt class="sig sig-object py" id="ds_yolo_output.downsample_yolo_output">
+<span class="sig-prename descclassname"><span class="pre">ds_yolo_output.</span></span><span class="sig-name descname"><span class="pre">downsample_yolo_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fpath</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ds_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ds_yolo_output.downsample_yolo_output" title="Link to this definition">¶</a></dt>
+<dd><p>Downsample the output from our custom YOLO pipeline.
+The tensor stored in the input file (.npy) will be downsampled ‘n’ times by a factor of ds_factor</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fpath</strong> (<em>str</em>) – The location of the file to be downsampled; Must be one of the .npy files output from the YOLO pipeline</p></li>
+<li><p><strong>n</strong> (<em>int</em>) – The number of times to downsample the image by ‘ds_factor’; For n=0, the bbox coordinate values will be replaced by their area.</p></li>
+<li><p><strong>ds_factor</strong> (<em>int</em>) – Default - 2; The downsampling factor for 1 iteration of downsampling</p></li>
+<li><p><strong>outdir</strong> (<em>str</em>) – Default - None; If None, don’t save the output. Else, the directory where the output will be saved</p></li>
+</ul>
 </dd>
-<dt>model_path<span class="classifier">str</span></dt><dd><p>The location of the weights for the pretrained model</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>out</strong> – The downsampled version of the original input file</p>
 </dd>
-<dt>img_dim0<span class="classifier">int</span></dt><dd><p>The size of the input image along axis 0; Used for reconstruction</p>
-</dd>
-<dt>img_dim1<span class="classifier">int</span></dt><dd><p>The size of the input image along axis 1; Used for reconstruction</p>
-</dd>
-<dt>out_path<span class="classifier">str</span></dt><dd><p>Default - ‘’; If no argument is passed, the output will only exist in memory and will not be saved. The location and fname of where the reconstructed output should be saved</p>
-</dd>
-<dt>batch_mode<span class="classifier">bool</span></dt><dd><p>Default - False; If True, apply the model to a batch of tiles instead of a single tile</p>
-</dd>
-<dt>verbose<span class="classifier">bool</span></dt><dd><p>Default - False; If True, print out intermediate and final progress notes</p>
-</dd>
-</dl>
-</section>
-<section id="returns">
-<h2>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>recon<span class="classifier">torch.Tensor()</span></dt><dd><p>The reconstructed model output where each element corresponds to a specific pixel in the original image. The 13 values in each element of the reconstruction ([cx0, cy0, w0, h0, conf0, cx1, cy1, w1, h1, conf1, cl0, cl1, cl2]) can be interpreted as follows. There are 2 predicted bounding boxes centered at (cx0, cy0) and (cx1,cy1) with their corresponding width, height, and confidence values defined by (w0, h0, conf0) and (w1, h1, conf1), respectively. cl0, cl1, and cl2 are the class probabilities and define the likelihood that a cell can be categorized as having a smooth, sharp, or bumpy boundary, respectively.</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray of float32</p>
 </dd>
 </dl>
-</section>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="yolo_tiles.count_bbox">
-<span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">count_bbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.count_bbox" title="Link to this definition">¶</a></dt>
-<dd><p>Count the number of bounding boxes output by the YOLO model.</p>
-<section id="id1">
-<h2>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>out<span class="classifier">torch.Tensor</span></dt><dd><p>The unprocessed output from the YOLO model</p>
-</dd>
-</dl>
-</section>
-<section id="id2">
-<h2>Returns:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>n0<span class="classifier">int</span></dt><dd><p>The number of bounding boxes found in the YOLO model output</p>
-</dd>
-</dl>
-</section>
+<dt class="sig sig-object py" id="ds_yolo_output.ds_outputs_to_orig_format">
+<span class="sig-prename descclassname"><span class="pre">ds_yolo_output.</span></span><span class="sig-name descname"><span class="pre">ds_outputs_to_orig_format</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Ad</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Pd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Fd</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ds_yolo_output.ds_outputs_to_orig_format" title="Link to this definition">¶</a></dt>
+<dd><p>A helper function for stacking the downsampled arrays back into the format to be saved as an .npy file</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="yolo_tiles.img_to_tiles">
-<span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">img_to_tiles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_overlap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tile_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">upper_threshold_bg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lower_threshold_bg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.img_to_tiles" title="Link to this definition">¶</a></dt>
-<dd><p>Convert an image into a set of tiles. Tiles will be of the shape [tile_dim, tile_dim, :] and overlap with each adjacent tile by ‘min_overlap’ pixels.</p>
-<section id="id3">
-<h2>Parameters:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>img<span class="classifier">np.array of size [N, M]</span></dt><dd><p>The image from which tiles will be extracted</p>
-</dd>
-<dt>outdir<span class="classifier">str</span></dt><dd><p>Default - ‘’; The location where tiles should be saved. If none supplied, tiles won’t be saved in a .npz file, just returned by this function</p>
-</dd>
-<dt>min_overlap<span class="classifier">int</span></dt><dd><p>Default - 32; The number of overlapping pixels between 2 adjacent tiles</p>
-</dd>
-<dt>tile_dim<span class="classifier">int</span></dt><dd><p>Default - 256; The length of a tile along each axis</p>
-</dd>
-<dt>upper_threshold_bg<span class="classifier">int</span></dt><dd><p>Default - inf; If the 95th percentile of a tile is &gt;= this value, mark it as background. If a value is supplied, it will be used as the padding for the image</p>
-</dd>
-<dt>lower_threshold_bg<span class="classifier">int</span></dt><dd><p>Default - -inf;  If the 95th percentile of a tile is &lt;= this value, mark it as background. If a value is supplied, it will be used as the padding for the image</p>
-</dd>
-<dt>verbose<span class="classifier">bool</span></dt><dd><p>Default - False; If True, print out intermediate and final progress notes</p>
-</dd>
-</dl>
-</section>
-<section id="id4">
-<h2>Returns:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>padded_img<span class="classifier">np.array of size [N*, M*]</span></dt><dd><p>The original image padded along all 4 sides with either 0 or the supplied background threshold value. This image is intended to be pushed through the rest of the YOLO tile pipeline.</p>
-</dd>
-<dt>tiles<span class="classifier">list(dict)</span></dt><dd><p>A list containing all the tiles which comprise ‘padded_img’. Each element is a dictionary containing 5 values: (1) The pixel values of the tile, (2) The anchor point for the tile used in reconstruction, (3) A boolean which defines the tile as background or foreground, (4) The row idx of the tile in the whole iamge, and (5) The col idx of the tile in the whole iamge</p>
-</dd>
-</dl>
-</section>
+<dt class="sig sig-object py" id="ds_yolo_output.orig_format_to_ds_outputs">
+<span class="sig-prename descclassname"><span class="pre">ds_yolo_output.</span></span><span class="sig-name descname"><span class="pre">orig_format_to_ds_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ds_yolo_output.orig_format_to_ds_outputs" title="Link to this definition">¶</a></dt>
+<dd><p>A helper function for breaking down the stacked arrays back into the intermediate outputs from downsampling - Ad, Pd, and Fd</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="yolo_tiles.load_test_image">
-<span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">load_test_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img_dim0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">img_dim1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spacing</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">16</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.load_test_image" title="Link to this definition">¶</a></dt>
-<dd><p>Generate an artificial image simulating bright cells on a dark background</p>
-<section id="id5">
-<h2>Parameters:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>img_dim0<span class="classifier">float</span></dt><dd><p>The desired size of the test image along axis 0</p>
+<dt class="sig sig-object py" id="ds_yolo_output.plot_yolo_outputs">
+<span class="sig-prename descclassname"><span class="pre">ds_yolo_output.</span></span><span class="sig-name descname"><span class="pre">plot_yolo_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ds_yolo_output.plot_yolo_outputs" title="Link to this definition">¶</a></dt>
+<dd><p>Generate a set of 4 plots visualizing the downsampled output.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>out</strong> (<em>ndarray</em><em> of </em><em>shape</em><em> (</em><em>R</em><em>, </em><em>C</em><em>, </em><em>5</em><em>)</em>) – The downsampled YOLO output</p></li>
+<li><p><strong>n</strong> (<em>int</em>) – The number of times ‘out’ was downsampled from the original</p></li>
+</ul>
 </dd>
-<dt>img_dim1<span class="classifier">float</span></dt><dd><p>The desired size of the test image along axis 1</p>
-</dd>
-<dt>spacing<span class="classifier">int</span></dt><dd><p>Default - 16; The distance between 2 adjacent simulated cells</p>
-</dd>
-<dt>r<span class="classifier">int</span></dt><dd><p>Default - 4; The radius of a simulated cell</p>
-</dd>
-</dl>
-</section>
-<section id="id6">
-<h2>Returns:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>img<span class="classifier">np.array of size [imgdim0, imgdim1]</span></dt><dd><p>The test image</p>
-</dd>
-<dt>total_bbox<span class="classifier">int</span></dt><dd><p>The numbe of simulated cells in the test image</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>fig</strong> (<em>matplotlib.pyplot.figure</em>) – The figure obhect visualizing the 4 subplots</p></li>
+<li><p><strong>ax</strong> (<em>matplotlib.pyplot.axes</em>) – The axes object containing the 4 subplots</p></li>
+</ul>
+</p>
 </dd>
 </dl>
-</section>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="yolo_tiles.preprocess">
-<span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">preprocess</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">img</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gamma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">upsample</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.preprocess" title="Link to this definition">¶</a></dt>
-<dd><p>Prepare an image for the YOLO tile pipeline by normalization, a gamma correction, and upsampling by a factor of 2</p>
-<section id="id7">
-<h2>Parameters:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>img<span class="classifier">array of shape [N,M]</span></dt><dd><p>A microscopy image of tissue stained for nuclei</p>
-</dd>
-<dt>gamma<span class="classifier">bool</span></dt><dd><p>Default - True; If True, apply a gamma correction where the gamma value is 1/2</p>
-</dd>
-<dt>upsample<span class="classifier">bool</span></dt><dd><p>Default - True; If True, upsampled the image by a factor of 2</p>
-</dd>
-</dl>
-</section>
-<section id="id8">
-<h2>Returns:<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>img_up<span class="classifier">array of shape [N*2, M*2]</span></dt><dd><p>A normalized, gamma corrected, upsampled version of the input image</p>
-</dd>
-</dl>
-</section>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="yolo_tiles.remove_bbox_in_overlap">
-<span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">remove_bbox_in_overlap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tile_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_cond</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[16,</span> <span class="pre">16]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.remove_bbox_in_overlap" title="Link to this definition">¶</a></dt>
-<dd><p>Remove bounding boxes that lie in the exclusion zone defined by ‘boundary_cond’ from the model output before appending to reconstruction.</p>
-<section id="id9">
-<h2>Parameters:<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>out<span class="classifier">torch.Tensor of shape [13, tile_dim/stride, tile_im/stride]</span></dt><dd><p>The output from the YOLO model after processing a tile_dim x tile_dim image.</p>
-</dd>
-<dt>B<span class="classifier">int</span></dt><dd><p>the number of target classes used in the YOLO model</p>
-</dd>
-<dt>stride<span class="classifier">int</span></dt><dd><p>The nmuber of pixels the kernel moves during each step of the YOLO model</p>
-</dd>
-<dt>tile_dim<span class="classifier">int</span></dt><dd><p>The dimensions of a tile extracted from the original image</p>
-</dd>
-<dt>boundary_cond<span class="classifier">np.array(int)</span></dt><dd><p>The thickness of the exclusion zones along each axis</p>
-</dd>
-</dl>
-</section>
-<section id="id10">
-<h2>Returns:<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>out<span class="classifier">torch.Tensor of shape [13, tile_dim/stride, tile_im/stride]</span></dt><dd><p>The original output from the model, but now bboxes that don’t meet the filtering criterion have a confidence of -inf.</p>
-</dd>
-</dl>
-</section>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="yolo_tiles.tileDataset">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_tiles.</span></span><span class="sig-name descname"><span class="pre">tileDataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tiles</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_tiles.tileDataset" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></p>
-<p>Used to initialize a custom DataLoader for applying the model to tiles in batch mode instead of individually.</p>
-<section id="id11">
-<h2>Parameters:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h2>
-<dl class="simple">
-<dt>tiles<span class="classifier">list of dict</span></dt><dd><p>A list of dictionaries where each element contains the pixel values and meta-data for a single tile. This is the ‘tiles’ object output from the function img_to_tiles(…)</p>
-</dd>
-</dl>
-</section>
 </dd></dl>
 
 </section>
@@ -236,14 +112,11 @@
   <div>
     <h3><a href="index.html">Table of Contents</a></h3>
     <ul>
-<li><a class="reference internal" href="#">YOLO tile mode Functions:</a><ul>
-<li><a class="reference internal" href="#yolo_tiles.apply_model_to_tiles"><code class="docutils literal notranslate"><span class="pre">apply_model_to_tiles()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_tiles.count_bbox"><code class="docutils literal notranslate"><span class="pre">count_bbox()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_tiles.img_to_tiles"><code class="docutils literal notranslate"><span class="pre">img_to_tiles()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_tiles.load_test_image"><code class="docutils literal notranslate"><span class="pre">load_test_image()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_tiles.preprocess"><code class="docutils literal notranslate"><span class="pre">preprocess()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_tiles.remove_bbox_in_overlap"><code class="docutils literal notranslate"><span class="pre">remove_bbox_in_overlap()</span></code></a></li>
-<li><a class="reference internal" href="#yolo_tiles.tileDataset"><code class="docutils literal notranslate"><span class="pre">tileDataset</span></code></a></li>
+<li><a class="reference internal" href="#">Downsample YOLO Outputs:</a><ul>
+<li><a class="reference internal" href="#ds_yolo_output.downsample_yolo_output"><code class="docutils literal notranslate"><span class="pre">downsample_yolo_output()</span></code></a></li>
+<li><a class="reference internal" href="#ds_yolo_output.ds_outputs_to_orig_format"><code class="docutils literal notranslate"><span class="pre">ds_outputs_to_orig_format()</span></code></a></li>
+<li><a class="reference internal" href="#ds_yolo_output.orig_format_to_ds_outputs"><code class="docutils literal notranslate"><span class="pre">orig_format_to_ds_outputs()</span></code></a></li>
+<li><a class="reference internal" href="#ds_yolo_output.plot_yolo_outputs"><code class="docutils literal notranslate"><span class="pre">plot_yolo_outputs()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -296,7 +169,7 @@
           <a href="yolo_tiles.html" title="YOLO tile mode Functions:"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">yolo_model  documentation</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href="">YOLO tile mode Functions:</a></li> 
+        <li class="nav-item nav-item-this"><a href="">Downsample YOLO Outputs:</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">

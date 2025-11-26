@@ -1,7 +1,7 @@
-YOLO tile mode Functions:
+Downsample YOLO Outputs:
 ===============================
 
-.. automodule:: yolo_tiles
+.. automodule:: ds_yolo_output
    :members:
    :undoc-members:
    :show-inheritance:
