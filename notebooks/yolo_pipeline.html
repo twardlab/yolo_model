@@ -205,35 +205,48 @@ Old bb count 1181616 vs New bb count 4618656
 </div>
 <section id="Real-Data-Processing">
 <h3>Real Data Processing<a class="headerlink" href="#Real-Data-Processing" title="Link to this heading">¶</a></h3>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
 # model_path = &#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854/modelsave.pt&#39;
 net = Net()
 net.load_state_dict(torch.load(model_path))
+
+img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v04/&#39;
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-&lt;All keys matched successfully&gt;
-</pre></div></div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Generate the .npz metadata file for the whole dataset
+img_path = os.path.join(img_dir, os.listdir(img_dir)[0])
+img = tifffile.imread(img_path)
+
+fname_meta = os.path.join(outdir, os.path.split(img_dir)[-1] + &#39;_metadata.npz&#39;)
+np.savez(fname_meta,
+         nrow = img.shape[0],
+         ncol = img.shape[1],
+         nslice = len(os.listdir(img_dir)),
+         drow = 7.464,
+         dcol = 7.464,
+         dslice = 2.0)
+
+# data = np.load(fname_meta)
+# print([k for k in data])
+</pre></div>
+</div>
 </div>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load a target image
-start_total = time.time()
-img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
-outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v04/&#39;
-next_idx = 3202
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start_total = time.time()
+# next_idx = 3202
 
 net = Net()
 B = net.B
@@ -7705,7 +7718,7 @@ Finished entire image in 64.55s
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_pipeline_13_1.png" src="../_images/notebooks_yolo_pipeline_13_1.png" />
+<img alt="../_images/notebooks_yolo_pipeline_14_1.png" src="../_images/notebooks_yolo_pipeline_14_1.png" />
 </div>
 </div>
 </section>
@@ -7979,7 +7992,7 @@ Finished entire image in 192.88s
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_pipeline_20_1.png" src="../_images/notebooks_yolo_pipeline_20_1.png" />
+<img alt="../_images/notebooks_yolo_pipeline_21_1.png" src="../_images/notebooks_yolo_pipeline_21_1.png" />
 </div>
 </div>
 </section>
@@ -8139,7 +8152,7 @@ Finished postprocessing in 0.00s
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_pipeline_23_2.png" src="../_images/notebooks_yolo_pipeline_23_2.png" />
+<img alt="../_images/notebooks_yolo_pipeline_24_2.png" src="../_images/notebooks_yolo_pipeline_24_2.png" />
 </div>
 </div>
 <div class="nbinput docutils container">
@@ -8222,7 +8235,7 @@ Text(0.5, 1.0, &#39;bbox confidence&#39;)
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_pipeline_27_1.png" src="../_images/notebooks_yolo_pipeline_27_1.png" />
+<img alt="../_images/notebooks_yolo_pipeline_28_1.png" src="../_images/notebooks_yolo_pipeline_28_1.png" />
 </div>
 </div>
 </section>

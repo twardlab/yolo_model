@@ -201,28 +201,44 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 2,
+   "execution_count": 3,
    "id": "aa02f21d-d062-46de-ba37-55002748a4b4",
    "metadata": {
     "scrolled": true
    },
-   "outputs": [
-    {
-     "data": {
-      "text/plain": [
-       "<All keys matched successfully>"
-      ]
-     },
-     "execution_count": 2,
-     "metadata": {},
-     "output_type": "execute_result"
-    }
-   ],
+   "outputs": [],
    "source": [
     "model_path = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt'\n",
     "# model_path = '/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854/modelsave.pt'\n",
     "net = Net()\n",
-    "net.load_state_dict(torch.load(model_path))"
+    "net.load_state_dict(torch.load(model_path))\n",
+    "\n",
+    "img_dir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched'\n",
+    "outdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v04/'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "27463416-8fb0-445d-a213-9174ae753e51",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Generate the .npz metadata file for the whole dataset\n",
+    "img_path = os.path.join(img_dir, os.listdir(img_dir)[0])\n",
+    "img = tifffile.imread(img_path)\n",
+    "\n",
+    "fname_meta = os.path.join(outdir, os.path.split(img_dir)[-1] + '_metadata.npz')\n",
+    "np.savez(fname_meta, \n",
+    "         nrow = img.shape[0], \n",
+    "         ncol = img.shape[1], \n",
+    "         nslice = len(os.listdir(img_dir)),\n",
+    "         drow = 7.464, \n",
+    "         dcol = 7.464, \n",
+    "         dslice = 2.0)\n",
+    "\n",
+    "# data = np.load(fname_meta)\n",
+    "# print([k for k in data])"
    ]
   },
   {
@@ -7434,11 +7450,8 @@
     }
    ],
    "source": [
-    "# Load a target image\n",
     "start_total = time.time()\n",
-    "img_dir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched'\n",
-    "outdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v04/'\n",
-    "next_idx = 3202\n",
+    "# next_idx = 3202\n",
     "\n",
     "net = Net()\n",
     "B = net.B\n",
