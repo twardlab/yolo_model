@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>YOLO 3D Main Functions: &#8212; yolo_model  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="_static/nature.css?v=279e0f84" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">YOLO 3D Main Functions:</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="yolo-3d-main-functions">
+<h1>YOLO 3D Main Functions:<a class="headerlink" href="#yolo-3d-main-functions" title="Link to this heading">¶</a></h1>
+<p id="module-yolo_help_3D">IN PROGRESS …</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="yolo_help_3D.GroundTruthDataset3D">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">GroundTruthDataset3D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">M</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nclasses</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reproducible</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.GroundTruthDataset3D" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></p>
+<p>This dataset will generate a set of random images of size N x N. And they will contain poisson distributed cells with mean M.</p>
+<section id="parameters-for-initialization">
+<h2>Parameters for Initialization:<a class="headerlink" href="#parameters-for-initialization" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>N<span class="classifier">int</span></dt><dd><p>The number of images to generate for this simulated dataset; Default - 256</p>
+</dd>
+<dt>M<span class="classifier">int</span></dt><dd><p>The mean number of cells appended to each image, sampled from a Poisson distribution; Default - 350</p>
+</dd>
+<dt>nclasses<span class="classifier">int</span></dt><dd><p>The number of classes to categorize this collection of simulated cells; Default = 3</p>
+</dd>
+<dt>reproducible<span class="classifier">bool</span></dt><dd><p>If True, set np.random.seed() to the integer index supplied</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h2>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>out_arr<span class="classifier">3 x N array</span></dt><dd><ul class="simple">
+<li><p>out_arr[0] is a 1 x N x N array defining the base image</p></li>
+<li><p>out_arr[1] is a X x 4 array containing the bbox info for X cells</p></li>
+<li><p>out_arr[2] is a X x 1 array containing the categorical label for the cell within the corresponding bbox; 0 - smooth boundary, 1 - sharp boudnary; 2 - bumpy boundary</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="yolo_help_3D.Net">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">Net</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nclasses</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.Net" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of variable shape.</p>
+<section id="parameters">
+<h2>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>nclasses<span class="classifier">int</span></dt><dd><p>Default - 3; The number of distinct classes in the dataset</p>
+</dd>
+</dl>
+</section>
+<section id="id1">
+<h2>Returns:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>Net<span class="classifier">torch.nn.Module</span></dt><dd><p>A neural network which can take input images with any number of channels</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="yolo_help_3D.Net.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.Net.forward" title="Link to this definition">¶</a></dt>
+<dd><p>Forward method for the yolo network.</p>
+<section id="inputs">
+<h3>Inputs<a class="headerlink" href="#inputs" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>x<span class="classifier">torch.Tensor</span></dt><dd><p>Object is of size 1 x CH x ROW x COL. # of channels, rows, and columns are arbitrary. This differs from the original yolo paper, which requires a fixed number of channels, rows, and columns.</p>
+</dd>
+</dl>
+</section>
+<section id="outputs">
+<h3>Outputs<a class="headerlink" href="#outputs" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>x<span class="classifier">torch.Tensor</span></dt><dd><p>Object is of size 5 * bbox_per_cell (2) + num_classes (3) x ROW x COL, where ROW and COL are equal to the input image size divided by the network’s stride (8). The five numbers per cell are [cx, cy, scalex, scaley, confidence].</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="yolo_help_3D.VariableInputConv2d">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">VariableInputConv2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.VariableInputConv2d" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Note the assumption here is that we have batch size one, so I can work with the batch dimension.
+This version adds a few extra convolutions.</p>
+<p>We only process 1 image at a time, so we can use the batch dimension.</p>
+<p>Step 1: move channel dimension to batch dimension.  Now we have N samples, with one channel each.</p>
+<dl class="simple">
+<dt>Step 2: apply some convolutions and relus, to end up with an N x M array of images. Where M is fixed,</dt><dd><p>and N is variable.</p>
+</dd>
+<dt>Step 3: Take a softmax of the result over the N channels.  Now matrix multiply, and N x M array, with a N x 1 array,</dt><dd><p>to get an M x 1 array (where M is fixed).</p>
+</dd>
+</dl>
+<p>Step 4: Return the result which is a fixed number of channels.</p>
+<p>What’s nice is it is permutation invariant.  So if we input an RGB image, or a BGR image, the result would be exactly the same.
+We don’t need to have the channels in any specific order.</p>
+<p>WORKING TODO
+Change so it supports a batch dimension
+This requires every image in a batch to have the same number of channels, but I think its okay</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="yolo_help_3D.VariableInputConv2d.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.VariableInputConv2d.forward" title="Link to this definition">¶</a></dt>
+<dd><p>Define the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="yolo_help_3D.apply_model_to_orthogonal_slices">
+<span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">apply_model_to_orthogonal_slices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">I</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.apply_model_to_orthogonal_slices" title="Link to this definition">¶</a></dt>
+<dd><p>Apply the 2D YOLO model to all the slices in each orothognal view of the volume I</p>
+<section id="id2">
+<h2>Parameters:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>model_path<span class="classifier">str</span></dt><dd><p>The path to the saved weights of the pretrained YOLO model</p>
+</dd>
+<dt>I<span class="classifier">array</span></dt><dd><p>The 3D volume to be processed by the 2D YOLO model. Expects shape [N,N,N,d] where N is the desired cube size and d is the number of channels.</p>
+</dd>
+</dl>
+</section>
+<section id="id3">
+<h2>Returns:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>recon_xy: array</dt><dd><p>The 3D reconstruction generated from applying the model to XY slices.</p>
+</dd>
+<dt>recon_xz: array</dt><dd><p>The 3D reconstruction generated from applying the model to XZ slices.</p>
+</dd>
+<dt>recon_yz: array</dt><dd><p>The 3D reconstruction generated from applying the model to YZ slices.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="yolo_help_3D.gen_3D_GT">
+<span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">gen_3D_GT</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">M</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nclasses</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thr_rel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.15</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.gen_3D_GT" title="Link to this definition">¶</a></dt>
+<dd><p>Generate a synthetic 3D volume with ellipsoidal blobs (“cells”) and several artifacts
+commonly found in natural microscopy data.</p>
+<p>Output volume is channels-last: (Z, Y, X, d).</p>
+<dl class="simple">
+<dt>Bounding boxes are computed by:</dt><dd><ol class="arabic simple">
+<li><p>Synthesizing each object’s mask in a local ROI</p></li>
+<li><p>Thresholding the mask at (thr_rel * max(mask))</p></li>
+<li><p>Taking the tight axis-aligned bounding box of the thresholded support</p></li>
+</ol>
+</dd>
+</dl>
+<section id="id4">
+<h2>Parameters:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>N<span class="classifier">int</span></dt><dd><p>Spatial size for X, Y, and Z (volume is N x N x N).</p>
+</dd>
+<dt>M<span class="classifier">int</span></dt><dd><p>Upper bound for number of objects (m = 1 + randint(M)).</p>
+</dd>
+<dt>nclasses<span class="classifier">int</span></dt><dd><p>Number of classes (labels in [0, nclasses-1]).</p>
+</dd>
+<dt>thr_rel<span class="classifier">float</span></dt><dd><p>Relative threshold for bbox extraction: keep = mask &gt; thr_rel * mask.max().</p>
+</dd>
+</dl>
+</section>
+<section id="id5">
+<h2>Returns:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>I<span class="classifier">np.ndarray</span></dt><dd><p>Image volume of shape (N, N, N, d) float32  (Z, Y, X, d)</p>
+</dd>
+<dt>bbox<span class="classifier">np.ndarray</span></dt><dd><p>Bounding boxes of shape (m, 6) float32
+Each row: (x0, y0, z0, w, h, depth) with half-open extents</p>
+</dd>
+<dt>cl<span class="classifier">np.ndarray</span></dt><dd><p>Class labels of shape (m,)</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="yolo_help_3D.orthogonal_to_3D">
+<span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">orthogonal_to_3D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">down_xy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">down_xz</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">down_yz</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tile_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">256</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.orthogonal_to_3D" title="Link to this definition">¶</a></dt>
+<dd><p>Stitch together 3 volumes of orthogonal slices with 2D bbox info stored at each voxel into 1 volume with 3D bbox info stored at each voxel.</p>
+<section id="id6">
+<h2>Parameters:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>down_xy: array</dt><dd><p>The 3D reconstruction of XY slices, downsampled by a factor of ‘ds_factor’.</p>
+</dd>
+<dt>down_xz: array</dt><dd><p>The 3D reconstruction of XZ slices, downsampled by a factor of ‘ds_factor’.</p>
+</dd>
+<dt>down_yz: array</dt><dd><p>The 3D reconstruction of YZ slices, downsampled by a factor of ‘ds_factor’.</p>
+</dd>
+<dt>tile_dim<span class="classifier">int</span></dt><dd><p>The size of the original 3D reconstruction</p>
+</dd>
+</dl>
+</section>
+<section id="id7">
+<h2>Returns:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h2>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="yolo_help_3D.recon_down">
+<span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">recon_down</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recon_xy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recon_xz</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recon_yz</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tile_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">256</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.recon_down" title="Link to this definition">¶</a></dt>
+<dd><p>Dowsample each volume along their respective ‘slice’ dimensions by taking the bbox of highest confidence at every pixel across ‘ds_factor’ consecutive slices.</p>
+<section id="id8">
+<h2>Parameters:<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>recon_xy: array</dt><dd><p>The 3D reconstruction generated from applying the model to XY slices.</p>
+</dd>
+<dt>recon_xz: array</dt><dd><p>The 3D reconstruction generated from applying the model to XZ slices.</p>
+</dd>
+<dt>recon_yz: array</dt><dd><p>The 3D reconstruction generated from applying the model to YZ slices.</p>
+</dd>
+</dl>
+</section>
+<section id="id9">
+<h2>Returns:<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>down_xy: array</dt><dd><p>The 3D reconstruction of XY slices, downsampled by a factor of ‘ds_factor’.</p>
+</dd>
+<dt>down_xz: array</dt><dd><p>The 3D reconstruction of XZ slices, downsampled by a factor of ‘ds_factor’.</p>
+</dd>
+<dt>down_yz: array</dt><dd><p>The 3D reconstruction of YZ slices, downsampled by a factor of ‘ds_factor’.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="yolo_help_3D.vol_to_mip">
+<span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">vol_to_mip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vol</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ds_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">slice_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.vol_to_mip" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a 3D image volume (vol) into a stack of 2D MIPs along an axis (ax_idx).
+This is useful for visualizing outputs from the YOLO_3D pipeline.</p>
+<section id="id10">
+<h2>Parameters:<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>vol<span class="classifier">array of shape N x M x K</span></dt><dd><p>The image volume to be ‘downsampled’</p>
+</dd>
+<dt>ax_idx<span class="classifier">int</span></dt><dd><p>The axis along which MIPs should be generated</p>
+</dd>
+<dt>ds_factor<span class="classifier">int</span></dt><dd><p>The number of slices to use in each MIP</p>
+</dd>
+<dt>slice_idx<span class="classifier">int</span></dt><dd><p>Default - -1; If -1, return the downsampled 3d volume of 2d slices along ‘ax_idx’. Else, Return the MIP of [slice_idx:slice_idx+ds_factor] along ‘ax_idx’.</p>
+</dd>
+</dl>
+</section>
+<section id="id11">
+<h2>Returns:<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>vol_mip<span class="classifier">array</span></dt><dd><p>A stack of MIPs along the ‘ax_idx’ axis</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="yolo_help_3D.vol_to_mip_rgb">
+<span class="sig-prename descclassname"><span class="pre">yolo_help_3D.</span></span><span class="sig-name descname"><span class="pre">vol_to_mip_rgb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vol</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ds_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#yolo_help_3D.vol_to_mip_rgb" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a 3D image volume (vol) into a stack of 2D MIPs along an axis (ax_idx).
+This is useful for visualizing outputs from the YOLO_3D pipeline.</p>
+<section id="id12">
+<h2>Parameters:<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>vol<span class="classifier">array of shape 256x256x256x3</span></dt><dd><p>The image volume to be ‘downsampled’</p>
+</dd>
+<dt>ax_idx<span class="classifier">int</span></dt><dd><p>The axis along which MIPs should be generated</p>
+</dd>
+<dt>ds_factor<span class="classifier">int</span></dt><dd><p>The number of slices to use in each MIP</p>
+</dd>
+</dl>
+</section>
+<section id="id13">
+<h2>Returns:<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>vol_mip<span class="classifier">array</span></dt><dd><p>A stack of MIPs along the ‘ax_idx’ axis</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">YOLO 3D Main Functions:</a><ul>
+<li><a class="reference internal" href="#yolo_help_3D.GroundTruthDataset3D"><code class="docutils literal notranslate"><span class="pre">GroundTruthDataset3D</span></code></a></li>
+<li><a class="reference internal" href="#yolo_help_3D.Net"><code class="docutils literal notranslate"><span class="pre">Net</span></code></a><ul>
+<li><a class="reference internal" href="#yolo_help_3D.Net.forward"><code class="docutils literal notranslate"><span class="pre">Net.forward()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#yolo_help_3D.VariableInputConv2d"><code class="docutils literal notranslate"><span class="pre">VariableInputConv2d</span></code></a><ul>
+<li><a class="reference internal" href="#yolo_help_3D.VariableInputConv2d.forward"><code class="docutils literal notranslate"><span class="pre">VariableInputConv2d.forward()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#yolo_help_3D.apply_model_to_orthogonal_slices"><code class="docutils literal notranslate"><span class="pre">apply_model_to_orthogonal_slices()</span></code></a></li>
+<li><a class="reference internal" href="#yolo_help_3D.gen_3D_GT"><code class="docutils literal notranslate"><span class="pre">gen_3D_GT()</span></code></a></li>
+<li><a class="reference internal" href="#yolo_help_3D.orthogonal_to_3D"><code class="docutils literal notranslate"><span class="pre">orthogonal_to_3D()</span></code></a></li>
+<li><a class="reference internal" href="#yolo_help_3D.recon_down"><code class="docutils literal notranslate"><span class="pre">recon_down()</span></code></a></li>
+<li><a class="reference internal" href="#yolo_help_3D.vol_to_mip"><code class="docutils literal notranslate"><span class="pre">vol_to_mip()</span></code></a></li>
+<li><a class="reference internal" href="#yolo_help_3D.vol_to_mip_rgb"><code class="docutils literal notranslate"><span class="pre">vol_to_mip_rgb()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/yolo_help_3D.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">YOLO 3D Main Functions:</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Andrew Bennecke, Daniel Tward.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>
