@@ -1,0 +1,3569 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>(0) Apply 2D model to 3D volume of 2D coronal slices &#8212; yolo_model  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">(0) Apply 2D model to 3D volume of 2D coronal slices</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
+import matplotlib.pyplot as plt
+import os
+import time
+import numpy as np
+import random
+from matplotlib.patches import Rectangle
+import tifffile
+import h5py
+from torch.utils.data import DataLoader
+import imageio.v2 as imageio
+from scipy.ndimage import gaussian_filter
+
+import importlib as imp
+import sys
+sys.path.append(&#39;/home/abenneck/Desktop/yolo_tiles/docs/scripts&#39;)
+
+import yolo_tiles
+imp.reload(yolo_tiles)
+from yolo_tiles import img_to_tiles, apply_model_to_tiles, load_test_image, preprocess, tileDataset, remove_bbox_in_overlap
+
+import yolo_help
+imp.reload(yolo_help)
+from yolo_help import bbox_to_rectangles, imshow, convert_data, Net, get_best_bounding_box_per_cell
+
+import yolo_post_help
+imp.reload(yolo_post_help)
+from yolo_post_help import remove_low_conf_bboxes, postprocess, bb_to_rec
+
+import yolo_help_3D
+imp.reload(yolo_help_3D)
+from yolo_help_3D import apply_model_to_orthogonal_slices, gen_3D_GT, recon_down, vol_to_mip_rgb, orthogonal_to_3D
+</pre></div>
+</div>
+</div>
+<section id="(0)-Apply-2D-model-to-3D-volume-of-2D-coronal-slices">
+<h1>(0) Apply 2D model to 3D volume of 2D coronal slices<a class="headerlink" href="#(0)-Apply-2D-model-to-3D-volume-of-2D-coronal-slices" title="Link to this heading">¶</a></h1>
+<section id="(0.0)-Extract-a-3D-volume-from-a-stack-of-2D-slices">
+<h2>(0.0) Extract a 3D volume from a stack of 2D slices<a class="headerlink" href="#(0.0)-Extract-a-3D-volume-from-a-stack-of-2D-slices" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v05/&#39;
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>idx_start = 1500 # Entire slice clearly visible after gamma correction
+n_slice = 120 # The number of slices to generate a cube
+tile_idx = 2077 # This tile has an anchor point of ~(10_000, 7_500)
+last_idx = 120
+
+for idx, fname in enumerate(sorted(os.listdir(img_dir))[(idx_start):(idx_start+n_slice)]):
+
+    if idx &lt; last_idx:
+        continue
+
+    # Load the image
+    img_path = os.path.join(img_dir, fname)
+    img = tifffile.imread(img_path)
+
+    # Preprocess using gamma correction + upsampling
+    start = time.time()
+    img_up = preprocess(img)
+    print(f&#39;Finished preprocessing in {time.time()-start:.2f}s&#39;)
+
+    # Extract tiles from the preprocessed input image
+    padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04, verbose=True)
+    I_tile = tiles[tile_idx][&#39;img&#39;]
+    np.save(os.path.join(outdir, f&#39;slice_{idx}.npy&#39;), I_tile)
+
+    print(f&#39;Finished {idx}/{n_slice}\n&#39;)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="(0.1)-Stack-+-interpolate-the-slices-to-have-one-isotropic-cube-of-data">
+<h2>(0.1) Stack + interpolate the slices to have one isotropic cube of data<a class="headerlink" href="#(0.1)-Stack-+-interpolate-the-slices-to-have-one-isotropic-cube-of-data" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load and stack all the extracted tiles
+slice_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v05/&#39;
+vol = []
+for fname in os.listdir(slice_dir):
+    I = np.load(os.path.join(slice_dir, fname))
+    vol.append(I)
+vol_stacked = np.stack(vol, axis=2)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Generate a gif of all the slices
+if False:
+    frames = []
+    for fname in os.listdir(slice_dir):
+        img = np.load(os.path.join(slice_dir, fname))
+        x = img.astype(np.float32)
+        x -= x.min()
+        x /= (x.max() if x.max() &gt; 0 else 1.0)
+        img_u8 = (x * 255).astype(np.uint8)
+        frames.append(img_u8)
+
+    imageio.mimsave(&#39;/home/abenneck/Desktop/vol.gif&#39;, frames, duration = 100, loop=0)
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Interpolate along the z-axis
+from scipy.ndimage import map_coordinates
+tile_dim = 256
+
+x = np.arange(tile_dim)
+y = np.arange(tile_dim)
+z = np.linspace(0, n_slice-1, tile_dim)
+
+X, Y, Z = np.meshgrid(x, y, z, indexing=&#39;ij&#39;)
+coords = np.array([X, Y, Z])
+vol_interp = map_coordinates(vol_stacked, coords, order=3)
+vol_interp.shape
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+(256, 256, 256)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Generate a 3D view of the interpolated data
+
+# Define dimensions and grid
+Nx, Ny, Nz = 256, 256, 256
+X, Y, Z = np.meshgrid(np.arange(Nx), np.arange(Ny), -np.arange(Nz))
+kw = {&#39;vmin&#39;: vol_interp.min(), &#39;vmax&#39;: vol_interp.max(), &#39;levels&#39;: np.linspace(vol_interp.min(), vol_interp.max(), 10)}
+
+# Create a figure with 3D ax
+fig = plt.figure(figsize=(8,8))
+ax = fig.add_subplot(111, projection=&#39;3d&#39;)
+
+# Plot contour surfaces
+_ = ax.contourf(
+    X[:, :, 0], Y[:, :, 0], vol_interp[:, :, 0],
+    zdir=&#39;z&#39;, offset=0, **kw)
+
+_ = ax.contourf(
+    X[0, :, :], vol_interp[0, :, :], Z[0, :, :],
+    zdir=&#39;y&#39;, offset=0, **kw)
+
+C = ax.contourf(
+    vol_interp[:, -1, :], Y[:, -1, :], Z[:, -1, :],
+    zdir=&#39;x&#39;, offset=X.max(), **kw)
+
+# Set limits of the plot from coord limits
+xmin, xmax = X.min(), X.max()
+ymin, ymax = Y.min(), Y.max()
+zmin, zmax = Z.min(), Z.max()
+ax.set(xlim=[xmin, xmax], ylim=[ymin, ymax], zlim=[zmin, zmax])
+
+# Plot edges
+edges_kw = dict(color=&#39;0.4&#39;, linewidth=1, zorder=1e3)
+ax.plot([xmax, xmax], [ymin, ymax], 0, **edges_kw)
+ax.plot([xmin, xmax], [ymin, ymin], 0, **edges_kw)
+ax.plot([xmax, xmax], [ymin, ymin], [zmin, zmax], **edges_kw)
+
+# Set labels and zticks
+ax.set_xlabel(&#39;X&#39;)
+ax.set_ylabel(&#39;Y&#39;)
+ax.set_zlabel(&#39;Z (Slice)&#39;)
+ax.view_init(30, -45, 0)
+ax.set_box_aspect(None, zoom=0.9)
+
+# Show Figure
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_3d_9_0.png" src="../_images/notebooks_yolo_3d_9_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fig, ax = plt.subplots(1,3, layout=&#39;tight&#39;)
+ax[0].imshow(vol_interp[0,:,:])
+ax[0].set_title(&#39;[0,:,:]&#39;)
+ax[0].set_xlabel(&#39;Z&#39;)
+ax[0].set_ylabel(&#39;Y&#39;)
+
+ax[1].imshow(vol_interp[:,0,:])
+ax[1].set_title(&#39;[:,0,:]&#39;)
+ax[1].set_xlabel(&#39;X&#39;)
+ax[1].set_ylabel(&#39;Z&#39;)
+
+ax[2].imshow(vol_interp[:,:,0])
+ax[2].set_title(&#39;[:,:,0]&#39;)
+ax[2].set_xlabel(&#39;X&#39;)
+ax[2].set_ylabel(&#39;Y&#39;)
+
+fig.set_size_inches(9,3)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_3d_10_0.png" src="../_images/notebooks_yolo_3d_10_0.png" />
+</div>
+</div>
+</section>
+<section id="(0.2)-Apply-the-network-to-each-slice-along-all-3-cardinal-planes">
+<h2>(0.2) Apply the network to each slice along all 3 cardinal planes<a class="headerlink" href="#(0.2)-Apply-the-network-to-each-slice-along-all-3-cardinal-planes" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load the pretrained model
+model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
+net = Net()
+net.load_state_dict(torch.load(model_path))
+
+# Define some hyperparameters
+ds_factor = 8
+bbox_dim = 5
+num_classes = 3
+B = net.B
+stride = net.stride
+dtype = torch.float32
+pads = np.array([0,0])
+
+# Initialize reconstruction containers
+recon_xy = np.ones((int(tile_dim/ds_factor), int(tile_dim/ds_factor), tile_dim, bbox_dim+num_classes))*(-np.inf)
+recon_xz = np.ones((int(tile_dim/ds_factor), tile_dim, int(tile_dim/ds_factor), bbox_dim+num_classes))*(-np.inf)
+recon_yz = np.ones((tile_dim, int(tile_dim/ds_factor), int(tile_dim/ds_factor), bbox_dim+num_classes))*(-np.inf)
+
+start = time.time()
+for idx in np.arange(tile_dim):
+    slice_xy = vol_interp[:,:,idx][None]
+    slice_xz = vol_interp[:,idx,:][None]
+    slice_yz = vol_interp[idx,:,:][None]
+
+    # Apply model to slices parallel to the XY-plane
+    out_xy = net((torch.tensor(slice_xy[None],dtype=dtype)))
+    out_xy = out_xy[0].detach().numpy()
+    out_xy = postprocess(out_xy, B, stride, pads, up_factor=1)
+    recon_xy[:,:,idx,:] = out_xy
+
+    # Apply model to slices parallel to the XZ-plane
+    out_xz = net((torch.tensor(slice_xz[None],dtype=dtype)))
+    out_xz = out_xz[0].detach().numpy()
+    out_xz = postprocess(out_xz, B, stride, pads, up_factor=1)
+    recon_xz[:,idx,:,:] = out_xz
+
+    # Apply model to slices parallel to the YZ-plane
+    out_yz = net((torch.tensor(slice_yz[None],dtype=dtype)))
+    out_yz = out_yz[0].detach().numpy()
+    out_yz = postprocess(out_yz, B, stride, pads, up_factor=1)
+    recon_yz[idx,:,:,:] = out_yz
+
+    if idx % 25 == 0:
+        print(f&#39;Finished {idx}/{tile_dim}&#39;)
+
+print(f&#39;Finished applying model to 3 orthogonal views in {time.time()-start:.2f}s&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished 0/256
+Finished 25/256
+Finished 50/256
+Finished 75/256
+Finished 100/256
+Finished 125/256
+Finished 150/256
+Finished 175/256
+Finished 200/256
+Finished 225/256
+Finished 250/256
+Finished applying model to 3 orthogonal views in 14.46s
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>slice_idx = 200
+
+nrow, ncol = 2, 3
+fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;, sharex=True, sharey=True)
+
+axs[0,0].imshow(vol_interp[slice_idx,:,:])
+axs[1,0].imshow(vol_interp[slice_idx,:,:])
+bb = recon_yz[slice_idx,:,:,:]
+scores = recon_yz[slice_idx,:,:,-4]
+predicted_rectangles = bb_to_rec(bb, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,0].add_collection(predicted_rectangles)
+axs[0,0].set_title(f&#39;recon_yz[{slice_idx},:,:]&#39;)
+
+axs[0,1].imshow(vol_interp[:,slice_idx,:])
+axs[1,1].imshow(vol_interp[:,slice_idx,:])
+bb = recon_xz[:,slice_idx,:,:]
+scores = recon_xz[:,slice_idx,:,-4]
+predicted_rectangles = bb_to_rec(bb, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,1].add_collection(predicted_rectangles)
+axs[0,1].set_title(f&#39;recon_xz[:,{slice_idx},:]&#39;)
+
+axs[0,2].imshow(vol_interp[:,:,slice_idx])
+axs[1,2].imshow(vol_interp[:,:,slice_idx])
+bb = recon_xy[:,:,slice_idx,:]
+scores = recon_xy[:,:,slice_idx,-4]
+predicted_rectangles = bb_to_rec(bb, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,2].add_collection(predicted_rectangles)
+axs[0,2].set_title(f&#39;recon_xy[:,:,{slice_idx}]&#39;)
+
+fig.set_size_inches(ncol*3, nrow*3)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_3d_13_0.png" src="../_images/notebooks_yolo_3d_13_0.png" />
+</div>
+</div>
+</section>
+<section id="(0.3)-Downsample-the-outputs-along-the-'tile_dim'-axis">
+<h2>(0.3) Downsample the outputs along the ‘tile_dim’ axis<a class="headerlink" href="#(0.3)-Downsample-the-outputs-along-the-'tile_dim'-axis" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>conf_idx = 4
+ds_factor = 8
+down_dim = int(tile_dim/ds_factor)
+
+down_xy = []
+down_xz = []
+down_yz = []
+
+start = time.time()
+for idx in np.arange(down_dim):
+
+    # Extract subset of 8 XY-slices to be downsampled into 1 slice
+    recon_xy_down = recon_xy[:,:,(idx*ds_factor):((idx+1)*ds_factor),:]
+
+    # Get idx of bbox with highest confidence at each pixel
+    inds_xy = np.argmax(recon_xy_down[..., conf_idx], axis = 2)
+
+    # Downsample along relevant axis using the above indeces
+    recon_xy_down = np.take_along_axis(recon_xy_down, inds_xy[:, :, None, None], axis=2)
+
+    # Append downsampled slice to final output for XY-slices
+    down_xy.append(recon_xy_down)
+
+    # Repeat for XZ-slices
+    recon_xz_down = recon_xz[:,(idx*ds_factor):((idx+1)*ds_factor),:,:]
+    inds_xz = np.argmax(recon_xz_down[..., conf_idx], axis = 1)
+    recon_xz_down = np.take_along_axis(recon_xz_down, inds_xz[:, None, :, None], axis=1)
+    down_xz.append(recon_xz_down)
+
+    # Repear for YZ-slices
+    recon_yz_down = recon_yz[(idx*ds_factor):((idx+1)*ds_factor),:,:,:]
+    inds_yz = np.argmax(recon_yz_down[..., conf_idx], axis = 0)
+    recon_yz_down = np.take_along_axis(recon_yz_down, inds_yz[None, :, :, None], axis=0)
+    down_yz.append(recon_yz_down)
+
+# Concat lists so that they are now each 32x32x32 cubes
+down_xy = np.concatenate(down_xy, axis=2)
+down_xz = np.concatenate(down_xz, axis=1)
+down_yz = np.concatenate(down_yz, axis=0)
+
+print(f&#39;Finished downsampling outputs in {time.time()-start:.2f}s&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished downsampling outputs in 0.02s
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Downsample vol_interp along one axis. Useful for overlaying bbox outputs on MIPs
+def vol_to_mip(vol, ax_idx, ds_factor = 8):
+    &quot;&quot;&quot;
+    Convert a 3D image volume (vol) into a stack of 2D MIPs along an axis (ax_idx).
+    This is useful for visualizing outputs from the YOLO_3D pipeline.
+
+    Parameters:
+    ===========
+    vol : array of shape 256x256x256
+        The image volume to be &#39;downsampled&#39;
+    ax_idx : int
+        The axis along which MIPs should be generated
+    ds_factor : int
+        The number of slices to use in each MIP
+
+    Returns:
+    ========
+    vol_mip : array
+        A stack of MIPs along the &#39;ax_idx&#39; axis
+    &quot;&quot;&quot;
+    vol_mip = []
+    vol_dim = vol.shape[ax_idx]
+    for i in np.arange(int(vol_dim/ds_factor)):
+
+        if ax_idx == 0:
+            vol_slice_stack = vol[(i*ds_factor):((i+1)*ds_factor), :, :]
+        elif ax_idx == 1:
+            vol_slice_stack = vol[:, (i*ds_factor):((i+1)*ds_factor), :]
+        elif ax_idx == 2:
+            vol_slice_stack = vol[:, :, (i*ds_factor):((i+1)*ds_factor)]
+        else:
+            raise Exception(f&#39;vol only has {len(vol.shape)} axes, but ax_idx = {ax_idx} was passed&#39;)
+
+        vol_slice_max = np.max(vol_slice_stack, axis=ax_idx)
+        vol_mip.append(vol_slice_max)
+
+    vol_mip = np.stack(vol_mip, axis=ax_idx)
+    return vol_mip
+
+vol_0 = vol_to_mip(vol_interp, 0)
+vol_1 = vol_to_mip(vol_interp, 1)
+vol_2 = vol_to_mip(vol_interp, 2)
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(&#39;recon_output.shape =&gt; downsampled_output.shape&#39;)
+print(f&#39;xy: {recon_xy.shape} =&gt; {down_xy.shape}&#39;)
+print(f&#39;xz: {recon_xz.shape} =&gt; {down_xz.shape}&#39;)
+print(f&#39;yz: {recon_yz.shape} =&gt; {down_yz.shape}\n&#39;)
+
+print(&#39;vol_interp.shape =&gt; vol_mip.shape&#39;)
+print(f&#39;xy: {vol_interp.shape} =&gt; {vol_0.shape}&#39;)
+print(f&#39;xz: {vol_interp.shape} =&gt; {vol_1.shape}&#39;)
+print(f&#39;yz: {vol_interp.shape} =&gt; {vol_2.shape}&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+recon_output.shape =&gt; downsampled_output.shape
+xy: (32, 32, 256, 8) =&gt; (32, 32, 32, 8)
+xz: (32, 256, 32, 8) =&gt; (32, 32, 32, 8)
+yz: (256, 32, 32, 8) =&gt; (32, 32, 32, 8)
+
+vol_interp.shape =&gt; vol_mip.shape
+xy: (256, 256, 256) =&gt; (32, 256, 256)
+xz: (256, 256, 256) =&gt; (256, 32, 256)
+yz: (256, 256, 256) =&gt; (256, 256, 32)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>slice_idx = 15 # 0:32
+ds_factor = 8
+orig_slice_idx = slice_idx*ds_factor # 0:256
+
+fig, axs = plt.subplots(2, 2, layout=&#39;constrained&#39;, sharex=True, sharey=True)
+axs[0,0].imshow(vol_interp[orig_slice_idx,:,:])
+axs[0,0].set_title(f&#39;original[{orig_slice_idx},:,:]&#39;)
+
+scores = recon_yz[slice_idx,:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_yz[slice_idx,:,:,:], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,0].imshow(vol_interp[slice_idx,:,:])
+axs[1,0].add_collection(predicted_rectangles)
+
+axs[0,1].imshow(vol_0[slice_idx,:,:])
+axs[0,1].set_title(f&#39;MIP[{slice_idx},:,:] = max(original[{orig_slice_idx}:{orig_slice_idx+8},:,:], axis=0)&#39;)
+
+scores = down_yz[slice_idx,:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(down_yz[slice_idx,:,:,:], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,1].imshow(vol_0[slice_idx,:,:])
+axs[1,1].add_collection(predicted_rectangles)
+
+fig.set_size_inches(7,7)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_3d_18_0.png" src="../_images/notebooks_yolo_3d_18_0.png" />
+</div>
+</div>
+</section>
+<section id="(0.4)-Stitch-together-3-2D-outputs-into-1-3D-output-of-the-same-shape">
+<h2>(0.4) Stitch together 3 2D outputs into 1 3D output of the same shape<a class="headerlink" href="#(0.4)-Stitch-together-3-2D-outputs-into-1-3D-output-of-the-same-shape" title="Link to this heading">¶</a></h2>
+down_xy[0,0,0,:] = [xmin, ymin, xmax, ymax, conf, cl0, cl1, cl2]
+down_xz[0,0,0,:] = [xmin, zmin, xmax, zmax, conf, cl0, cl1, cl2]
+down_yz[0,0,0,:] = [ymin, zmin, ymax, zmax, conf, cl0, cl1, cl2]<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[37]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start = time.time()
+
+bbox_dim = 7
+recon_total = np.ones((down_dim, down_dim, down_dim, bbox_dim+num_classes))*(-np.inf)
+for i in np.arange(down_dim):
+    for j in np.arange(down_dim):
+        for k in np.arange(down_dim):
+
+            # From meeting 02/26/26
+            xmin = (down_xy[i,j,k,1] + down_xz[i,j,k,1]) / 2
+            xmax = (down_xy[i,j,k,3] + down_xz[i,j,k,3]) / 2
+            ymin = (down_xy[i,j,k,0] + down_yz[i,j,k,1]) / 2
+            ymax = (down_xy[i,j,k,2] + down_yz[i,j,k,3]) / 2
+            zmin = (down_xz[i,j,k,0] + down_yz[i,j,k,0]) / 2
+            zmax = (down_xz[i,j,k,2] + down_yz[i,j,k,2]) / 2
+
+            # conf = np.max([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
+            # conf = np.min([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
+            conf = down_xy[i,j,k,4] * down_xz[i,j,k,4] * down_yz[i,j,k,4]
+            # conf = np.sum([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]]) / 3
+
+            cl0 = np.max([down_xy[i,j,k,5], down_xz[k,i,j,5], down_yz[j,k,i,5]])
+            cl1 = np.max([down_xy[i,j,k,6], down_xz[k,i,j,6], down_yz[j,k,i,6]])
+            cl2 = np.max([down_xy[i,j,k,7], down_xz[k,i,j,7], down_yz[j,k,i,7]])
+
+            recon_total[i,j,k] = [xmin, xmax, ymin, ymax, zmin, zmax, conf, cl0, cl1, cl2]
+
+print(f&#39;Finished combining outputs in {time.time()-start:.2f}s&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished combining outputs in 0.66s
+</pre></div></div>
+</div>
+<section id="Summary-Statistics">
+<h3>Summary Statistics<a class="headerlink" href="#Summary-Statistics" title="Link to this heading">¶</a></h3>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[38]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(&#39;Bbox details&#39;)
+print(f&#39;np.min(xmin): {np.min(recon_total[:,:,:,0])}&#39;)
+print(f&#39;np.max(xmax): {np.max(recon_total[:,:,:,1])}&#39;)
+print(f&#39;np.min(ymin): {np.min(recon_total[:,:,:,2])}&#39;)
+print(f&#39;np.max(ymax): {np.max(recon_total[:,:,:,3])}&#39;)
+print(f&#39;np.min(zmin): {np.min(recon_total[:,:,:,4])}&#39;)
+print(f&#39;np.max(zmax): {np.max(recon_total[:,:,:,5])}&#39;)
+print()
+
+print(&#39;Conf details&#39;)
+print(f&#39;min: {np.min(recon_total[:,:,:,-4])}&#39;)
+print(f&#39;max: {np.max(recon_total[:,:,:,-4])}&#39;)
+print(f&#39;avg: {np.average(recon_total[:,:,:,-4])}&#39;)
+print(f&#39;std: {np.std(recon_total[:,:,:,-4])}&#39;)
+print()
+
+print(&#39;Data at [0,0,0]&#39;)
+print(recon_total[0,0,0])
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Bbox details
+np.min(xmin): -8.238142013549805
+np.max(xmax): 262.76905822753906
+np.min(ymin): -7.571131229400635
+np.max(ymax): 262.87811279296875
+np.min(zmin): -7.786772727966309
+np.max(zmax): 263.6905975341797
+
+Conf details
+min: 4.639359041831663e-53
+max: 0.6652349433787457
+avg: 0.054715814889773895
+std: 0.11211835098978983
+
+Data at [0,0,0]
+[-5.61961627e+00  9.99296999e+00 -4.26669455e+00  1.24777112e+01
+  1.43471456e+00  7.24990344e+00  7.90833776e-05  3.27794075e-01
+ -2.78825045e-01 -2.23635584e-01]
+</pre></div></div>
+</div>
+</section>
+</section>
+<section id="(0.5)-Visualize-the-outputs">
+<h2>(0.5) Visualize the outputs<a class="headerlink" href="#(0.5)-Visualize-the-outputs" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[39]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>slice_idx = 31 # 0:31
+
+outdir = &#39;/home/abenneck/Desktop/yolo3d_outputs/gif_frames_0&#39;
+# for slice_idx in np.arange(down_dim):
+
+nrow, ncol = 2, 3
+fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;, sharex=True, sharey=True)
+axs[0,0].imshow(vol_0[slice_idx,:,:])
+axs[0,0].set_title(f&#39;yz[{slice_idx},:,:]&#39;)
+axs[0,1].imshow(vol_1[:,slice_idx,:])
+axs[0,1].set_title(f&#39;xz[:,{slice_idx},:]&#39;)
+axs[0,2].imshow(vol_2[:,:,slice_idx])
+axs[0,2].set_title(f&#39;xy[:,:,{slice_idx}]&#39;)
+
+print(&#39;Plotting bboxes . . .&#39;)
+
+scores = recon_total[slice_idx,:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_total[slice_idx,:,:,:], pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,0].imshow(vol_0[slice_idx,:,:])
+axs[1,0].add_collection(predicted_rectangles)
+
+scores = recon_total[:,slice_idx,:,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_total[:,slice_idx,:,:], pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,1].imshow(vol_1[:,slice_idx,:])
+axs[1,1].add_collection(predicted_rectangles)
+
+scores = recon_total[:,:,slice_idx,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_total[:,:,slice_idx,:], pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,2].imshow(vol_2[:,:,slice_idx])
+axs[1,2].add_collection(predicted_rectangles)
+
+fig.set_size_inches(ncol*3, nrow*3)
+# plt.savefig(os.path.join(outdir, f&#39;recon_slice_{slice_idx:03d}.png&#39;))
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Plotting bboxes . . .
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_3d_25_1.png" src="../_images/notebooks_yolo_3d_25_1.png" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[33]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Generate a gif of all the slices
+if False:
+    frames = []
+    for fname in sorted(os.listdir(outdir)):
+        if &#39;.ipynb&#39; not in fname:
+            img = imageio.imread(os.path.join(outdir, fname))
+            frames.append(img)
+
+    imageio.mimsave(&#39;/home/abenneck/Desktop/yolo3d_outputs/gif0.gif&#39;, frames, duration = 1000, loop=0)
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="(1)-Quantify-model-performance-on-a-3D-simulated-dataset">
+<h1>(1) Quantify model performance on a 3D simulated dataset<a class="headerlink" href="#(1)-Quantify-model-performance-on-a-3D-simulated-dataset" title="Link to this heading">¶</a></h1>
+<section id="(1.1)-Initialize-a-3D-volume-w/-cells-+-artifacts">
+<h2>(1.1) Initialize a 3D volume w/ cells + artifacts<a class="headerlink" href="#(1.1)-Initialize-a-3D-volume-w/-cells-+-artifacts" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def gen_3D_GT(N, M, nclasses, thr_rel=0.15):
+    &quot;&quot;&quot;
+    Generate a synthetic 3D volume with ellipsoidal blobs (&quot;cells&quot;) and several artifacts
+    commonly found in natural microscopy data.
+
+    Output volume is channels-last: (Z, Y, X, d).
+
+    Bounding boxes are computed by:
+      1) Synthesizing each object&#39;s mask in a local ROI
+      2) Thresholding the mask at (thr_rel * max(mask))
+      3) Taking the tight axis-aligned bounding box of the thresholded support
+
+    Parameters
+    ----------
+    N : int
+        Spatial size for X, Y, and Z (volume is N x N x N).
+    M : int
+        Upper bound for number of objects (m = 1 + randint(M)).
+    nclasses : int
+        Number of classes (labels in [0, nclasses-1]).
+    thr_rel : float
+        Relative threshold for bbox extraction: keep = mask &gt; thr_rel * mask.max().
+
+    Returns
+    -------
+    I : np.ndarray
+        Image volume of shape (N, N, N, d) float32  (Z, Y, X, d)
+    bbox : np.ndarray
+        Bounding boxes of shape (m, 6) float32
+        Each row: (x0, y0, z0, w, h, depth) with half-open extents
+    cl : np.ndarray
+        Class labels of shape (m,)
+    &quot;&quot;&quot;
+    # number of channels
+    d = 3
+    bg = np.random.rand(d).astype(np.float32)
+
+    # channels-last volume: (Z, Y, X, d)
+    I = np.zeros((N, N, N, d), dtype=np.float32) + bg[None, None, None, :]
+
+    # how many objects
+    m = 1 + np.random.randint(M)
+    cl = np.random.randint(0, nclasses, size=m)
+
+    # centers in voxel coordinates: (x, y, z)
+    c = (np.random.rand(m, 3) * (np.array([N, N, N]) - 1)).astype(np.float32)
+
+    # sizes (sigmas) per axis: (sx, sy, sz)
+    s = (3 + np.random.rand(m, 3) * 20).astype(np.float32)
+
+    # Euler angles (rx, ry, rz)
+    angles = (np.random.rand(m, 3) * 2 * np.pi).astype(np.float32)
+
+    color0 = np.random.rand(d).astype(np.float32)
+    bbox = np.zeros((m, 6), dtype=np.float32)
+
+    def euler_R(rx, ry, rz):
+        &quot;&quot;&quot;Rotation matrix R = Rz @ Ry @ Rx.&quot;&quot;&quot;
+        cx, sx = np.cos(rx), np.sin(rx)
+        cy, sy = np.cos(ry), np.sin(ry)
+        cz, sz = np.cos(rz), np.sin(rz)
+
+        Rx = np.array([[1, 0, 0],
+                       [0, cx, -sx],
+                       [0, sx,  cx]], dtype=np.float32)
+        Ry = np.array([[ cy, 0, sy],
+                       [  0,  1,  0],
+                       [-sy, 0, cy]], dtype=np.float32)
+        Rz = np.array([[cz, -sz, 0],
+                       [sz,  cz, 0],
+                       [ 0,   0, 1]], dtype=np.float32)
+        return (Rz @ Ry @ Rx).astype(np.float32)
+
+    for i in range(m):
+        cx, cy, cz = c[i]
+        sx_, sy_, sz_ = s[i]
+        cli = int(cl[i])
+        R = euler_R(*angles[i])
+
+        # ROI for synthesis: center +/- 3*max(sigma)
+        mxi = float(max(sx_, sy_, sz_))
+        left   = int(np.clip(cx - 3*mxi, 0, N - 1))
+        right  = int(np.clip(cx + 3*mxi, 0, N - 1))
+        top    = int(np.clip(cy - 3*mxi, 0, N - 1))
+        bottom = int(np.clip(cy + 3*mxi, 0, N - 1))
+        front  = int(np.clip(cz - 3*mxi, 0, N - 1))
+        back   = int(np.clip(cz + 3*mxi, 0, N - 1))
+
+        # enforce non-empty half-open ranges
+        right  = max(right,  left + 1)
+        bottom = max(bottom, top + 1)
+        back   = max(back,   front + 1)
+
+        # local coordinate blocks (broadcasted)
+        zz = (np.arange(front, back, dtype=np.float32) - cz)[:, None, None]   # (Dz,1,1)
+        yy = (np.arange(top, bottom, dtype=np.float32) - cy)[None, :, None]   # (1,Dy,1)
+        xx = (np.arange(left, right, dtype=np.float32) - cx)[None, None, :]   # (1,1,Dx)
+
+        # rotate into object frame: P&#39; = R^T P
+        Xp = R[0, 0]*xx + R[1, 0]*yy + R[2, 0]*zz
+        Yp = R[0, 1]*xx + R[1, 1]*yy + R[2, 1]*zz
+        Zp = R[0, 2]*xx + R[1, 2]*yy + R[2, 2]*zz
+
+        # ellipsoidal metric
+        q = (Xp/(sx_ + 1e-6))**2 + (Yp/(sy_ + 1e-6))**2 + (Zp/(sz_ + 1e-6))**2
+        base = (q/2.0)*(3.0**2)
+
+        # class-dependent mask shape + optional bumps
+        if cli &lt;= 1:
+            mask = np.exp(-(base)**(1 + 2*cli)).astype(np.float32)
+        else:
+            mask = np.exp(-(base)**4).astype(np.float32)
+            bumps = gaussian_filter(np.random.randn(*mask.shape).astype(np.float32), 1)
+            mask *= np.exp(bumps).astype(np.float32)
+
+        # add object to volume
+        color = (color0*0.95 + np.random.rand(d).astype(np.float32)*0.05).astype(np.float32)
+        I[front:back, top:bottom, left:right, :] += mask[..., None] * color[None, None, None, :]
+
+        # bbox from thresholded mask support within ROI
+        thr = float(mask.max()) * float(thr_rel)
+        keep = mask &gt; thr
+
+        if np.any(keep):
+            zz_idx, yy_idx, xx_idx = np.where(keep)
+            z0 = front + int(zz_idx.min())
+            z1 = front + int(zz_idx.max()) + 1  # half-open
+            y0 = top   + int(yy_idx.min())
+            y1 = top   + int(yy_idx.max()) + 1
+            x0 = left  + int(xx_idx.min())
+            x1 = left  + int(xx_idx.max()) + 1
+        else:
+            # fallback: 1-voxel box at rounded center (rare)
+            x0 = int(np.clip(round(cx), 0, N-1))
+            x1 = min(x0 + 1, N)
+            y0 = int(np.clip(round(cy), 0, N-1))
+            y1 = min(y0 + 1, N)
+            z0 = int(np.clip(round(cz), 0, Z-1))
+            z1 = min(z0 + 1, Z)
+
+        bbox[i] = np.array([x0, y0, z0, x1-x0, y1-y0, z1-z0], dtype=np.float32)
+
+    # --- global artifacts (computed without allocating a full meshgrid) ---
+    z = np.arange(N, dtype=np.float32)[:, None, None]
+    y = np.arange(N, dtype=np.float32)[None, :, None]
+    x = np.arange(N, dtype=np.float32)[None, None, :]
+
+    # Gaussian &quot;sheet&quot; artifact (thin plane)
+    n = np.random.randn(3).astype(np.float32)
+    n /= (np.linalg.norm(n) + 1e-6)
+    p0 = np.array([np.random.rand()*(N-1),
+                   np.random.rand()*(N-1),
+                   np.random.rand()*(N-1)], dtype=np.float32)
+    dist = n[0]*(x - p0[0]) + n[1]*(y - p0[1]) + n[2]*(z - p0[2])
+    width = np.float32(1 + np.random.rand()*20)
+    sheet = np.exp(-(dist/width)**2).astype(np.float32)
+    I += sheet[..., None] * (np.random.rand(d).astype(np.float32)*2)[None, None, None, :]
+
+    # Logistic &quot;slab&quot; artifact (smooth plane transition)
+    n2 = np.random.randn(3).astype(np.float32)
+    n2 /= (np.linalg.norm(n2) + 1e-6)
+    p1 = np.array([np.random.rand()*(N-1),
+                   np.random.rand()*(N-1),
+                   np.random.rand()*(N-1)], dtype=np.float32)
+    dist2 = n2[0]*(x - p1[0]) + n2[1]*(y - p1[1]) + n2[2]*(z - p1[2])
+    sharp = np.float32(1 + np.random.rand()*10)
+    slab = (1.0/(1.0 + np.exp(-(dist2/sharp)))).astype(np.float32)
+    I += slab[..., None] * np.random.rand(d).astype(np.float32)[None, None, None, :]
+
+    # optional intensity warp
+    if np.random.rand() &gt; 0.5:
+        mu = np.float32(np.random.rand()*4)
+        I = np.exp(-mu * I).astype(np.float32)
+
+    # blur (3D per channel)
+    sigma = np.random.rand()*2
+    for ch in range(d):
+        I[..., ch] = gaussian_filter(I[..., ch], sigma)
+
+    # additive smooth noise
+    noise = (np.random.rand(*I.shape).astype(np.float32) * (np.random.rand()*0.5)).astype(np.float32)
+    sigma_n = np.random.rand()*2
+    for ch in range(d):
+        noise[..., ch] = gaussian_filter(noise[..., ch], sigma_n)
+    I += noise
+
+    return I, bbox, cl
+</pre></div>
+</div>
+</div>
+<section id="Generate-the-3D-simulated-dataset">
+<h3>Generate the 3D simulated dataset<a class="headerlink" href="#Generate-the-3D-simulated-dataset" title="Link to this heading">¶</a></h3>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>applyPipelineToSimulatedData = False
+
+np.random.seed(5)
+
+N = 256
+M = 350
+nclasses = 2
+I, bbox, cl = gen_3D_GT(N, M, nclasses, thr_rel=0.15)
+
+fig, ax = plt.subplots()
+ax.imshow(I[I.shape[0] // 2,:,:,:].max(axis=-1))
+ax.set_title(f&#39;Example slice&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Text(0.5, 1.0, &#39;Example slice&#39;)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_3d_31_1.png" src="../_images/notebooks_yolo_3d_31_1.png" />
+</div>
+</div>
+</section>
+<section id="Generate-+-save-orthogonal-views-of-the-data-(frames-for-the-gif)">
+<h3>Generate + save orthogonal views of the data (frames for the gif)<a class="headerlink" href="#Generate-+-save-orthogonal-views-of-the-data-(frames-for-the-gif)" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def gen_orthogonal_frames(I, bbox):
+    &quot;&quot;&quot;
+    Generate N images containing the ith slice from each plane of the simulated volume I.
+    &quot;&quot;&quot;
+
+    N = I.shape[0]
+    M = bbox.shape[0]
+
+    for slice_idx in np.arange(N):
+        nrow, ncol = 1, 3
+        fig, axs = plt.subplots(1,3,layout=&#39;tight&#39;)
+        fig.set_size_inches(ncol*3, nrow*4)
+        fig.suptitle(f&#39;Orthogonal views of XYZ slices for idx {slice_idx}&#39;)
+        for slice_ax in [0,1,2]:
+
+            # Show a slice (max over channels) with contrast normalization
+            if slice_ax == 0:
+                img = I[slice_idx,:,:,:].max(axis=-1)  # (Y,X)
+                slice_name = &#39;Z&#39;
+            elif slice_ax == 1:
+                img = I[:,slice_idx,:,:].max(axis=-1)  # (Z,X)
+                slice_name = &#39;Y&#39;
+            elif slice_ax == 2:
+                img = I[:,:,slice_idx,:].max(axis=-1)  # (Z,Y)
+                slice_name = &#39;X&#39;
+            else:
+                raise Exception(f&#39;Invalid slice_ax: {slice_ax}&#39;)
+
+            Imin, Imax = np.percentile(img, (1, 99))
+            img_disp = np.clip((img - Imin) / (Imax - Imin), 0, 1)
+
+            axs[slice_ax].imshow(img_disp)
+            axs[slice_ax].set_title(f&#39;{slice_name}&#39;)
+            axs[slice_ax].axis(&quot;off&quot;)
+
+            count = 0
+            for (x0, y0, z0, w, h, d) in bbox:
+                # draw boxes that intersect this slice
+                if slice_ax == 0 and z0 &lt;= slice_idx &lt; z0 + d:
+                    axs[slice_ax].add_patch(Rectangle((x0, y0), w, h, fc = &#39;none&#39;, ec = &#39;k&#39;, linewidth=1.2))
+                    count += 1
+                elif slice_ax == 1 and y0 &lt;= slice_idx &lt; y0 + w:
+                    axs[slice_ax].add_patch(Rectangle((x0, z0), h, d, fc = &#39;none&#39;, ec = &#39;k&#39;, linewidth=1.2))
+                    count += 1
+                elif slice_ax == 2 and x0 &lt;= slice_idx &lt; x0 + h:
+                    axs[slice_ax].add_patch(Rectangle((y0, z0), w, d, fc = &#39;none&#39;, ec = &#39;k&#39;, linewidth=1.2))
+                    count += 1
+                else:
+                    continue
+
+            axs[slice_ax].text(5, 15, f&quot;Boxes on slice: {count}&quot;, backgroundcolor = [1,1,1,0.5], fontsize=10, color=&#39;k&#39;)
+        plt.savefig(os.path.join(outdir, f&#39;idx_{slice_idx:03d}&#39;))
+    plt.close(&#39;all&#39;)
+
+if False:
+    # Generate + save N frames
+    outdir = &#39;/home/abenneck/Desktop/yolo3d_outputs/gif_frames_gt0&#39;
+    gen_orthogonal_frames(I, bbox)
+
+    # Combine those N frames into a single .gif file
+    for fname in sorted(os.listdir(outdir)):
+        if &#39;.ipynb&#39; not in fname:
+            img = imageio.imread(os.path.join(outdir, fname))
+            frames.append(img)
+
+    # NOTE: duration is the number of ms to display each frame
+    imageio.mimsave(&#39;/home/abenneck/Desktop/yolo3d_outputs/gif_gt0.gif&#39;, frames, duration = 100, loop=0)
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="(1.2)-Apply-our-earlier-pipeline-to-the-simulated-3D-dataset-+-quantify-performance">
+<h2>(1.2) Apply our earlier pipeline to the simulated 3D dataset + quantify performance<a class="headerlink" href="#(1.2)-Apply-our-earlier-pipeline-to-the-simulated-3D-dataset-+-quantify-performance" title="Link to this heading">¶</a></h2>
+<section id="Apply-2D-model-to-orthogonal-slices">
+<h3>Apply 2D model to orthogonal slices<a class="headerlink" href="#Apply-2D-model-to-orthogonal-slices" title="Link to this heading">¶</a></h3>
+NOTE: Earlier data was shape [256,256,256] and simulated dataset is shape [256,256,256,3]<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
+    model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
+    # model_path = &#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854/modelsave.pt&#39;
+    recon_xy, recon_xz, recon_yz = apply_model_to_orthogonal_slices(model_path, I)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Downsample-along-the-slice-dimension">
+<h3>Downsample along the slice dimension<a class="headerlink" href="#Downsample-along-the-slice-dimension" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
+    down_xy, down_xz, down_yz = recon_down(recon_xy, recon_xz, recon_yz)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(&#39;recon_output.shape =&gt; downsampled_output.shape&#39;)
+print(f&#39;xy: {recon_xy.shape} =&gt; {down_xy.shape}&#39;)
+print(f&#39;xz: {recon_xz.shape} =&gt; {down_xz.shape}&#39;)
+print(f&#39;yz: {recon_yz.shape} =&gt; {down_yz.shape}&#39;)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Generate-MIP-volumes-along-each-axis">
+<h3>Generate MIP-volumes along each axis<a class="headerlink" href="#Generate-MIP-volumes-along-each-axis" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
+    vol_0 = vol_to_mip_rgb(I, 0)
+    vol_1 = vol_to_mip_rgb(I, 1)
+    vol_2 = vol_to_mip_rgb(I, 2)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Combine-3-2D-outputs-into-1-3D-output">
+<h3>Combine 3 2D outputs into 1 3D output<a class="headerlink" href="#Combine-3-2D-outputs-into-1-3D-output" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
+    recon_total = orthogonal_to_3D(down_xy, down_xz, down_yz)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Visualize-the-outputs">
+<h3>Visualize the outputs<a class="headerlink" href="#Visualize-the-outputs" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if False and applyPipelineToSimulatedData:
+    slice_idx = 15 # 0:31
+
+    outdir = &#39;/home/abenneck/Desktop/yolo3d_outputs/gif_frames_0&#39;
+    # for slice_idx in np.arange(down_dim):
+
+    nrow, ncol = 2, 3
+    fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;, sharex=True, sharey=True)
+    axs[0,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
+    axs[0,0].set_title(f&#39;yz[{slice_idx},:,:]&#39;)
+    axs[0,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
+    axs[0,1].set_title(f&#39;xz[:,{slice_idx},:]&#39;)
+    axs[0,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
+    axs[0,2].set_title(f&#39;xy[:,:,{slice_idx}]&#39;)
+
+    print(&#39;Plotting bboxes . . .&#39;)
+
+    # conf_thresh = 0.0
+    scores = recon_total[slice_idx,:,:,-4].ravel()
+    scores[scores &lt; conf_thresh] = 0.0
+    predicted_rectangles = bb_to_rec(recon_total[slice_idx,:,:,:], pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+    axs[1,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
+    axs[1,0].add_collection(predicted_rectangles)
+
+    scores = recon_total[:,slice_idx,:,-4].ravel()
+    scores[scores &lt; conf_thresh] = 0.0
+    predicted_rectangles = bb_to_rec(recon_total[:,slice_idx,:,:], pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+    axs[1,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
+    axs[1,1].add_collection(predicted_rectangles)
+
+    scores = recon_total[:,:,slice_idx,-4].ravel()
+    scores[scores &lt; conf_thresh] = 0.0
+    predicted_rectangles = bb_to_rec(recon_total[:,:,slice_idx,:], pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+    axs[1,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
+    axs[1,2].add_collection(predicted_rectangles)
+
+    fig.set_size_inches(ncol*3, nrow*3)
+    # plt.savefig(os.path.join(outdir, f&#39;recon_slice_{slice_idx:03d}.png&#39;))
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="(1.3)-Quantify-Model-Performance-wrt-GT-bboxes">
+<h2>(1.3) Quantify Model Performance wrt GT bboxes<a class="headerlink" href="#(1.3)-Quantify-Model-Performance-wrt-GT-bboxes" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def yolo_output_to_list(bb_grid):
+
+    if len(bb_grid.shape) == 2:
+        return bb_grid
+
+    if len(bb_grid.shape) == 3:
+        bb_list = bb_grid.reshape(bb_grid.shape[0] * bb_grid.shape[1], bb_grid.shape[2])
+
+    return bb_list
+
+indir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0&#39;
+data = np.load(os.path.join(indir, os.listdir(indir)[0]))
+print(data.shape)
+data_flat = yolo_output_to_list(data)
+print(data_flat[0])
+
+def get_mAP(gt_bboxes, pred_bboxes):
+
+    # Compute IOU between gt_bboxes and pred_bboxes
+
+    # Assign each gt_bbox to a pred_bbox, if applicable
+
+    # Compute (P,R) points for c_thresh = 0:0.01:1 at each iou_thresh = 0:0.05:1
+
+    # Compute AP as area under each PR curve
+    AP = [0,0]
+
+    return AP, np.mean(AP)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+(2148, 1832, 8)
+[-3.75 -2.75 -3.75 -2.75  0.    -inf  -inf  -inf]
+</pre></div></div>
+</div>
+</section>
+<section id="(1.4)-The-Complete-Pipeline">
+<h2>(1.4) The Complete Pipeline<a class="headerlink" href="#(1.4)-The-Complete-Pipeline" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Generate a synthetic dataset
+np.random.seed(0)
+N = 256
+M = 350
+nclasses = 2
+I, bbox, cl = gen_3D_GT(N, M, nclasses, thr_rel=0.15)
+
+# Apply our model to the orthogonal slices
+# model_path = &#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854/modelsave.pt&#39;
+model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
+recon_xy, recon_xz, recon_yz = apply_model_to_orthogonal_slices(model_path, I)
+
+# Downsample along the corresponding slice axis
+down_xy, down_xz, down_yz = recon_down(recon_xy, recon_xz, recon_yz)
+
+# Generate MIP-volumes for downstream visualization
+vol_0 = vol_to_mip_rgb(I, 0)
+vol_1 = vol_to_mip_rgb(I, 1)
+vol_2 = vol_to_mip_rgb(I, 2)
+
+# Combine the 3 orthogonal views into 1 3D view
+recon_total = orthogonal_to_3D(down_xy, down_xz, down_yz)
+
+# Quantify the performance of the model
+<br/></pre></div>
+</div>
+</div>
+<section id="Visualize-results-on-input-image-volume">
+<h3>Visualize results on input image volume<a class="headerlink" href="#Visualize-results-on-input-image-volume" title="Link to this heading">¶</a></h3>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>slice_idx = 15 # 0:31
+
+outdir = &#39;/home/abenneck/Desktop/yolo3d_outputs/gif_frames_0&#39;
+# for slice_idx in np.arange(down_dim):
+
+nrow, ncol = 2, 3
+fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;, sharex=True, sharey=True)
+axs[0,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
+axs[0,0].set_title(f&#39;yz[{slice_idx},:,:]&#39;)
+axs[0,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
+axs[0,1].set_title(f&#39;xz[:,{slice_idx},:]&#39;)
+axs[0,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
+axs[0,2].set_title(f&#39;xy[:,:,{slice_idx}]&#39;)
+
+print(&#39;Plotting bboxes . . .&#39;)
+
+scores = recon_total[slice_idx,:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_total[slice_idx,:,:,:], pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+axs[1,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
+axs[1,0].add_collection(predicted_rectangles)
+
+scores = recon_total[:,slice_idx,:,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_total[:,slice_idx,:,:], pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+axs[1,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
+axs[1,1].add_collection(predicted_rectangles)
+
+scores = recon_total[:,:,slice_idx,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_total[:,:,slice_idx,:], pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+axs[1,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
+axs[1,2].add_collection(predicted_rectangles)
+
+fig.set_size_inches(ncol*3, nrow*3)
+# plt.savefig(os.path.join(outdir, f&#39;recon_slice_{slice_idx:03d}.png&#39;))
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Plotting bboxes . . .
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_3d_52_1.png" src="../_images/notebooks_yolo_3d_52_1.png" />
+</div>
+</div>
+</section>
+</section>
+</section>
+<section id="(2)-Apply-the-above-pipeline-to-real-HDF5-data">
+<h1>(2) Apply the above pipeline to real HDF5 data<a class="headerlink" href="#(2)-Apply-the-above-pipeline-to-real-HDF5-data" title="Link to this heading">¶</a></h1>
+<section id="(2.0)-Apply-model-to-2D-slices-from-3D-volume,-using-tile-method-since-images-are-relatively-large">
+<h2>(2.0) Apply model to 2D slices from 3D volume, using tile method since images are relatively large<a class="headerlink" href="#(2.0)-Apply-model-to-2D-slices-from-3D-volume,-using-tile-method-since-images-are-relatively-large" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start_total = time.time()
+
+# Laod 2D YOLO model
+model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
+net = Net()
+net.load_state_dict(torch.load(model_path))
+B = net.B
+stride = net.stride
+
+# Load HDF5 3D input image
+fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5&#39;
+vol = h5py.File(fname)
+vol_stack = vol[&#39;stack&#39;]
+curr_ax = 1 # [0,1,2]
+next_idx = 8587
+
+# outdir = f&#39;/home/abenneck/Desktop/yolo3d_outputs/Ex_488_Em_525/ax{curr_ax}&#39;
+outdir = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax{curr_ax}&#39;
+
+for idx in np.arange(vol_stack.shape[curr_ax]):
+
+    if idx &lt; next_idx:
+        continue
+
+    # Extract the slice
+    if curr_ax == 0:
+        img = vol_stack[idx,:,:]
+        out_fname = os.path.split(fname)[-1][:-3] + f&#39;idx_{idx:05d}_:_:.npy&#39;
+    elif curr_ax == 1:
+        img = vol_stack[:,idx,:]
+        out_fname = os.path.split(fname)[-1][:-3] + f&#39;idx_:_{idx:05d}_:.npy&#39;
+    elif curr_ax == 2:
+        img = vol_stack[:,:,idx]
+        out_fname = os.path.split(fname)[-1][:-3] + f&#39;idx_:_:_{idx:05d}.npy&#39;
+    else:
+        raise Exception(f&#39;Invalid ax ({curr_ax}) supplied, only ({[k for k in range(2)]}) allowed&#39;)
+
+    # Preprocess using gamma correction + upsampling
+    start = time.time()
+    img_up = preprocess(img)
+    print(f&#39;Finished preprocessing in {time.time()-start:.2f}s&#39;)
+
+    # Extract tiles from the preprocessed input image
+    padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04, verbose=True)
+
+    # Apply model to tiles + apply bbox edge filtering
+    print(&#39;Applying model to tiles . . .&#39;)
+    out = apply_model_to_tiles(tiles, model_path, padded_img.shape[0], padded_img.shape[1], verbose=True)
+
+    # Convert the raw model output into a more useful data structure
+    print(&#39;Postprocessing . . .&#39;)
+    pads = (np.array(padded_img.shape) - np.array(img_up.shape))/2
+    out = torch.tensor(out.clone().detach(), dtype=torch.float32)
+    out = postprocess(out, B, stride, pads, up_factor=2, verbose=True)
+
+    # Save the processed output
+    out_path = os.path.join(outdir, out_fname)
+    if True:
+        np.save(out_path, out)
+
+    # # (11/19/25) Save some additional metadata in an npz file
+    # out_fnamez = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;_metadata.npz&#39;
+    # out_pathz = os.path.join(outdir, out_fnamez)
+    # if False:
+    #     np.savez(out_pathz,
+    #             units = &#39;um&#39;,
+    #             nrow_orig_img = img.shape[0],
+    #             ncol_orig_img = img.shape[1],
+    #             drow_orig_img = 1.866,
+    #             dcol_orig_img = 1.866,
+    #             dslice_orig_img = 2.0,
+    #             nrow_upsampled_img = img_up.shape[0],
+    #             ncol_upsampled_img = img_up.shape[1],
+    #             drow_upsampled_img = 3.732,
+    #             dcol_upsampled_img = 3.732,
+    #             pad_row_top = pads[0],
+    #             pad_row_bot = pads[0],
+    #             pad_col_left = pads[1],
+    #             pad_col_right = pads[1],
+    #             nrow = out.shape[0],
+    #             ncol = out.shape[1],
+    #             drow = 7.464,
+    #             dcol = 7.464,
+    #             note = &quot;Bbox coords refer to the original image, with (0,0) corresponding to the top left pixel center&quot;
+    #             )
+
+    print(f&#39;Saved the outputs for image {idx}/{vol_stack.shape[curr_ax]} in {time.time()-start_total:.2f}s\n&#39;)
+    start_total = time.time()
+<br/><br/></pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished preprocessing in 1.19s
+Finished extracting all tiles in 3.13s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.28s
+Finished tiles 100:300/2178 in 0.90s
+Finished applying model to entire image in 5.02s with 204/2178 (0.094) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/tmp/ipykernel_399209/1616186617.py:53: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  out = torch.tensor(out.clone().detach(), dtype=torch.float32)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Saved the outputs for image 8429/8587 in 36.27s
+
+Finished preprocessing in 1.23s
+Finished extracting all tiles in 3.14s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.27s
+Finished tiles 100:300/2178 in 0.94s
+Finished applying model to entire image in 4.52s with 172/2178 (0.079) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8430/8587 in 10.38s
+
+Finished preprocessing in 1.37s
+Finished extracting all tiles in 3.65s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.02s
+Finished tiles 100:300/2178 in 1.62s
+Finished applying model to entire image in 6.77s with 151/2178 (0.069) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.21s
+Saved the outputs for image 8431/8587 in 62.59s
+
+Finished preprocessing in 2.15s
+Finished extracting all tiles in 4.21s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.36s
+Finished tiles 100:300/2178 in 1.87s
+Finished applying model to entire image in 8.86s with 152/2178 (0.070) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.36s
+Saved the outputs for image 8432/8587 in 17.48s
+
+Finished preprocessing in 1.79s
+Finished extracting all tiles in 4.35s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 3.39s
+Finished tiles 100:300/2178 in 12.45s
+Finished applying model to entire image in 51.88s with 151/2178 (0.069) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8433/8587 in 59.84s
+
+Finished preprocessing in 1.80s
+Finished extracting all tiles in 4.17s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 3.50s
+Finished tiles 100:300/2178 in 15.49s
+Finished applying model to entire image in 77.48s with 223/2178 (0.102) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.18s
+Saved the outputs for image 8434/8587 in 85.38s
+
+Finished preprocessing in 1.31s
+Finished extracting all tiles in 3.25s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.30s
+Finished tiles 100:300/2178 in 0.92s
+Finished applying model to entire image in 4.97s with 186/2178 (0.085) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.20s
+Saved the outputs for image 8435/8587 in 11.47s
+
+Finished preprocessing in 1.65s
+Finished extracting all tiles in 3.80s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.42s
+Finished tiles 100:300/2178 in 1.88s
+Finished tiles 300:1100/2178 in 6.27s
+Finished applying model to entire image in 11.10s with 249/2178 (0.114) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.32s
+Saved the outputs for image 8436/8587 in 18.59s
+
+Finished preprocessing in 1.62s
+Finished extracting all tiles in 3.65s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.12s
+Finished tiles 100:300/2178 in 1.51s
+Finished applying model to entire image in 10.05s with 209/2178 (0.096) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8437/8587 in 17.01s
+
+Finished preprocessing in 2.06s
+Finished extracting all tiles in 4.92s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.31s
+Finished tiles 100:300/2178 in 0.97s
+Finished applying model to entire image in 5.83s with 230/2178 (0.106) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.13s
+Saved the outputs for image 8438/8587 in 14.57s
+
+Finished preprocessing in 1.56s
+Finished extracting all tiles in 4.07s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.05s
+Finished tiles 100:300/2178 in 1.56s
+Finished applying model to entire image in 8.01s with 201/2178 (0.092) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.21s
+Saved the outputs for image 8439/8587 in 15.16s
+
+Finished preprocessing in 1.81s
+Finished extracting all tiles in 4.56s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.87s
+Finished tiles 100:300/2178 in 2.06s
+Finished applying model to entire image in 11.82s with 219/2178 (0.101) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.25s
+Saved the outputs for image 8440/8587 in 20.17s
+
+Finished preprocessing in 2.19s
+Finished extracting all tiles in 3.74s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.50s
+Finished tiles 100:300/2178 in 3.51s
+Finished applying model to entire image in 8.06s with 218/2178 (0.100) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8441/8587 in 15.72s
+
+Finished preprocessing in 1.26s
+Finished extracting all tiles in 3.45s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.40s
+Finished tiles 100:300/2178 in 1.12s
+Finished applying model to entire image in 6.31s with 197/2178 (0.090) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8442/8587 in 12.49s
+
+Finished preprocessing in 1.60s
+Finished extracting all tiles in 4.01s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.81s
+Finished tiles 100:300/2178 in 1.37s
+Finished applying model to entire image in 8.17s with 160/2178 (0.073) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8443/8587 in 15.54s
+
+Finished preprocessing in 1.62s
+Finished extracting all tiles in 3.69s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.56s
+Finished tiles 100:300/2178 in 1.10s
+Finished applying model to entire image in 8.30s with 181/2178 (0.083) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8444/8587 in 15.76s
+
+Finished preprocessing in 1.65s
+Finished extracting all tiles in 3.87s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.26s
+Finished tiles 100:300/2178 in 0.90s
+Finished applying model to entire image in 5.24s with 204/2178 (0.094) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8445/8587 in 12.50s
+
+Finished preprocessing in 1.27s
+Finished extracting all tiles in 3.93s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.90s
+Finished tiles 100:300/2178 in 2.43s
+Finished applying model to entire image in 14.55s with 197/2178 (0.090) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.27s
+Saved the outputs for image 8446/8587 in 21.39s
+
+Finished preprocessing in 2.17s
+Finished extracting all tiles in 5.47s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.42s
+Finished tiles 100:300/2178 in 1.37s
+Finished applying model to entire image in 9.61s with 189/2178 (0.087) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.18s
+Saved the outputs for image 8447/8587 in 19.37s
+
+Finished preprocessing in 2.17s
+Finished extracting all tiles in 5.37s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.91s
+Finished tiles 100:300/2178 in 1.00s
+Finished applying model to entire image in 5.93s with 178/2178 (0.082) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8448/8587 in 44.66s
+
+Finished preprocessing in 1.27s
+Finished extracting all tiles in 3.44s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.41s
+Finished tiles 100:300/2178 in 1.17s
+Finished applying model to entire image in 9.16s with 204/2178 (0.094) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.27s
+Saved the outputs for image 8449/8587 in 15.58s
+
+Finished preprocessing in 1.62s
+Finished extracting all tiles in 3.67s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.38s
+Finished tiles 100:300/2178 in 1.09s
+Finished applying model to entire image in 9.96s with 187/2178 (0.086) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.31s
+Saved the outputs for image 8450/8587 in 17.20s
+
+Finished preprocessing in 1.63s
+Finished extracting all tiles in 3.85s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.62s
+Finished tiles 100:300/2178 in 2.65s
+Finished applying model to entire image in 9.61s with 218/2178 (0.100) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8451/8587 in 16.76s
+
+Finished preprocessing in 1.54s
+Finished extracting all tiles in 3.21s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.30s
+Finished tiles 100:300/2178 in 0.97s
+Finished applying model to entire image in 5.82s with 212/2178 (0.097) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.28s
+Saved the outputs for image 8452/8587 in 12.53s
+
+Finished preprocessing in 1.63s
+Finished extracting all tiles in 3.87s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.62s
+Finished tiles 100:300/2178 in 2.22s
+Finished applying model to entire image in 9.86s with 207/2178 (0.095) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.31s
+Saved the outputs for image 8453/8587 in 17.46s
+
+Finished preprocessing in 1.97s
+Finished extracting all tiles in 3.72s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.32s
+Finished tiles 100:300/2178 in 2.21s
+Finished applying model to entire image in 9.53s with 184/2178 (0.084) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.28s
+Saved the outputs for image 8454/8587 in 17.19s
+
+Finished preprocessing in 1.63s
+Finished extracting all tiles in 4.26s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.33s
+Finished tiles 100:300/2178 in 0.92s
+Finished applying model to entire image in 5.01s with 207/2178 (0.095) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8455/8587 in 12.55s
+
+Finished preprocessing in 1.26s
+Finished extracting all tiles in 3.82s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.40s
+Finished tiles 100:300/2178 in 2.35s
+Finished tiles 300:1100/2178 in 6.60s
+Finished applying model to entire image in 12.44s with 251/2178 (0.115) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.19s
+Saved the outputs for image 8456/8587 in 19.19s
+
+Finished preprocessing in 2.09s
+Finished extracting all tiles in 3.70s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.48s
+Finished tiles 100:300/2178 in 1.34s
+Finished applying model to entire image in 9.69s with 214/2178 (0.098) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.32s
+Saved the outputs for image 8457/8587 in 17.67s
+
+Finished preprocessing in 1.62s
+Finished extracting all tiles in 4.01s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.97s
+Finished tiles 100:300/2178 in 2.67s
+Finished applying model to entire image in 9.05s with 200/2178 (0.092) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8458/8587 in 16.31s
+
+Finished preprocessing in 1.26s
+Finished extracting all tiles in 3.84s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.38s
+Finished tiles 100:300/2178 in 1.21s
+Finished applying model to entire image in 11.36s with 224/2178 (0.103) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.21s
+Saved the outputs for image 8459/8587 in 18.07s
+
+Finished preprocessing in 2.16s
+Finished extracting all tiles in 3.97s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.98s
+Finished tiles 100:300/2178 in 4.79s
+Finished applying model to entire image in 15.87s with 222/2178 (0.102) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.31s
+Saved the outputs for image 8460/8587 in 24.20s
+
+Finished preprocessing in 1.95s
+Finished extracting all tiles in 3.64s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.33s
+Finished tiles 100:300/2178 in 0.87s
+Finished applying model to entire image in 5.75s with 222/2178 (0.102) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8461/8587 in 13.07s
+
+Finished preprocessing in 1.59s
+Finished extracting all tiles in 3.63s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.64s
+Finished tiles 100:300/2178 in 1.80s
+Finished applying model to entire image in 7.74s with 180/2178 (0.083) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.28s
+Saved the outputs for image 8462/8587 in 14.82s
+
+Finished preprocessing in 1.57s
+Finished extracting all tiles in 3.68s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.42s
+Finished tiles 100:300/2178 in 2.34s
+Finished applying model to entire image in 12.22s with 190/2178 (0.087) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.21s
+Saved the outputs for image 8463/8587 in 19.49s
+
+Finished preprocessing in 1.63s
+Finished extracting all tiles in 3.96s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.13s
+Finished tiles 100:300/2178 in 1.46s
+Finished applying model to entire image in 6.60s with 198/2178 (0.091) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8464/8587 in 13.77s
+
+Finished preprocessing in 1.22s
+Finished extracting all tiles in 3.46s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.35s
+Finished tiles 100:300/2178 in 1.83s
+Finished tiles 300:1100/2178 in 5.09s
+Finished applying model to entire image in 10.73s with 244/2178 (0.112) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.27s
+Saved the outputs for image 8465/8587 in 17.12s
+
+Finished preprocessing in 2.18s
+Finished extracting all tiles in 5.11s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.36s
+Finished tiles 100:300/2178 in 1.04s
+Finished tiles 300:1100/2178 in 8.77s
+Finished applying model to entire image in 12.58s with 231/2178 (0.106) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.22s
+Saved the outputs for image 8466/8587 in 22.01s
+
+Finished preprocessing in 1.77s
+Finished extracting all tiles in 3.85s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.79s
+Finished tiles 100:300/2178 in 1.07s
+Finished applying model to entire image in 7.24s with 216/2178 (0.099) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8467/8587 in 14.55s
+
+Finished preprocessing in 1.26s
+Finished extracting all tiles in 3.85s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.43s
+Finished tiles 100:300/2178 in 2.01s
+Finished tiles 300:1100/2178 in 8.05s
+Finished applying model to entire image in 14.98s with 254/2178 (0.117) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.32s
+Saved the outputs for image 8468/8587 in 21.94s
+
+Finished preprocessing in 2.03s
+Finished extracting all tiles in 4.53s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.89s
+Finished tiles 100:300/2178 in 1.35s
+Finished tiles 300:1100/2178 in 3.36s
+Finished applying model to entire image in 8.38s with 236/2178 (0.108) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8469/8587 in 16.89s
+
+Finished preprocessing in 1.63s
+Finished extracting all tiles in 3.71s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.86s
+Finished tiles 100:300/2178 in 2.35s
+Finished applying model to entire image in 8.75s with 210/2178 (0.096) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8470/8587 in 15.80s
+
+Finished preprocessing in 1.24s
+Finished extracting all tiles in 3.64s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.26s
+Finished tiles 100:300/2178 in 3.25s
+Finished applying model to entire image in 15.62s with 222/2178 (0.102) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.24s
+Saved the outputs for image 8471/8587 in 22.34s
+
+Finished preprocessing in 1.70s
+Finished extracting all tiles in 3.71s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.60s
+Finished tiles 100:300/2178 in 2.31s
+Finished applying model to entire image in 10.89s with 214/2178 (0.098) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.20s
+Saved the outputs for image 8472/8587 in 18.46s
+
+Finished preprocessing in 1.58s
+Finished extracting all tiles in 3.71s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.06s
+Finished tiles 100:300/2178 in 0.87s
+Finished applying model to entire image in 5.84s with 204/2178 (0.094) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8473/8587 in 12.81s
+
+Finished preprocessing in 1.24s
+Finished extracting all tiles in 4.77s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.33s
+Finished tiles 100:300/2178 in 2.15s
+Finished applying model to entire image in 12.28s with 223/2178 (0.102) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.26s
+Saved the outputs for image 8474/8587 in 20.14s
+
+Finished preprocessing in 1.86s
+Finished extracting all tiles in 3.71s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.37s
+Finished tiles 100:300/2178 in 1.13s
+Finished applying model to entire image in 7.53s with 190/2178 (0.087) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.13s
+Saved the outputs for image 8475/8587 in 14.74s
+
+Finished preprocessing in 2.14s
+Finished extracting all tiles in 4.45s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.47s
+Finished tiles 100:300/2178 in 1.72s
+Finished applying model to entire image in 7.54s with 201/2178 (0.092) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8476/8587 in 15.93s
+
+Finished preprocessing in 1.28s
+Finished extracting all tiles in 3.21s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.33s
+Finished tiles 100:300/2178 in 1.07s
+Finished tiles 300:1100/2178 in 4.57s
+Finished applying model to entire image in 8.56s with 239/2178 (0.110) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.34s
+Saved the outputs for image 8477/8587 in 14.99s
+
+Finished preprocessing in 1.58s
+Finished extracting all tiles in 3.78s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.93s
+Finished tiles 100:300/2178 in 1.49s
+Finished applying model to entire image in 10.19s with 224/2178 (0.103) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.33s
+Saved the outputs for image 8478/8587 in 17.52s
+
+Finished preprocessing in 1.64s
+Finished extracting all tiles in 3.85s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 2.23s
+Finished tiles 100:300/2178 in 1.46s
+Finished applying model to entire image in 10.52s with 200/2178 (0.092) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.29s
+Saved the outputs for image 8479/8587 in 18.04s
+
+Finished preprocessing in 1.66s
+Finished extracting all tiles in 3.82s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.80s
+Finished tiles 100:300/2178 in 1.47s
+Finished tiles 300:1100/2178 in 4.03s
+Finished applying model to entire image in 10.94s with 229/2178 (0.105) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.09s
+Saved the outputs for image 8480/8587 in 47.10s
+
+Finished preprocessing in 1.24s
+Finished extracting all tiles in 3.18s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.29s
+Finished tiles 100:300/2178 in 0.99s
+Finished tiles 300:1100/2178 in 6.85s
+Finished applying model to entire image in 10.74s with 242/2178 (0.111) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.27s
+Saved the outputs for image 8481/8587 in 16.78s
+
+Finished preprocessing in 2.19s
+Finished extracting all tiles in 4.64s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.78s
+Finished tiles 100:300/2178 in 1.77s
+Finished applying model to entire image in 11.00s with 225/2178 (0.103) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.20s
+Saved the outputs for image 8482/8587 in 19.97s
+
+Finished preprocessing in 1.59s
+Finished extracting all tiles in 3.70s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.62s
+Finished tiles 100:300/2178 in 2.05s
+Finished applying model to entire image in 10.81s with 205/2178 (0.094) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.34s
+Saved the outputs for image 8483/8587 in 17.98s
+
+Finished preprocessing in 1.25s
+Finished extracting all tiles in 3.19s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.27s
+Finished tiles 100:300/2178 in 0.99s
+Finished applying model to entire image in 7.67s with 199/2178 (0.091) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.13s
+Saved the outputs for image 8484/8587 in 13.76s
+
+Finished preprocessing in 1.80s
+Finished extracting all tiles in 3.70s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.31s
+Finished tiles 100:300/2178 in 1.04s
+Finished applying model to entire image in 11.33s with 219/2178 (0.101) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8485/8587 in 18.70s
+
+Finished preprocessing in 2.08s
+Finished extracting all tiles in 4.18s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.66s
+Finished tiles 100:300/2178 in 2.47s
+Finished applying model to entire image in 9.90s with 202/2178 (0.093) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.25s
+Saved the outputs for image 8486/8587 in 18.24s
+
+Finished preprocessing in 1.72s
+Finished extracting all tiles in 3.33s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.28s
+Finished tiles 100:300/2178 in 1.04s
+Finished applying model to entire image in 6.62s with 218/2178 (0.100) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.28s
+Saved the outputs for image 8487/8587 in 13.62s
+
+Finished preprocessing in 2.17s
+Finished extracting all tiles in 3.91s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.69s
+Finished tiles 100:300/2178 in 1.98s
+Finished tiles 300:1100/2178 in 4.28s
+Finished applying model to entire image in 9.41s with 234/2178 (0.107) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.13s
+Saved the outputs for image 8488/8587 in 17.34s
+
+Finished preprocessing in 2.15s
+Finished extracting all tiles in 5.20s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.65s
+Finished tiles 100:300/2178 in 2.32s
+Finished applying model to entire image in 11.64s with 223/2178 (0.102) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.31s
+Saved the outputs for image 8489/8587 in 20.99s
+
+Finished preprocessing in 1.60s
+Finished extracting all tiles in 3.42s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.27s
+Finished tiles 100:300/2178 in 0.98s
+Finished applying model to entire image in 5.15s with 212/2178 (0.097) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8490/8587 in 11.72s
+
+Finished preprocessing in 2.10s
+Finished extracting all tiles in 4.32s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.99s
+Finished tiles 100:300/2178 in 2.02s
+Finished tiles 300:1100/2178 in 5.91s
+Finished applying model to entire image in 11.90s with 266/2178 (0.122) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.24s
+Saved the outputs for image 8491/8587 in 20.30s
+
+Finished preprocessing in 1.64s
+Finished extracting all tiles in 3.76s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.51s
+Finished tiles 100:300/2178 in 2.04s
+Finished tiles 300:1100/2178 in 4.38s
+Finished applying model to entire image in 10.15s with 249/2178 (0.114) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.31s
+Saved the outputs for image 8492/8587 in 17.38s
+
+Finished preprocessing in 1.58s
+Finished extracting all tiles in 4.85s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.48s
+Finished tiles 100:300/2178 in 1.18s
+Finished applying model to entire image in 5.94s with 217/2178 (0.100) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8493/8587 in 14.02s
+
+Finished preprocessing in 1.23s
+Finished extracting all tiles in 4.72s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.74s
+Finished tiles 100:300/2178 in 1.27s
+Finished applying model to entire image in 12.52s with 213/2178 (0.098) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8494/8587 in 20.22s
+
+Finished preprocessing in 1.81s
+Finished extracting all tiles in 3.68s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.66s
+Finished tiles 100:300/2178 in 1.09s
+Finished tiles 300:1100/2178 in 3.75s
+Finished applying model to entire image in 7.72s with 235/2178 (0.108) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.24s
+Saved the outputs for image 8495/8587 in 15.08s
+
+Finished preprocessing in 2.13s
+Finished extracting all tiles in 3.72s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.65s
+Finished tiles 100:300/2178 in 1.82s
+Finished tiles 300:1100/2178 in 4.66s
+Finished applying model to entire image in 8.87s with 245/2178 (0.112) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.13s
+Saved the outputs for image 8496/8587 in 16.44s
+
+Finished preprocessing in 1.28s
+Finished extracting all tiles in 3.42s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 2.50s
+Finished tiles 100:300/2178 in 2.21s
+Finished tiles 300:1100/2178 in 5.22s
+Finished applying model to entire image in 11.74s with 235/2178 (0.108) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.31s
+Saved the outputs for image 8497/8587 in 18.10s
+
+Finished preprocessing in 1.65s
+Finished extracting all tiles in 3.74s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.13s
+Finished tiles 100:300/2178 in 1.14s
+Finished applying model to entire image in 11.08s with 224/2178 (0.103) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.35s
+Saved the outputs for image 8498/8587 in 18.64s
+
+Finished preprocessing in 1.88s
+Finished extracting all tiles in 3.73s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.27s
+Finished tiles 100:300/2178 in 1.17s
+Finished applying model to entire image in 10.04s with 226/2178 (0.104) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8499/8587 in 17.83s
+
+Finished preprocessing in 1.24s
+Finished extracting all tiles in 3.31s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.29s
+Finished tiles 100:300/2178 in 0.93s
+Finished tiles 300:1100/2178 in 6.01s
+Finished applying model to entire image in 10.12s with 235/2178 (0.108) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8500/8587 in 16.52s
+
+Finished preprocessing in 2.16s
+Finished extracting all tiles in 4.16s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 2.08s
+Finished tiles 100:300/2178 in 1.92s
+Finished applying model to entire image in 14.26s with 225/2178 (0.103) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8501/8587 in 22.67s
+
+Finished preprocessing in 2.15s
+Finished extracting all tiles in 3.75s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.19s
+Finished tiles 100:300/2178 in 1.06s
+Finished applying model to entire image in 6.92s with 188/2178 (0.086) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8502/8587 in 14.53s
+
+Finished preprocessing in 1.30s
+Finished extracting all tiles in 3.18s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.42s
+Finished tiles 100:300/2178 in 2.86s
+Finished applying model to entire image in 8.55s with 198/2178 (0.091) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.26s
+Saved the outputs for image 8503/8587 in 14.88s
+
+Finished preprocessing in 1.62s
+Finished extracting all tiles in 3.78s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.09s
+Finished tiles 100:300/2178 in 1.10s
+Finished tiles 300:1100/2178 in 5.45s
+Finished applying model to entire image in 11.03s with 270/2178 (0.124) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.19s
+Saved the outputs for image 8504/8587 in 18.34s
+
+Finished preprocessing in 2.18s
+Finished extracting all tiles in 5.03s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.46s
+Finished tiles 100:300/2178 in 1.13s
+Finished tiles 300:1100/2178 in 6.34s
+Finished applying model to entire image in 12.05s with 249/2178 (0.114) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.24s
+Saved the outputs for image 8505/8587 in 21.38s
+
+Finished preprocessing in 1.21s
+Finished extracting all tiles in 3.20s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.29s
+Finished tiles 100:300/2178 in 0.95s
+Finished tiles 300:1100/2178 in 4.28s
+Finished applying model to entire image in 8.67s with 234/2178 (0.107) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8506/8587 in 15.02s
+
+Finished preprocessing in 2.09s
+Finished extracting all tiles in 5.36s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.61s
+Finished tiles 100:300/2178 in 2.78s
+Finished applying model to entire image in 12.75s with 211/2178 (0.097) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.19s
+Saved the outputs for image 8507/8587 in 21.96s
+
+Finished preprocessing in 2.17s
+Finished extracting all tiles in 3.90s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.76s
+Finished tiles 100:300/2178 in 1.14s
+Finished applying model to entire image in 9.12s with 221/2178 (0.101) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.10s
+Saved the outputs for image 8508/8587 in 16.89s
+
+Finished preprocessing in 1.26s
+Finished extracting all tiles in 3.16s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.46s
+Finished tiles 100:300/2178 in 2.62s
+Finished tiles 300:1100/2178 in 3.35s
+Finished applying model to entire image in 9.20s with 229/2178 (0.105) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8509/8587 in 15.20s
+
+Finished preprocessing in 2.17s
+Finished extracting all tiles in 3.91s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.59s
+Finished tiles 100:300/2178 in 1.10s
+Finished applying model to entire image in 8.88s with 201/2178 (0.092) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8510/8587 in 16.88s
+
+Finished preprocessing in 1.96s
+Finished extracting all tiles in 3.86s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.52s
+Finished tiles 100:300/2178 in 1.09s
+Finished applying model to entire image in 9.40s with 214/2178 (0.098) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.28s
+Saved the outputs for image 8511/8587 in 17.32s
+
+Finished preprocessing in 2.12s
+Finished extracting all tiles in 3.66s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.61s
+Finished tiles 100:300/2178 in 1.54s
+Finished tiles 300:1100/2178 in 6.97s
+Finished applying model to entire image in 13.15s with 253/2178 (0.116) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8512/8587 in 48.61s
+
+Finished preprocessing in 1.28s
+Finished extracting all tiles in 3.18s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.29s
+Finished tiles 100:300/2178 in 0.96s
+Finished tiles 300:1100/2178 in 9.49s
+Finished applying model to entire image in 14.53s with 239/2178 (0.110) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.16s
+Saved the outputs for image 8513/8587 in 20.75s
+
+Finished preprocessing in 1.61s
+Finished extracting all tiles in 3.74s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.69s
+Finished tiles 100:300/2178 in 1.14s
+Finished tiles 300:1100/2178 in 5.07s
+Finished applying model to entire image in 11.86s with 243/2178 (0.112) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.32s
+Saved the outputs for image 8514/8587 in 19.36s
+
+Finished preprocessing in 2.12s
+Finished extracting all tiles in 5.44s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.56s
+Finished tiles 100:300/2178 in 1.11s
+Finished applying model to entire image in 5.44s with 203/2178 (0.093) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8515/8587 in 14.69s
+
+Finished preprocessing in 1.21s
+Finished extracting all tiles in 3.62s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.14s
+Finished tiles 100:300/2178 in 1.91s
+Finished applying model to entire image in 9.24s with 165/2178 (0.076) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.18s
+Saved the outputs for image 8516/8587 in 15.77s
+
+Finished preprocessing in 1.57s
+Finished extracting all tiles in 3.72s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.25s
+Finished tiles 100:300/2178 in 2.57s
+Finished applying model to entire image in 9.42s with 166/2178 (0.076) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.32s
+Saved the outputs for image 8517/8587 in 16.80s
+
+Finished preprocessing in 1.68s
+Finished extracting all tiles in 3.71s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.35s
+Finished tiles 100:300/2178 in 2.08s
+Finished tiles 300:1100/2178 in 4.54s
+Finished applying model to entire image in 9.87s with 227/2178 (0.104) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.20s
+Saved the outputs for image 8518/8587 in 17.33s
+
+Finished preprocessing in 1.20s
+Finished extracting all tiles in 3.22s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.29s
+Finished tiles 100:300/2178 in 0.96s
+Finished tiles 300:1100/2178 in 5.62s
+Finished applying model to entire image in 9.91s with 240/2178 (0.110) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.26s
+Saved the outputs for image 8519/8587 in 16.14s
+
+Finished preprocessing in 1.56s
+Finished extracting all tiles in 3.68s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.45s
+Finished tiles 100:300/2178 in 1.98s
+Finished tiles 300:1100/2178 in 5.05s
+Finished applying model to entire image in 10.81s with 243/2178 (0.112) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.29s
+Saved the outputs for image 8520/8587 in 18.08s
+
+Finished preprocessing in 1.96s
+Finished extracting all tiles in 3.70s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.93s
+Finished tiles 100:300/2178 in 1.68s
+Finished tiles 300:1100/2178 in 5.17s
+Finished applying model to entire image in 11.43s with 230/2178 (0.106) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8521/8587 in 18.99s
+
+Finished preprocessing in 1.68s
+Finished extracting all tiles in 3.28s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.33s
+Finished tiles 100:300/2178 in 0.98s
+Finished tiles 300:1100/2178 in 2.55s
+Finished applying model to entire image in 7.59s with 234/2178 (0.107) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.19s
+Saved the outputs for image 8522/8587 in 14.38s
+
+Finished preprocessing in 1.58s
+Finished extracting all tiles in 3.74s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.80s
+Finished tiles 100:300/2178 in 1.68s
+Finished tiles 300:1100/2178 in 6.95s
+Finished applying model to entire image in 13.49s with 222/2178 (0.102) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.20s
+Saved the outputs for image 8523/8587 in 20.73s
+
+Finished preprocessing in 1.58s
+Finished extracting all tiles in 3.71s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.52s
+Finished tiles 100:300/2178 in 1.76s
+Finished applying model to entire image in 12.42s with 217/2178 (0.100) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.15s
+Saved the outputs for image 8524/8587 in 19.49s
+
+Finished preprocessing in 1.26s
+Finished extracting all tiles in 3.24s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.31s
+Finished tiles 100:300/2178 in 0.96s
+Finished tiles 300:1100/2178 in 4.72s
+Finished applying model to entire image in 10.22s with 234/2178 (0.107) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.27s
+Saved the outputs for image 8525/8587 in 16.65s
+
+Finished preprocessing in 2.11s
+Finished extracting all tiles in 4.74s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.56s
+Finished tiles 100:300/2178 in 1.28s
+Finished applying model to entire image in 9.52s with 208/2178 (0.096) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.33s
+Saved the outputs for image 8526/8587 in 18.59s
+
+Finished preprocessing in 1.66s
+Finished extracting all tiles in 3.71s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.76s
+Finished tiles 100:300/2178 in 2.69s
+Finished tiles 300:1100/2178 in 5.08s
+Finished applying model to entire image in 12.21s with 240/2178 (0.110) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8527/8587 in 19.69s
+
+Finished preprocessing in 1.25s
+Finished extracting all tiles in 3.18s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.29s
+Finished tiles 100:300/2178 in 1.01s
+Finished tiles 300:1100/2178 in 3.40s
+Finished applying model to entire image in 7.16s with 214/2178 (0.098) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.16s
+Saved the outputs for image 8528/8587 in 13.18s
+
+Finished preprocessing in 1.57s
+Finished extracting all tiles in 3.81s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.69s
+Finished tiles 100:300/2178 in 1.23s
+Finished applying model to entire image in 9.32s with 178/2178 (0.082) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.16s
+Saved the outputs for image 8529/8587 in 16.62s
+
+Finished preprocessing in 2.14s
+Finished extracting all tiles in 3.85s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.87s
+Finished tiles 100:300/2178 in 2.68s
+Finished applying model to entire image in 11.45s with 164/2178 (0.075) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.19s
+Saved the outputs for image 8530/8587 in 19.57s
+
+Finished preprocessing in 1.47s
+Finished extracting all tiles in 3.23s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.28s
+Finished tiles 100:300/2178 in 0.92s
+Finished applying model to entire image in 3.88s with 157/2178 (0.072) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.16s
+Saved the outputs for image 8531/8587 in 10.43s
+
+Finished preprocessing in 1.62s
+Finished extracting all tiles in 3.65s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.42s
+Finished tiles 100:300/2178 in 2.40s
+Finished applying model to entire image in 10.93s with 188/2178 (0.086) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.35s
+Saved the outputs for image 8532/8587 in 18.46s
+
+Finished preprocessing in 2.05s
+Finished extracting all tiles in 3.75s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.65s
+Finished tiles 100:300/2178 in 2.45s
+Finished applying model to entire image in 9.35s with 203/2178 (0.093) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.21s
+Saved the outputs for image 8533/8587 in 17.23s
+
+Finished preprocessing in 1.69s
+Finished extracting all tiles in 3.98s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.31s
+Finished tiles 100:300/2178 in 0.84s
+Finished applying model to entire image in 4.65s with 182/2178 (0.084) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8534/8587 in 11.91s
+
+Finished preprocessing in 1.38s
+Finished extracting all tiles in 3.96s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.46s
+Finished tiles 100:300/2178 in 1.28s
+Finished applying model to entire image in 11.63s with 200/2178 (0.092) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8535/8587 in 18.65s
+
+Finished preprocessing in 2.02s
+Finished extracting all tiles in 4.57s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.32s
+Finished tiles 100:300/2178 in 2.21s
+Finished tiles 300:1100/2178 in 4.29s
+Finished applying model to entire image in 9.66s with 215/2178 (0.099) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.15s
+Saved the outputs for image 8536/8587 in 18.04s
+
+Finished preprocessing in 2.13s
+Finished extracting all tiles in 3.89s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.33s
+Finished tiles 100:300/2178 in 0.91s
+Finished tiles 300:1100/2178 in 2.87s
+Finished applying model to entire image in 5.78s with 220/2178 (0.101) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8537/8587 in 13.57s
+
+Finished preprocessing in 1.46s
+Finished extracting all tiles in 3.73s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.89s
+Finished tiles 100:300/2178 in 1.25s
+Finished tiles 300:1100/2178 in 4.13s
+Finished applying model to entire image in 9.96s with 233/2178 (0.107) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8538/8587 in 16.76s
+
+Finished preprocessing in 2.08s
+Finished extracting all tiles in 5.30s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.54s
+Finished tiles 100:300/2178 in 1.70s
+Finished tiles 300:1100/2178 in 7.77s
+Finished applying model to entire image in 14.17s with 229/2178 (0.105) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.15s
+Saved the outputs for image 8539/8587 in 23.63s
+
+Finished preprocessing in 2.14s
+Finished extracting all tiles in 3.64s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.31s
+Finished tiles 100:300/2178 in 1.03s
+Finished tiles 300:1100/2178 in 2.88s
+Finished applying model to entire image in 9.59s with 262/2178 (0.120) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.29s
+Saved the outputs for image 8540/8587 in 17.34s
+
+Finished preprocessing in 2.07s
+Finished extracting all tiles in 4.57s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.46s
+Finished tiles 100:300/2178 in 1.22s
+Finished tiles 300:1100/2178 in 6.56s
+Finished applying model to entire image in 11.98s with 275/2178 (0.126) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.20s
+Saved the outputs for image 8541/8587 in 20.79s
+
+Finished preprocessing in 2.14s
+Finished extracting all tiles in 4.50s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.52s
+Finished tiles 100:300/2178 in 1.58s
+Finished applying model to entire image in 7.28s with 205/2178 (0.094) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.15s
+Saved the outputs for image 8542/8587 in 16.04s
+
+Finished preprocessing in 1.60s
+Finished extracting all tiles in 3.46s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.31s
+Finished tiles 100:300/2178 in 1.02s
+Finished applying model to entire image in 5.59s with 205/2178 (0.094) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.27s
+Saved the outputs for image 8543/8587 in 12.81s
+
+Finished preprocessing in 1.25s
+Finished extracting all tiles in 3.24s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.30s
+Finished tiles 100:300/2178 in 1.24s
+Finished applying model to entire image in 6.64s with 196/2178 (0.090) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.22s
+Saved the outputs for image 8544/8587 in 41.59s
+
+Finished preprocessing in 1.85s
+Finished extracting all tiles in 5.12s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.86s
+Finished tiles 100:300/2178 in 2.27s
+Finished applying model to entire image in 13.05s with 207/2178 (0.095) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.19s
+Saved the outputs for image 8545/8587 in 22.11s
+
+Finished preprocessing in 2.06s
+Finished extracting all tiles in 5.27s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.44s
+Finished tiles 100:300/2178 in 2.98s
+Finished tiles 300:1100/2178 in 4.68s
+Finished applying model to entire image in 9.97s with 242/2178 (0.111) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.13s
+Saved the outputs for image 8546/8587 in 19.01s
+
+Finished preprocessing in 1.23s
+Finished extracting all tiles in 3.31s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.01s
+Finished tiles 100:300/2178 in 1.77s
+Finished tiles 300:1100/2178 in 3.95s
+Finished applying model to entire image in 10.36s with 223/2178 (0.102) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8547/8587 in 16.44s
+
+Finished preprocessing in 1.88s
+Finished extracting all tiles in 3.78s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.62s
+Finished tiles 100:300/2178 in 1.08s
+Finished applying model to entire image in 9.27s with 216/2178 (0.099) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.24s
+Saved the outputs for image 8548/8587 in 17.07s
+
+Finished preprocessing in 1.59s
+Finished extracting all tiles in 3.68s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.68s
+Finished tiles 100:300/2178 in 1.22s
+Finished tiles 300:1100/2178 in 5.25s
+Finished applying model to entire image in 13.16s with 244/2178 (0.112) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.13s
+Saved the outputs for image 8549/8587 in 20.37s
+
+Finished preprocessing in 1.26s
+Finished extracting all tiles in 3.19s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.24s
+Finished tiles 100:300/2178 in 0.82s
+Finished applying model to entire image in 7.35s with 174/2178 (0.080) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.31s
+Saved the outputs for image 8550/8587 in 13.68s
+
+Finished preprocessing in 1.55s
+Finished extracting all tiles in 3.68s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.60s
+Finished tiles 100:300/2178 in 1.27s
+Finished applying model to entire image in 9.06s with 189/2178 (0.087) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8551/8587 in 16.01s
+
+Finished preprocessing in 1.88s
+Finished extracting all tiles in 3.72s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.85s
+Finished tiles 100:300/2178 in 1.35s
+Finished tiles 300:1100/2178 in 6.06s
+Finished applying model to entire image in 11.18s with 230/2178 (0.106) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8552/8587 in 18.89s
+
+Finished preprocessing in 2.14s
+Finished extracting all tiles in 3.25s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.32s
+Finished tiles 100:300/2178 in 0.95s
+Finished applying model to entire image in 4.80s with 190/2178 (0.087) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.29s
+Saved the outputs for image 8553/8587 in 12.25s
+
+Finished preprocessing in 2.14s
+Finished extracting all tiles in 4.75s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.83s
+Finished tiles 100:300/2178 in 2.55s
+Finished applying model to entire image in 8.55s with 157/2178 (0.072) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8554/8587 in 17.33s
+
+Finished preprocessing in 2.06s
+Finished extracting all tiles in 5.47s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.18s
+Finished tiles 100:300/2178 in 1.51s
+Finished applying model to entire image in 6.79s with 167/2178 (0.077) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.33s
+Saved the outputs for image 8555/8587 in 16.27s
+
+Finished preprocessing in 1.60s
+Finished extracting all tiles in 3.67s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.27s
+Finished tiles 100:300/2178 in 0.86s
+Finished applying model to entire image in 3.90s with 150/2178 (0.069) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8556/8587 in 10.77s
+
+Finished preprocessing in 1.21s
+Finished extracting all tiles in 3.70s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.10s
+Finished tiles 100:300/2178 in 2.30s
+Finished applying model to entire image in 7.54s with 145/2178 (0.067) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8557/8587 in 14.17s
+
+Finished preprocessing in 1.58s
+Finished extracting all tiles in 3.67s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.92s
+Finished tiles 100:300/2178 in 1.90s
+Finished applying model to entire image in 9.24s with 174/2178 (0.080) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.32s
+Saved the outputs for image 8558/8587 in 16.50s
+
+Finished preprocessing in 2.14s
+Finished extracting all tiles in 4.86s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.70s
+Finished tiles 100:300/2178 in 1.42s
+Finished applying model to entire image in 7.43s with 187/2178 (0.086) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8559/8587 in 16.49s
+
+Finished preprocessing in 1.25s
+Finished extracting all tiles in 3.25s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.29s
+Finished tiles 100:300/2178 in 0.98s
+Finished tiles 300:1100/2178 in 3.49s
+Finished applying model to entire image in 8.28s with 221/2178 (0.101) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8560/8587 in 14.66s
+
+Finished preprocessing in 2.17s
+Finished extracting all tiles in 5.53s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.10s
+Finished tiles 100:300/2178 in 1.70s
+Finished tiles 300:1100/2178 in 8.39s
+Finished applying model to entire image in 14.20s with 220/2178 (0.101) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8561/8587 in 23.97s
+
+Finished preprocessing in 1.61s
+Finished extracting all tiles in 3.74s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.13s
+Finished tiles 100:300/2178 in 1.10s
+Finished applying model to entire image in 7.00s with 177/2178 (0.081) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.13s
+Saved the outputs for image 8562/8587 in 13.98s
+
+Finished preprocessing in 1.24s
+Finished extracting all tiles in 3.30s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.42s
+Finished tiles 100:300/2178 in 2.04s
+Finished applying model to entire image in 10.99s with 169/2178 (0.078) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.16s
+Saved the outputs for image 8563/8587 in 17.09s
+
+Finished preprocessing in 1.62s
+Finished extracting all tiles in 4.09s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.36s
+Finished tiles 100:300/2178 in 3.63s
+Finished applying model to entire image in 11.37s with 209/2178 (0.096) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.18s
+Saved the outputs for image 8564/8587 in 19.15s
+
+Finished preprocessing in 1.61s
+Finished extracting all tiles in 3.72s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.52s
+Finished tiles 100:300/2178 in 2.46s
+Finished applying model to entire image in 7.67s with 193/2178 (0.089) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8565/8587 in 14.59s
+
+Finished preprocessing in 1.23s
+Finished extracting all tiles in 3.35s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.81s
+Finished tiles 100:300/2178 in 1.40s
+Finished applying model to entire image in 10.06s with 206/2178 (0.095) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.25s
+Saved the outputs for image 8566/8587 in 16.23s
+
+Finished preprocessing in 1.78s
+Finished extracting all tiles in 4.36s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.03s
+Finished tiles 100:300/2178 in 1.49s
+Finished tiles 300:1100/2178 in 4.69s
+Finished applying model to entire image in 11.50s with 226/2178 (0.104) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.16s
+Saved the outputs for image 8567/8587 in 19.62s
+
+Finished preprocessing in 1.78s
+Finished extracting all tiles in 3.73s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.80s
+Finished tiles 100:300/2178 in 2.01s
+Finished tiles 300:1100/2178 in 4.84s
+Finished applying model to entire image in 10.26s with 247/2178 (0.113) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.18s
+Saved the outputs for image 8568/8587 in 17.74s
+
+Finished preprocessing in 1.26s
+Finished extracting all tiles in 3.24s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.30s
+Finished tiles 100:300/2178 in 0.91s
+Finished applying model to entire image in 7.13s with 199/2178 (0.091) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.28s
+Saved the outputs for image 8569/8587 in 13.23s
+
+Finished preprocessing in 1.75s
+Finished extracting all tiles in 3.89s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.92s
+Finished tiles 100:300/2178 in 1.94s
+Finished applying model to entire image in 9.35s with 195/2178 (0.090) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8570/8587 in 17.09s
+
+Finished preprocessing in 2.15s
+Finished extracting all tiles in 4.87s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.72s
+Finished tiles 100:300/2178 in 2.40s
+Finished applying model to entire image in 10.45s with 199/2178 (0.091) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.19s
+Saved the outputs for image 8571/8587 in 19.36s
+
+Finished preprocessing in 1.64s
+Finished extracting all tiles in 3.27s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.27s
+Finished tiles 100:300/2178 in 0.91s
+Finished applying model to entire image in 4.23s with 160/2178 (0.073) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.15s
+Saved the outputs for image 8572/8587 in 11.11s
+
+Finished preprocessing in 2.09s
+Finished extracting all tiles in 3.70s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.38s
+Finished tiles 100:300/2178 in 3.01s
+Finished applying model to entire image in 9.11s with 162/2178 (0.074) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.32s
+Saved the outputs for image 8573/8587 in 17.14s
+
+Finished preprocessing in 1.76s
+Finished extracting all tiles in 4.35s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.32s
+Finished tiles 100:300/2178 in 2.50s
+Finished applying model to entire image in 7.87s with 171/2178 (0.079) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.29s
+Saved the outputs for image 8574/8587 in 16.17s
+
+Finished preprocessing in 1.56s
+Finished extracting all tiles in 3.72s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.29s
+Finished tiles 100:300/2178 in 0.91s
+Finished applying model to entire image in 4.76s with 190/2178 (0.087) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8575/8587 in 11.72s
+
+Finished preprocessing in 1.25s
+Finished extracting all tiles in 4.11s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.22s
+Finished tiles 100:300/2178 in 2.68s
+Finished tiles 300:1100/2178 in 5.93s
+Finished applying model to entire image in 13.23s with 215/2178 (0.099) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.29s
+Saved the outputs for image 8576/8587 in 55.75s
+
+Finished preprocessing in 2.14s
+Finished extracting all tiles in 3.97s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.40s
+Finished tiles 100:300/2178 in 1.53s
+Finished applying model to entire image in 10.44s with 161/2178 (0.074) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.20s
+Saved the outputs for image 8577/8587 in 18.67s
+
+Finished preprocessing in 2.09s
+Finished extracting all tiles in 3.69s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.33s
+Finished tiles 100:300/2178 in 0.94s
+Finished applying model to entire image in 4.18s with 175/2178 (0.080) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8578/8587 in 11.65s
+
+Finished preprocessing in 1.78s
+Finished extracting all tiles in 4.51s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.54s
+Finished tiles 100:300/2178 in 1.06s
+Finished applying model to entire image in 9.37s with 161/2178 (0.074) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.17s
+Saved the outputs for image 8579/8587 in 17.41s
+
+Finished preprocessing in 2.15s
+Finished extracting all tiles in 4.00s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.90s
+Finished tiles 100:300/2178 in 1.42s
+Finished applying model to entire image in 5.92s with 122/2178 (0.056) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.14s
+Saved the outputs for image 8580/8587 in 13.87s
+
+Finished preprocessing in 1.61s
+Finished extracting all tiles in 3.74s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.38s
+Finished tiles 100:300/2178 in 2.43s
+Finished applying model to entire image in 6.53s with 197/2178 (0.090) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.12s
+Saved the outputs for image 8581/8587 in 13.59s
+
+Finished preprocessing in 1.22s
+Finished extracting all tiles in 3.48s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 1.30s
+Finished tiles 100:300/2178 in 1.51s
+Finished applying model to entire image in 9.41s with 177/2178 (0.081) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.30s
+Saved the outputs for image 8582/8587 in 15.69s
+
+Finished preprocessing in 2.15s
+Finished extracting all tiles in 4.64s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.93s
+Finished tiles 100:300/2178 in 2.62s
+Finished applying model to entire image in 11.67s with 202/2178 (0.093) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.16s
+Saved the outputs for image 8583/8587 in 20.42s
+
+Finished preprocessing in 1.88s
+Finished extracting all tiles in 3.71s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.37s
+Finished tiles 100:300/2178 in 1.62s
+Finished applying model to entire image in 5.44s with 188/2178 (0.086) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.11s
+Saved the outputs for image 8584/8587 in 12.77s
+
+Finished preprocessing in 1.23s
+Finished extracting all tiles in 3.23s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.82s
+Finished tiles 100:300/2178 in 1.52s
+Finished applying model to entire image in 7.52s with 175/2178 (0.080) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.18s
+Saved the outputs for image 8585/8587 in 13.56s
+
+Finished preprocessing in 2.11s
+Finished extracting all tiles in 3.28s
+Applying model to tiles . . .
+Finished tiles 0:100/2178 in 0.36s
+Finished tiles 100:300/2178 in 1.25s
+Finished applying model to entire image in 3.78s with 84/2178 (0.039) tiles marked as foreground
+Postprocessing . . .
+Finished postprocessing in 0.32s
+Saved the outputs for image 8586/8587 in 11.46s
+
+</pre></div></div>
+</div>
+</section>
+<section id="(2.1)-Downsample-each-dataset-along-the-'slice'-dimension">
+<h2>(2.1) Downsample each dataset along the ‘slice’ dimension<a class="headerlink" href="#(2.1)-Downsample-each-dataset-along-the-'slice'-dimension" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># curr_ax, idx_start = 0, 3600
+# curr_ax, idx_start = 1, 8587
+curr_ax, idx_start = 2, 7321
+
+indir = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax{curr_ax}&#39;
+outdir = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax{curr_ax}_down&#39;
+conf_idx = 4
+n_files = len(os.listdir(indir))
+ds_factor = 4
+
+ds_count = 0
+recon_down = []
+time_start = time.time()
+
+for idx, fname in enumerate(sorted(os.listdir(indir))):
+
+    if idx &lt; idx_start:
+        continue
+
+    # Increment count for current number of slices in the &quot;to-be-downsampled&quot; stack
+    ds_count += 1
+
+    # Load slice data
+    data = np.load(os.path.join(indir, fname))
+
+    # Append slice to the stack before downsampling
+    recon_down.append(data)
+
+    # Downsample every &#39;ds_factor&#39; (4) slices
+    if ds_count == ds_factor:
+        recon_down = np.stack(recon_down)
+        inds = np.argmax(recon_down[..., conf_idx], axis = 0)
+        recon_down_out = np.take_along_axis(recon_down, inds[None, :, :, None], axis=0)
+        recon_down_out = recon_down_out[0]
+
+        # Save downsampled output
+        out_fname = fname[:30] + f&#39;_ax{curr_ax}_{idx-3:05d}:{idx:05d}.npy&#39;
+        np.save(os.path.join(outdir, out_fname), recon_down_out)
+        print(f&#39;Downsampled slices {idx-3}-{idx}/{n_files} in {time.time()-time_start:.02f}s and saved outputs at {out_fname}&#39;)
+        # break
+
+        # Reset counts + empty the primary data structure
+        time_start = time.time()
+        recon_down = []
+        ds_count = 0
+</pre></div>
+</div>
+</div>
+<section id="Plot-the-Results">
+<h3>Plot the Results<a class="headerlink" href="#Plot-the-Results" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Set parameters
+ds_factor = 4
+curr_ax = 2 # [0,1,2]
+orig_slice_idx = 3500 # {0:[0,3600],1:[0,8587],2:[0,7321]}
+out_slice_idx = int(orig_slice_idx/ds_factor)
+
+# Load HDF5 3D input image
+if curr_ax == 0:
+    fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5&#39;
+    vol = h5py.File(fname)
+    vol_stack = vol[&#39;stack&#39;]
+    img = vol_stack[orig_slice_idx, :, :]
+    img_title = f&#39;original[{orig_slice_idx},:,:]&#39;
+    img_mip = vol_to_mip(vol_stack, curr_ax, ds_factor = 4, slice_idx = orig_slice_idx)
+    img_mip_title = f&#39;MIP[{out_slice_idx},:,:] = max(original[{orig_slice_idx}:{orig_slice_idx+4},:,:], axis={curr_ax})&#39;
+    slice_fname = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax{curr_ax}/Ex_488_Em_525_stitched_chunk32idx_{orig_slice_idx:05d}_:_:.npy&#39;
+elif curr_ax == 1:
+    fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5&#39;
+    vol = h5py.File(fname)
+    vol_stack = vol[&#39;stack&#39;]
+    img = vol_stack[:, orig_slice_idx, :]
+    img_title = f&#39;original[:,{orig_slice_idx},:]&#39;
+    img_mip = vol_to_mip(vol_stack, curr_ax, ds_factor = 4, slice_idx = orig_slice_idx)
+    img_mip_title = f&#39;MIP[:,{out_slice_idx},:] = max(original[:,{orig_slice_idx}:{orig_slice_idx+4},:], axis={curr_ax})&#39;
+    slice_fname = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax{curr_ax}/Ex_488_Em_525_stitched_chunk32idx_:_{orig_slice_idx:05d}_:.npy&#39;
+else: # curr_ax = 2
+    fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_full_sag.h5&#39;
+    vol = h5py.File(fname)
+    vol_stack = vol[&#39;stack&#39;]
+    img = vol_stack[:, :, orig_slice_idx]
+    img_title = f&#39;original[:,:,{orig_slice_idx}]&#39;
+    img_mip = vol_to_mip(vol_stack, curr_ax, ds_factor = 4, slice_idx = orig_slice_idx)
+    img_mip_title = f&#39;MIP[:,:,{out_slice_idx}] = max(original[:,:,{orig_slice_idx}:{orig_slice_idx+4}], axis={curr_ax})&#39;
+    slice_fname = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax{curr_ax}/Ex_488_Em_525_stitched_full_sagidx_:_:_{orig_slice_idx:05d}.npy&#39;
+print(&#39;Finished loading images&#39;)
+
+# Load output files
+recon_orig = np.load(slice_fname)
+slice_fname_ds = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax{curr_ax}_down/Ex_488_Em_525_stitched_full_sa_ax{curr_ax}_{orig_slice_idx:05d}:{orig_slice_idx+3:05d}.npy&#39;
+recon_ds = np.load(slice_fname_ds)
+print(&#39;Finished loading outputs&#39;)
+
+# Generate visualization
+fig, axs = plt.subplots(2, 2, layout=&#39;constrained&#39;, sharex=True, sharey=True)
+axs[0,0].imshow(img)
+axs[0,0].set_title(img_title)
+
+time_start = time.time()
+scores = recon_orig[:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_orig, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,0].imshow(img)
+axs[1,0].add_collection(predicted_rectangles)
+print(f&#39;Finished orig bboxes in {time.time()-time_start:.02f}s&#39;)
+
+axs[0,1].imshow(img_mip)
+axs[0,1].set_title(img_mip_title)
+
+time_start = time.time()
+scores = recon_ds[:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(recon_ds, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1,1].imshow(img_mip)
+axs[1,1].add_collection(predicted_rectangles)
+print(f&#39;Finished ds bboxes in {time.time()-time_start:.02f}s&#39;)
+
+for ax_i in axs:
+    for ax in ax_i:
+        # ax.set_xlim([4500,4750])
+        # ax.set_ylim([1250,1000])
+        # ax.set_xlim([5000,5250])
+        # ax.set_ylim([1250,1000])
+        ax.set_xlim([1750,1800])
+        ax.set_ylim([2950,2900])
+
+fig.set_size_inches(7,7)
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="(2.2)-Stitch-together-downsampled-slices-+-save-ijk-cubes">
+<h2>(2.2) Stitch together downsampled slices + save ijk cubes<a class="headerlink" href="#(2.2)-Stitch-together-downsampled-slices-+-save-ijk-cubes" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes&#39;
+
+indir0 = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0_down&#39;
+data0 = np.load(os.path.join(indir0,os.listdir(indir0)[0]))
+shape0 = data0.shape
+
+indir1 = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax1_down&#39;
+data1 = np.load(os.path.join(indir1,os.listdir(indir1)[0]))
+shape1 = data1.shape
+
+indir2 = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax2_down&#39;
+data2 = np.load(os.path.join(indir2,os.listdir(indir2)[0]))
+shape2 = data2.shape
+
+out_dim = 256
+final_shape = np.array([shape1[0], shape0[0], shape0[1]])
+bbox_dim = 7 # Used to init 3D recon
+num_classes = 3 # Used to init 3D recon
+
+n_cube_i = final_shape[0] // out_dim # Num complete cubes along respective axis
+n_cube_j = final_shape[1] // out_dim # Num complete cubes along respective axis
+n_cube_k = final_shape[2] // out_dim # Num complete cubes along respective axis
+
+next_i = 2
+next_j = 5
+next_k = 3
+
+# Load 256 slices from each dir, stack them into 3 volumes, and combine the volumes into a 3D representation
+for i in np.arange(n_cube_i + 1): # (+1) added to include edge case cubes
+
+    if i &lt; next_i:
+        continue
+
+    for j in np.arange(n_cube_j + 1):
+
+        if j &lt; next_j and i &lt;= next_i:
+            continue
+
+        for k in np.arange(n_cube_k + 1):
+
+            if k &lt; next_k and i &lt;= next_i and j &lt;= next_j:
+                continue
+
+            # If cube lies on edge of volume, adjust relative idx accordingly
+            edge_str = &#39;edge &#39; if i == n_cube_i or j == n_cube_j or k == n_cube_k else &#39;&#39;
+            edge_i_end_idx = final_shape[0] if i == n_cube_i else (i+1)*(out_dim)
+            edge_j_end_idx = final_shape[1] if j == n_cube_j else (j+1)*(out_dim)
+            edge_k_end_idx = final_shape[2] - 2 if k == n_cube_k else (k+1)*(out_dim)
+            # print(f&#39;End idx: ({edge_i_end_idx}, {edge_j_end_idx}, {edge_k_end_idx})&#39;)
+
+            print(f&#39;Starting {edge_str}cube ({i},{j},{k}) . . .&#39;)
+            time_total = time.time()
+
+            # Load and stack outputs from ax0 slices
+            time_start = time.time()
+            out_stack0 = []
+            count0 = 0
+            idx_start0 = i*out_dim
+            for idx, fname in enumerate(sorted(os.listdir(indir0))):
+                if idx &lt; idx_start0:
+                    continue
+                out_slice = np.memmap(os.path.join(indir0,fname), dtype=np.float32, shape = shape0)
+
+                # TODO: Extract relevant 256x256 image from whole image before adding image to the stack
+                out_slice = out_slice[(j*out_dim):edge_j_end_idx,(k*out_dim):edge_k_end_idx,:]
+                out_stack0.append(out_slice)
+
+                count0 += 1
+                if count0 == out_dim:
+                    count0 = 0
+                    break
+            out_stack0 = np.stack(out_stack0, axis = 0)
+            print(f&#39;Finished ax0 in {time.time()-time_start:.2f}s with shape {out_stack0.shape}&#39;)
+
+            # Load and stack outputs from ax1 slices
+            time_start = time.time()
+            out_stack1 = []
+            count1 = 0
+            idx_start1 = j*out_dim
+            for idx, fname in enumerate(sorted(os.listdir(indir1))):
+                if idx &lt; idx_start1:
+                    continue
+                out_slice = np.memmap(os.path.join(indir1,fname), dtype=np.float32, shape = shape1)
+
+                # TODO: Extract relevant 256x256 image from whole image before adding image to the stack
+                out_slice = out_slice[(i*out_dim):edge_i_end_idx,(k*out_dim):edge_k_end_idx,:]
+                out_stack1.append(out_slice)
+
+                count1 += 1
+                if count1 == out_dim:
+                    count1 = 0
+                    break
+            out_stack1 = np.stack(out_stack1, axis = 0).transpose(1,0,2,3)
+            print(f&#39;Finished ax1 in {time.time()-time_start:.2f}s with shape {out_stack1.shape}&#39;)
+
+            # Load and stack outputs from ax2 slices
+            time_start = time.time()
+            out_stack2 = []
+            count2 = 0
+            idx_start2 = k*out_dim
+            for idx, fname in enumerate(sorted(os.listdir(indir2))):
+                if idx &lt; idx_start2:
+                    continue
+                out_slice = np.memmap(os.path.join(indir2,fname), dtype=np.float32, shape = shape2)
+
+                # TODO: Extract relevant 256x256 image from whole image before adding image to the stack
+                out_slice = out_slice[(i*out_dim):edge_i_end_idx,(j*out_dim):edge_j_end_idx,:]
+                out_stack2.append(out_slice)
+
+                count2 += 1
+                if count2 == out_dim:
+                    count2 = 0
+                    break
+            out_stack2 = np.stack(out_stack2, axis = 0).transpose(1,2,0,3)
+            print(f&#39;Finished ax2 in {time.time()-time_start:.2f}s with shape {out_stack2.shape}&#39;)
+
+            # Combine the 3 volumes into 1 volume where each elem is a bounding cube
+            i_lim = final_shape[0] % out_dim - 1 if i == n_cube_i else out_dim
+            j_lim = final_shape[1] % out_dim - 3 if j == n_cube_j else out_dim
+            k_lim = final_shape[2] % out_dim - 2 if k == n_cube_k else out_dim
+            # print(i_lim, j_lim, k_lim)
+            recon_total = np.ones((out_dim, out_dim, out_dim, bbox_dim+num_classes))*(-np.inf)
+            for i_ in np.arange(i_lim):
+                for j_ in np.arange(j_lim):
+                    for k_ in np.arange(k_lim):
+
+                        xmin = (out_stack2[i_,j_,k_,1] + out_stack1[i_,j_,k_,1]) / 2
+                        xmax = (out_stack2[i_,j_,k_,3] + out_stack1[i_,j_,k_,3]) / 2
+                        ymin = (out_stack2[i_,j_,k_,0] + out_stack0[i_,j_,k_,1]) / 2
+                        ymax = (out_stack2[i_,j_,k_,2] + out_stack0[i_,j_,k_,3]) / 2
+                        zmin = (out_stack1[i_,j_,k_,0] + out_stack0[i_,j_,k_,0]) / 2
+                        zmax = (out_stack1[i_,j_,k_,2] + out_stack0[i_,j_,k_,2]) / 2
+
+                        conf = np.min([out_stack0[i_,j_,k_,4], out_stack1[i_,j_,k_,4], out_stack2[i_,j_,k_,4]])
+
+                        cl0 = np.mean([out_stack0[i_,j_,k_,5], out_stack1[i_,j_,k_,5], out_stack2[i_,j_,k_,5]])
+                        cl1 = np.mean([out_stack0[i_,j_,k_,6], out_stack1[i_,j_,k_,6], out_stack2[i_,j_,k_,6]])
+                        cl2 = np.mean([out_stack0[i_,j_,k_,7], out_stack1[i_,j_,k_,7], out_stack2[i_,j_,k_,7]])
+
+                        recon_total[i_,j_,k_] = [xmin, xmax, ymin, ymax, zmin, zmax, conf, cl0, cl1, cl2]
+
+            # Save output cube using ijk format in fname
+            out_fname = f&#39;i{i:04d}_j{j:04d}_k{k:04d}_d{out_dim}_Ex_488_Em_525.npy&#39;
+            # out_fname = f&#39;i{i:04d}_j{j:04d}_k{k:04d}_di{ilim}_dj{j_lim}_dk{k_lim}_Ex_488_Em_525.npy&#39;
+            np.save(os.path.join(outdir, out_fname), recon_total)
+            print(f&#39;Saved cube ({i},{j},{k}) in {time.time()-time_total:.2f}s as {out_fname} in {outdir}\n&#39;)
+
+            # break
+        # break
+    # break
+<br/></pre></div>
+</div>
+</div>
+<section id="Plot-Results">
+<h3>Plot Results<a class="headerlink" href="#Plot-Results" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Set key parameters
+ds_factor = 4
+out_dim = 256
+orig_slice_dim = out_dim * ds_factor
+mid_slice_dim = int(orig_slice_dim / 2)
+shift = 768
+
+# Load output data cube + extract data from relevant slices
+time_start = time.time()
+outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes&#39;
+i, j, k = 2, 3, 3
+out_fname = f&#39;i{i:04d}_j{j:04d}_k{k:04d}_d{out_dim}_Ex_488_Em_525.npy&#39;
+data = np.load(os.path.join(outdir, out_fname))
+
+orig_slice_idx0 = (i*1024)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax0
+down_slice_idx0 = int((orig_slice_idx0 % 1024) / ds_factor)
+data0 = data[down_slice_idx0,:,:,:]
+
+orig_slice_idx1 = (j*1024)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax1
+down_slice_idx1 = int((orig_slice_idx1 % 1024) / ds_factor)
+data1 = data[:,down_slice_idx1,:,:]
+
+orig_slice_idx2 = (k*1024)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax2
+down_slice_idx2 = int((orig_slice_idx2 % 1024) / ds_factor)
+data2 = data[:,:,down_slice_idx2,:]
+print(f&#39;Finished loading bbox data in {time.time()-time_start:.2f}s&#39;)
+
+# Load original HDF5 3D images + convert to MIPs for visualization
+time_start = time.time()
+fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5&#39;
+vol = h5py.File(fname)
+vol_stack = vol[&#39;stack&#39;]
+img_mip0 = vol_to_mip(vol_stack, 0, ds_factor = 4, slice_idx = orig_slice_idx0)
+
+fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5&#39;
+vol = h5py.File(fname)
+vol_stack = vol[&#39;stack&#39;]
+img_mip1 = vol_to_mip(vol_stack, 1, ds_factor = 4, slice_idx = orig_slice_idx1)
+
+fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_full_sag.h5&#39;
+vol = h5py.File(fname)
+vol_stack = vol[&#39;stack&#39;]
+img_mip2 = vol_to_mip(vol_stack, 2, ds_factor = 4, slice_idx = orig_slice_idx2)
+print(f&#39;Finished loading images in {time.time()-time_start:.2f}s&#39;)
+
+# Initialize output figure
+time_start = time.time()
+nrow, ncol = 6,1
+fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;)
+axs[0].imshow(img_mip0)
+axs[0].add_patch(Rectangle((orig_slice_idx1-512,orig_slice_idx2-512),1024-shift,1024-shift,fc=&#39;none&#39;,ec=&#39;r&#39;))
+axs[0].set_title(f&#39;ax0=yz[{orig_slice_idx0},:,:]&#39;)
+axs[2].imshow(img_mip1)
+axs[2].set_title(f&#39;ax1=xz[:,{orig_slice_idx1},:]&#39;)
+axs[2].add_patch(Rectangle((orig_slice_idx2-512,orig_slice_idx0-512),1024-shift,1024-shift,fc=&#39;none&#39;,ec=&#39;r&#39;))
+axs[4].imshow(img_mip2)
+axs[4].set_title(f&#39;ax2=xy[:,:,{orig_slice_idx2}]&#39;)
+axs[4].add_patch(Rectangle((orig_slice_idx1-512,orig_slice_idx0-512),1024-shift,1024-shift,fc=&#39;none&#39;,ec=&#39;r&#39;))
+
+print(&#39;Plotting bboxes . . .&#39;)
+
+scores = data0[:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(data0, pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[1].imshow(img_mip0)
+axs[1].add_collection(predicted_rectangles)
+axs[1].set_xlim([orig_slice_idx1-512, orig_slice_idx1+512-shift])
+axs[1].set_ylim([orig_slice_idx2-512, orig_slice_idx2+512-shift])
+
+scores = data1[:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(data1, pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[3].imshow(img_mip1)
+axs[3].add_collection(predicted_rectangles)
+axs[3].set_xlim([orig_slice_idx2-512, orig_slice_idx2+512-shift])
+axs[3].set_ylim([orig_slice_idx0-512, orig_slice_idx0+512-shift])
+
+scores = data2[:,:,-4].ravel()
+predicted_rectangles = bb_to_rec(data2, pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+axs[5].imshow(img_mip2)
+axs[5].add_collection(predicted_rectangles)
+axs[5].set_xlim([orig_slice_idx1-512, orig_slice_idx1+512-shift])
+axs[5].set_ylim([orig_slice_idx0-512, orig_slice_idx0+512-shift])
+
+fig.set_size_inches(ncol*8, nrow*5)
+# plt.savefig(os.path.join(outdir, f&#39;recon_slice_{slice_idx:03d}.png&#39;))
+print(f&#39;Finished plotting everything in {time.time()-time_start:.2f}s&#39;)
+
+if False:
+    fig.savefig(os.path.join(&#39;/home/abenneck/Desktop/yolo3d_outputs/&#39;,&#39;slices_cube_i2_j3_k3_refined2.jpg&#39;))
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="(2.3)-Max-pool-ijk-cubes-n-times-by-a-factor-of-2">
+<h2>(2.3) Max pool ijk cubes n times by a factor of 2<a class="headerlink" href="#(2.3)-Max-pool-ijk-cubes-n-times-by-a-factor-of-2" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">(0) Apply 2D model to 3D volume of 2D coronal slices</a><ul>
+<li><a class="reference internal" href="#(0.0)-Extract-a-3D-volume-from-a-stack-of-2D-slices">(0.0) Extract a 3D volume from a stack of 2D slices</a></li>
+<li><a class="reference internal" href="#(0.1)-Stack-+-interpolate-the-slices-to-have-one-isotropic-cube-of-data">(0.1) Stack + interpolate the slices to have one isotropic cube of data</a></li>
+<li><a class="reference internal" href="#(0.2)-Apply-the-network-to-each-slice-along-all-3-cardinal-planes">(0.2) Apply the network to each slice along all 3 cardinal planes</a></li>
+<li><a class="reference internal" href="#(0.3)-Downsample-the-outputs-along-the-'tile_dim'-axis">(0.3) Downsample the outputs along the ‘tile_dim’ axis</a></li>
+<li><a class="reference internal" href="#(0.4)-Stitch-together-3-2D-outputs-into-1-3D-output-of-the-same-shape">(0.4) Stitch together 3 2D outputs into 1 3D output of the same shape</a><ul>
+<li><a class="reference internal" href="#Summary-Statistics">Summary Statistics</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(0.5)-Visualize-the-outputs">(0.5) Visualize the outputs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(1)-Quantify-model-performance-on-a-3D-simulated-dataset">(1) Quantify model performance on a 3D simulated dataset</a><ul>
+<li><a class="reference internal" href="#(1.1)-Initialize-a-3D-volume-w/-cells-+-artifacts">(1.1) Initialize a 3D volume w/ cells + artifacts</a><ul>
+<li><a class="reference internal" href="#Generate-the-3D-simulated-dataset">Generate the 3D simulated dataset</a></li>
+<li><a class="reference internal" href="#Generate-+-save-orthogonal-views-of-the-data-(frames-for-the-gif)">Generate + save orthogonal views of the data (frames for the gif)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(1.2)-Apply-our-earlier-pipeline-to-the-simulated-3D-dataset-+-quantify-performance">(1.2) Apply our earlier pipeline to the simulated 3D dataset + quantify performance</a><ul>
+<li><a class="reference internal" href="#Apply-2D-model-to-orthogonal-slices">Apply 2D model to orthogonal slices</a></li>
+<li><a class="reference internal" href="#Downsample-along-the-slice-dimension">Downsample along the slice dimension</a></li>
+<li><a class="reference internal" href="#Generate-MIP-volumes-along-each-axis">Generate MIP-volumes along each axis</a></li>
+<li><a class="reference internal" href="#Combine-3-2D-outputs-into-1-3D-output">Combine 3 2D outputs into 1 3D output</a></li>
+<li><a class="reference internal" href="#Visualize-the-outputs">Visualize the outputs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(1.3)-Quantify-Model-Performance-wrt-GT-bboxes">(1.3) Quantify Model Performance wrt GT bboxes</a></li>
+<li><a class="reference internal" href="#(1.4)-The-Complete-Pipeline">(1.4) The Complete Pipeline</a><ul>
+<li><a class="reference internal" href="#Visualize-results-on-input-image-volume">Visualize results on input image volume</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(2)-Apply-the-above-pipeline-to-real-HDF5-data">(2) Apply the above pipeline to real HDF5 data</a><ul>
+<li><a class="reference internal" href="#(2.0)-Apply-model-to-2D-slices-from-3D-volume,-using-tile-method-since-images-are-relatively-large">(2.0) Apply model to 2D slices from 3D volume, using tile method since images are relatively large</a></li>
+<li><a class="reference internal" href="#(2.1)-Downsample-each-dataset-along-the-'slice'-dimension">(2.1) Downsample each dataset along the ‘slice’ dimension</a><ul>
+<li><a class="reference internal" href="#Plot-the-Results">Plot the Results</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(2.2)-Stitch-together-downsampled-slices-+-save-ijk-cubes">(2.2) Stitch together downsampled slices + save ijk cubes</a><ul>
+<li><a class="reference internal" href="#Plot-Results">Plot Results</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(2.3)-Max-pool-ijk-cubes-n-times-by-a-factor-of-2">(2.3) Max pool ijk cubes n times by a factor of 2</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/notebooks/yolo_3d.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">(0) Apply 2D model to 3D volume of 2D coronal slices</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Andrew Bennecke, Daniel Tward.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>
