@@ -63,7 +63,7 @@ class GroundTruthDataset(torch.utils.data.Dataset):
         # sample the sizes, they will all be isotropic here to start
         # s = 10*np.exp(np.random.randn(m,2)*0.2)
         # s = 5*np.exp(np.random.randn(m,2)*0.2 + 1) # try smaller, but with variance
-        s = 3 + np.random.rand(m,2)*20 # 
+        s = 3 + np.random.rand(m,2)*20 # Size of the cell
         
         
         # note bbox is xy not row col
@@ -100,7 +100,8 @@ class GroundTruthDataset(torch.utils.data.Dataset):
             theta = ti
             Rows_ = (Rows-ci[1])*np.cos(theta) - (Cols-ci[0])*np.sin(theta)
             Cols_ = (Rows-ci[1])*np.sin(theta) + (Cols-ci[0])*np.cos(theta)
-            
+
+            # si is the std of the Gaussian, so width of bbox is 2 std's
             if cli <= 1:
                 mask = np.exp(-(((Rows_[...,top:bottom,left:right]/si[1])**2 + (Cols_[...,top:bottom,left:right]/si[0])**2)/2*3**2)**(1 + 2*cli)) 
             else:

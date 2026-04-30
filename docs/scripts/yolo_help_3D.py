@@ -161,8 +161,6 @@ class GroundTruthDataset3D(torch.utils.data.Dataset):
         
         return I,bbox,cl
 
-
-
 class Net(torch.nn.Module):
     """
     A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of variable shape. 
@@ -304,7 +302,6 @@ class Net(torch.nn.Module):
         
         return x
         
-
 class VariableInputConv2d(torch.nn.Module):
     ''' Note the assumption here is that we have batch size one, so I can work with the batch dimension.
     This version adds a few extra convolutions.
@@ -366,558 +363,472 @@ class VariableInputConv2d(torch.nn.Module):
         self.out = out
         return out
 
-# class VariableInputConv2d(torch.nn.Module):
-#     """The input layer to the YOLO neural network which takes an input image of size 1 x N x R x C, applies several convolutions to the image, and outputs an image of size 1 x M x R x C where N is variable and M is fixed. The assumption here is that we have a batch size of 1, so the batch dimension can be manipulated. This is accomplished via the following workflow:
-    
-#     (1): Move channel dimension to batch dimension, so that we now have N samples with 1 channel each
-#         - 1 x N x R x C => N x 1 x R x C
-#     (2) Apply some convolutions and relu operations, so that we now have an N x M array of images where M is fixed and N is variable
-#         - N x 1 x R x C => N x M x R x C
-#     (3) Take a softmax over all N channels and multiply
-#         - N x M x R x C => 1 x M x R x C
-#     (4) Return the result with a fixed number of channels
-    
-#     Note that this layer makes our overall network permutation invariant (i.e. if we input an RGB image, or a BGR image, the output would be exactly the same.
-
-#     Parameters:
-#     -----------
-#     M : int
-#         The desired number of output channels, independent of the number of input channels
-
-#     Returns:
-#     --------
-#     out : torch.tensor of size 1 x M x R x C
-    
-#     """
-#     def __init__(self,M):
-#         super().__init__()
-#         self.M = M
-#         self.c0  = torch.nn.Conv2d(1,M,3,1,1)
-#         self.c1  = torch.nn.Conv2d(M,M,3,1,1)
-#         self.c2  = torch.nn.Conv2d(M,M,3,1,1)
-        
-        
-#     def forward(self,x):
-#         # move the batch dim, make the size N x 1 x R x C
-#         x = x[0,:,None]
-        
-#         # apply the conv layer, make the size N x M x R x C
-#         cx = torch.relu(self.c0(x))
-#         cx = torch.relu(self.c1(cx))
-#         cx = self.c2(cx)
-#         cx = torch.softmax(cx*100,0)
-        
-#         # now matrix multiply
-#         out = torch.sum(x*cx,0,keepdims=True)
-#         self.out = out
-#         return out
-        
-
-
-def bbox_to_rectangles(bbox,**kwargs):
+def apply_model_to_orthogonal_slices(model_path, I):
     """
-    This function converts a set of bounding boxes of the form [cx,cy,w,h] to a set of rectangular objects for visualization purposes
+    Apply the 2D YOLO model to all the slices in each orothognal view of the volume I
 
     Parameters:
-    -----------
-    bbox : A N x 4 array[numpy.float64]
-        Contains the bbox info N bboxes of the form [xc,cy,w,h]
+    ===========
+    model_path : str
+        The path to the saved weights of the pretrained YOLO model
+    I : array
+        The 3D volume to be processed by the 2D YOLO model. Expects shape [N,N,N,d] where N is the desired cube size and d is the number of channels.
 
     Returns:
-    --------
-    out : matplotlib.collections.PolyCollection 
-        Contains N rectangles to be plotted later
-    
+    ========
+    recon_xy: array
+        The 3D reconstruction generated from applying the model to XY slices. 
+    recon_xz: array
+        The 3D reconstruction generated from applying the model to XZ slices. 
+    recon_yz: array
+        The 3D reconstruction generated from applying the model to YZ slices. 
     """
-    N = bbox.shape[0]
-    p0 = np.stack((bbox[:,0],bbox[:,1]),-1)
-    p1 = np.stack((bbox[:,0]+bbox[:,2],bbox[:,1]),-1)
-    p2 = np.stack((bbox[:,0]+bbox[:,2],bbox[:,1]+bbox[:,3]),-1)
-    p3 = np.stack((bbox[:,0],bbox[:,1]+bbox[:,3]),-1)
-    p = np.stack((p0,p1,p2,p3),-2)
-    p = p.reshape(N*4,2)
-    f = np.arange(N*4)
-    f = f.reshape(-1,4)
     
-    return PolyCollection(p[f],**kwargs)
-
-
-
-def convert_data(out,B,stride):
-    """
-    Convert the outputs from the YOLO neural network into bounding boxes for performance quantification. Note that this operation is not differentiable. It also outputs the raw data, reformmated into a list intsead of an image of grid cells. These outputs are differentiable. The last one of these outputs is the score (data[...,-1]). Note that class probabilities are NOT output by this function. 
-
-    Parameters:
-    -----------
-    out : torch.Tensor
-        The output object from the primary YOLO neural network
-    B : int
-        The number of bounding boxes per block that the model will output.  (Automatically defined when initializing the network)
-    stride : int
-        The number of pixels to pass over when convolving the input image in each layer (Automatically defined when initializing the network)
-
-    Returns:
-    --------
-    bboxes : torch.Tensor of size N x 4
-        N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,scalex,scaley]. There are no gradient computations done here. These bounding boxes are for visualization or downstream analysis.
-    data : torch.Tensor of size N x 5
-        N is the number of bounding boxes output from the network; Bounding boxes are of the form [cx,cy,w,h,conf]. There are gradient computations done here. These are for our loss function and, potentially, other downstream analysis.
-    
-    """
-    # Get the positions of the grid cells
-    x = torch.arange(out.shape[-1])*stride + (stride-1)/2
-    y = torch.arange(out.shape[-2])*stride + (stride-1)/2
-    YX = torch.stack(torch.meshgrid(y,x,indexing='ij'),0)
-    
-    bboxes = []
-    data = []
-    for i in range(B):
-        # Get the five numbers defining a bbox
-        outB = out[:,5*i:5*(i+1)]
-        
-        # Get the standard bbox coordinates for drawing and computing iou; They don't go into the loss
-        x = (torch.sigmoid(outB[:,0])-0.5)*stride + YX[1] # between -0.5 and 0.5, scaled
-        y = (torch.sigmoid(outB[:,1])-0.5)*stride + YX[0]
-        w = torch.exp(outB[:,2])*stride
-        h = torch.exp(outB[:,3])*stride
-        x = x - w/2
-        y = y - h/2
-
-        bboxes.append(torch.stack( (x.ravel(),y.ravel(),w.ravel(),h.ravel()) ).clone().detach())
-
-        # now the data that I actually need for the loss
-        # needs to be differentiable
-
-        c = torch.sigmoid(outB[:,4])
-
-
-        # these numbers need to be compared to the appropriate boxes
-        cx = torch.sigmoid(outB[:,0])-0.5
-        cy = torch.sigmoid(outB[:,1])-0.5
-        ws = torch.exp(outB[:,2])
-        hs = torch.exp(outB[:,3])    
-        data.append(torch.stack((cx.ravel(),cy.ravel(),ws.ravel(),hs.ravel(),c.ravel(),)))
-
-
-    bboxes = torch.cat(bboxes,-1).T
-    data = torch.cat(data,-1).T
-
-    return bboxes,data
-
-
-
-def get_assignment_inds(bboxes,bbox,shape,stride,B):
-    """
-    Assigns each training bounding box to a specific cell, and picks the bounding box from that cell with the best iou.
-
-    Parameters:
-    -----------
-    bboxes : torch.Tensor of size [N, 4]
-        N is the number of bounding boxes computed for a single image and is equal to (np.shape(I)[0] / stride) * (np.shape(I)[0] / stride) * net.B
-    bbox : torch.Tensor of size [X, 4]
-        X is the true number of bboxes associated with image I
-    shape : 4-dimensional torch.Tensor
-        The shape of the data directly output from the YOLO neural network
-    stride : int
-        The number of pixels to pass over when convolving the input image in each layer (Automatically defined when initializing the network)
-    B : int
-        The number of bboxes generated by the YOLO neural network at each block
-
-    Returns:
-    --------
-    assignment_inds : numpy array of size X
-        The index of the bounding box from the 'bboxes' parameter cooresponding to the ith bounding box from the 'bbox' parameter
-    ious : numpy array of size X
-        The iou between the ith bounding box from the 'bbox' parameter, and the corresponding bbox from the 'bboxes' parameter
-
-    """
-    # this should be the shape of the outputs
-    x = np.arange(shape[-1])*stride + (stride-1)/2
-    y = np.arange(shape[-2])*stride + (stride-1)/2
-    YX = np.stack(np.meshgrid(y,x,indexing='ij'),0).reshape(2,-1)
-
-    cx_bbox = bbox[...,0] + bbox[...,2]/2
-    cy_bbox = bbox[...,1] + bbox[...,3]/2
-
-    # each bbox should lie in exactly one cell
-    d2 = (cx_bbox[:,None] - YX[1,None,:])**2 + (cy_bbox[:,None] - YX[0,None,:])**2
-    assignment_inds = np.argmin(d2,-1)        
-    # the assignment ind will be used for classification
-
-
-    # after I figure out the cell I will calculate IOU
-    # and pick the best
-    # note the diag here is not a good idea, I need to avoid pairwise and just do it pointwise
-    ious = []
-    for i in range(B):
-        #ious.append( np.diag(iou(bboxes[assignment_inds+(bboxes.shape[0]//B)*i].numpy(),bbox) ))    
-        # print()
-        ious.append( iou(bboxes[assignment_inds+(bboxes.shape[0]//B)*i].numpy(),bbox,nopairwise=True) )
-    ious = np.stack(ious,0)    
-    B_inds = np.argmax(ious,0)    
-    assignment_inds = assignment_inds + ((B_inds*bboxes.shape[0]//B)*i)
-
-    ious = np.take_along_axis(ious,B_inds[None],axis=0)[0]
-    
-    return assignment_inds, ious
-
-
-def get_best_bounding_box_per_cell(bboxes,scores,B):
-    """
-    Get the best bounding box for each cell output from the YOLO neural network. 
-
-    Parameters:
-    -----------
-    bboxes : torch.Tensor of size [N, 4]
-        N is the number of bounding boxes computed for a single image and is equal to (np.shape(I)[0] / stride) * (np.shape(I)[0] / stride) * net.B
-    scores : torch.Tensor of size [N,1]
-        The confidence for each corresponding box in the 'bboxes' parameter
-    B : int
-        Default - 2; The number of bboxes generated by the YOLO neural network at each cell
-
-    Returns:
-    --------
-    bboxes_out : torch.Tensor of size [N/B, 4]
-        A list of the best bounding boxes for each cell
-    scores_out : torch.Tensor of size [N/B, 1]
-        A list of the confidence for the corresponding bounding boxes in 'bboxes_out'
-        
-    """
-
-    scores_out = scores.reshape(B,-1)
-    inds = torch.argmax(scores_out,0)
-    scores_out = torch.take_along_dim(scores_out,inds[None,:],0).squeeze()
-
-    bboxes_out = bboxes.reshape(B,-1,4)
-    bboxes_out = torch.take_along_dim(bboxes_out,inds[None,:,None],0).squeeze()
-
-    return bboxes_out, scores_out
-
-
-def get_reg_targets(assignment_inds,bbox,B,shape,stride):
-    """What are the true bounding box parameters we want to predict.
-
-    Parameters:
-    -----------
-    assignment_inds : numpy array of size X
-        The idx at position i corresponds to the bounding box output from the YOLO framework which most accurately encompasses bounding box 'i' in the 'bbox' (ground truth labels) parameter
-    bbox : torch.Tensor of size [X, 4]
-        X is the true number of bboxes associated with image I
-    B : int
-        The number of bboxes generated by the YOLO neural network at each block
-    shape : 4-dimensional torch.Tensor
-        The shape of the data directly output from the YOLO neural network
-    stride : int
-        The number of pixels to pass over when convolving the input image in each layer (Automatically defined when initializing the network)
-
-    Returns:
-    --------
-    shiftx : numpy array of shape [X,]
-        Defines the shift in x needed to align bbox[i] with the corresponding best estimated bounding box
-    shifty : numpy array of shape [X,]
-        Defines the shift in y needed to align bbox[i] with the corresponding best estimated bounding box
-    scalex : numpy array of shape [X,]
-        Defines the scale in x needed to align bbox[i] with the corresponding best estimated bounding box
-    scaley : numpy array of shape [X,]
-        Defines the scale in y needed to align bbox[i] with the corresponding best estimated bounding box
-    
-    """
-    # get the yx positions of each bbox
-    x = np.arange(shape[-1])*stride + (stride-1)/2
-    y = np.arange(shape[-2])*stride + (stride-1)/2
-    YX = np.stack(np.meshgrid(y,x,indexing='ij'),0).reshape(2,-1)
-
-
-    cx_assigned = YX[1].ravel()[assignment_inds%(shape[-1]*shape[-2])]
-    cy_assigned = YX[0].ravel()[assignment_inds%(shape[-1]*shape[-2])]
-
-    cx_true = bbox[:,0] + bbox[:,2]/2
-    cy_true = bbox[:,1] + bbox[:,3]/2
-
-    shiftx = (cx_true - cx_assigned)/stride
-    shifty = (cy_true - cy_assigned)/stride
-
-    scalex =(bbox[:,2]/stride)
-    scaley = (bbox[:,3]/stride)
-    
-    return shiftx,shifty,scalex,scaley
-
-
-
-def imshow(I,ax,**kwargs):
-    """
-    This function will normalize the image I and plot it on the axes object ax
-
-    Parameters:
-    -----------
-    I : 1 x N x N array[numpy.float64]
-        An image
-    ax : matplotlib.axes._axes.Axe object
-        An empty axis onto which I will be plotted
-
-
-    Returns:
-    --------
-    None
-        
-    """
-    I = np.array(I)
-    I = I - np.min(I,axis=(1,2),keepdims=True)
-    I = I / np.max(I,axis=(1,2),keepdims=True)
-    if I.shape[0] == 1:
-        ax.imshow(I[0],**kwargs)
-    elif I.shape[0] == 2:
-        ax.imshow(np.stack((I[0],I[1],I[0]*0),-1),**kwargs)
-    elif I.shape[0] >= 3:
-        ax.imshow(np.stack((I[0],I[1],I[2]),-1),**kwargs)
-
-
-def iou(bbox0,bbox1,nopairwise=False):
-    """
-    Calculate pairwise iou between a set of estimated bounding boxes (bbox0) and the set of ground truth bounding boxes (bbox1).
-
-    Parameters:
-    -----------
-    bbox0 : torch.Tensor of size [N, 4]
-        N is the number of bounding boxes
-    bbox1 : torch.Tensor of size [N, 4]
-        N is the number of bounding boxes
-    nopairwise : bool
-        If True, compute pointwise, not pairwise IOU
-
-    Returns:
-    --------
-    out : Array of length N
-        An array containing the pairwise (or pointwise) IOU values between the elements bbox0 and bbox 1
-    
-    """
-    if bbox0.ndim == 1: bbox0 = bbox0[None]
-    if bbox1.ndim == 1: bbox1 = bbox1[None]
-    if not nopairwise:
-        bbox0 = bbox0[:,None]
-        bbox1 = bbox1[None,:]
-        
-    # Get the coordinates for 2 opposite corners from all bboxes
-    l0 = bbox0[...,0]
-    l1 = bbox1[...,0]
-    r0 = bbox0[...,0] + bbox0[...,2]
-    r1 = bbox1[...,0] + bbox1[...,2]
-    
-    t0 = bbox0[...,1]
-    t1 = bbox1[...,1]
-    b0 = bbox0[...,1] + bbox0[...,3]
-    b1 = bbox1[...,1] + bbox1[...,3]
-    
-    
-    # Compute the coordinates for the intersection of all pairs of bounding boxes
-    l = np.maximum(l0*np.ones_like(l1),l1*np.ones_like(l0))
-    r = np.minimum(r0*np.ones_like(r1),r1*np.ones_like(r0))
-    t = np.maximum(t0*np.ones_like(t1),t1*np.ones_like(t0))
-    b = np.minimum(b0*np.ones_like(b1),b1*np.ones_like(b0))
-
-    # Compute the area within bbox0 (vol0), within bbox1 (vol1), and their shared area
-    vol0 = (r0-l0)*(b0-t0)    
-    vol1 = (r1-l1)*(b1-t1)    
-    vol = (r-l)*(b-t) * (r>l) * (b>t) # could be 0
-    
-    # Use de morgans law to get volume of union
-    VOL = vol0 + vol1 - vol
-    
-    return vol/VOL
-
-
-
-def train_yolo_model(nepochs, lr, cls_loss, outdir, modelname, optimizername, lossname, verbose = False, resume = False, J_path=None):
-    """
-    Train a neural network defined by the YOLO framework and other provided hyperparameters using the simulated dataset 'groundtruth'.
-
-    Parameters:
-    -----------
-    nepochs : int
-        The number of epochs used to train the model
-    lr : float
-        The learning rate used to train the model
-    outdir : str
-        The output directory where all files will be saved during training, or where all files were saved if the model has already been trained.
-    modelname : str
-        The file name of the model used during training
-    optimizername : str
-        The file name of the optimizer used during training
-    lossname : str
-        The file name of the losses computed during training
-    resume : bool
-        Default - False; If True, resume the training of model 'outdir/modelname' or load the pretrained model saved at 'outdir/modelname'
-    J_path : str
-        Default - None; The file path to the image to be used during the validation portion of training
-    
-    Returns:
-    --------
-    net : torch.nn.Module
-        A neural network which has been trained on a simulated dataset
-    
-    """
-
-    # Check to see that outdir exists and create outdir if it does not exist
-    os.makedirs(outdir,exist_ok=True)
-
+    # Load the pretrained model
     net = Net()
-    groundtruth = GroundTruthDataset()
-    optimizer = torch.optim.Adam(net.parameters(),lr=lr)
-    nclasses = 3
-
-    # Load the target image to be used during the evaluation step of training
-    if J_path is not None:
-        J = plt.imread(J_path)
-        J= J[...,:3]
-        if J.dtype == np.uint8:
-            J = J / 255.0
-        J = J.transpose((-1,0,1))
-
-    Esave = []    
-    fig,ax = plt.subplots(2,3,figsize=(9,6)) 
-    ax = ax.ravel()
-    fig1,ax1 = plt.subplots(3,3,figsize=(9,9))
-    fig1.subplots_adjust(left=0,right=1,bottom=0,top=1,hspace=0.1,wspace=0.1)
-
-    if resume:        
-        net.load_state_dict(torch.load(os.path.join(outdir,modelname)))
-        optimizer.load_state_dict(torch.load(os.path.join(outdir,optimizername)))
-        Esave = torch.load(os.path.join(outdir,lossname))[0]
-        print(f'Loaded predefined model from {outdir}/{modelname}')
-    for e in range(nepochs):
-        if verbose:
-            print(f'Starting epoch {e}')
-            start = time.time()
-
-        if resume and e < len(Esave):
-            continue
-        count = 0
-        Esave_ = []    
-        for I,bbox,cl in groundtruth:
-            optimizer.zero_grad()
-            # run through the net
-            out = net(torch.tensor(I[None],dtype=torch.float32))
-            
-            # convert the data into bbox format
-            bboxes,data = convert_data(out,net.B,net.stride)
-            
-            # get assignments
-            assignment_inds,ious = get_assignment_inds(bboxes,bbox,out.shape,net.stride,net.B)
-            unassigned_inds = np.array([a for a in range(bboxes.shape[0]) if a not in assignment_inds])
-            
-            
-            # get target parameters
-            shiftx,shifty,scalex,scaley = get_reg_targets(assignment_inds,bbox,net.B,out.shape,net.stride)    
+    net.load_state_dict(torch.load(model_path))
     
+    # Define some hyperparameters
+    tile_dim = I.shape[0]
+    ds_factor = 8
+    bbox_dim = 5
+    num_classes = 3
+    B = net.B
+    stride = net.stride
+    dtype = torch.float32
+    pads = np.array([0,0])
+    
+    # Initialize reconstruction containers
+    recon_xy = np.ones((int(tile_dim/ds_factor), int(tile_dim/ds_factor), tile_dim, bbox_dim+num_classes))*(-np.inf)
+    recon_xz = np.ones((int(tile_dim/ds_factor), tile_dim, int(tile_dim/ds_factor), bbox_dim+num_classes))*(-np.inf)
+    recon_yz = np.ones((tile_dim, int(tile_dim/ds_factor), int(tile_dim/ds_factor), bbox_dim+num_classes))*(-np.inf)
+    
+    start = time.time()
+    for idx in np.arange(tile_dim):
+        slice_xy = I[:,:,idx,:]
+        slice_xz = I[:,idx,:,:]
+        slice_yz = I[idx,:,:,:]
+    
+        # Apply model to slices parallel to the XY-plane
+        in_xy = torch.tensor(slice_xy, dtype=dtype).permute(2, 0, 1).unsqueeze(0)
+        out_xy = net(in_xy)
+        out_xy = out_xy[0].detach().numpy()
+        out_xy = postprocess(out_xy, B, stride, pads, up_factor=1)
+        recon_xy[:,:,idx,:] = out_xy
+    
+        # Apply model to slices parallel to the XZ-plane
+        in_xz = torch.tensor(slice_xz, dtype=dtype).permute(2, 0, 1).unsqueeze(0)
+        out_xz = net(in_xz)
+        out_xz = out_xz[0].detach().numpy()
+        out_xz = postprocess(out_xz, B, stride, pads, up_factor=1)
+        recon_xz[:,idx,:,:] = out_xz   
+        
+        # Apply model to slices parallel to the YZ-plane
+        in_yz = torch.tensor(slice_yz, dtype=dtype).permute(2, 0, 1).unsqueeze(0)
+        out_yz = net(in_yz)
+        out_yz = out_yz[0].detach().numpy()
+        out_yz = postprocess(out_yz, B, stride, pads, up_factor=1)
+        recon_yz[idx,:,:,:] = out_yz    
+    
+        if idx % 25 == 0:
+            print(f'Finished {idx}/{tile_dim}')
+    
+    print(f'Finished applying model to 3 orthogonal views in {time.time()-start:.2f}s')
+    return recon_xy, recon_xz, recon_yz
+
+def gen_3D_GT(N, M, nclasses, thr_rel=0.15):
+    """
+    Generate a synthetic 3D volume with ellipsoidal blobs ("cells") and several artifacts
+    commonly found in natural microscopy data.
+
+    Output volume is channels-last: (Z, Y, X, d).
+
+    Bounding boxes are computed by:
+      1) Synthesizing each object's mask in a local ROI
+      2) Thresholding the mask at (thr_rel * max(mask))
+      3) Taking the tight axis-aligned bounding box of the thresholded support
+
+    Parameters:
+    ===========
+    N : int
+        Spatial size for X, Y, and Z (volume is N x N x N).
+    M : int
+        Upper bound for number of objects (m = 1 + randint(M)).
+    nclasses : int
+        Number of classes (labels in [0, nclasses-1]).
+    thr_rel : float
+        Relative threshold for bbox extraction: keep = mask > thr_rel * mask.max().
+
+    Returns:
+    ========
+    I : np.ndarray
+        Image volume of shape (N, N, N, d) float32  (Z, Y, X, d)
+    bbox : np.ndarray
+        Bounding boxes of shape (m, 6) float32
+        Each row: (x0, y0, z0, w, h, depth) with half-open extents
+    cl : np.ndarray
+        Class labels of shape (m,)
+    """
+    # number of channels
+    d = 3
+    bg = np.random.rand(d).astype(np.float32)
+
+    # channels-last volume: (Z, Y, X, d)
+    I = np.zeros((N, N, N, d), dtype=np.float32) + bg[None, None, None, :]
+
+    # how many objects
+    m = 1 + np.random.randint(M)
+    cl = np.random.randint(0, nclasses, size=m)
+
+    # centers in voxel coordinates: (x, y, z)
+    c = (np.random.rand(m, 3) * (np.array([N, N, N]) - 1)).astype(np.float32)
+
+    # sizes (sigmas) per axis: (sx, sy, sz)
+    s = (3 + np.random.rand(m, 3) * 20).astype(np.float32)
+
+    # Euler angles (rx, ry, rz)
+    angles = (np.random.rand(m, 3) * 2 * np.pi).astype(np.float32)
+
+    color0 = np.random.rand(d).astype(np.float32)
+    bbox = np.zeros((m, 6), dtype=np.float32)
+
+    def euler_R(rx, ry, rz):
+        """Rotation matrix R = Rz @ Ry @ Rx."""
+        cx, sx = np.cos(rx), np.sin(rx)
+        cy, sy = np.cos(ry), np.sin(ry)
+        cz, sz = np.cos(rz), np.sin(rz)
+
+        Rx = np.array([[1, 0, 0],
+                       [0, cx, -sx],
+                       [0, sx,  cx]], dtype=np.float32)
+        Ry = np.array([[ cy, 0, sy],
+                       [  0,  1,  0],
+                       [-sy, 0, cy]], dtype=np.float32)
+        Rz = np.array([[cz, -sz, 0],
+                       [sz,  cz, 0],
+                       [ 0,   0, 1]], dtype=np.float32)
+        return (Rz @ Ry @ Rx).astype(np.float32)
+
+    for i in range(m):
+        cx, cy, cz = c[i]
+        sx_, sy_, sz_ = s[i]
+        cli = int(cl[i])
+        R = euler_R(*angles[i])
+
+        # ROI for synthesis: center +/- 3*max(sigma)
+        mxi = float(max(sx_, sy_, sz_))
+        left   = int(np.clip(cx - 3*mxi, 0, N - 1))
+        right  = int(np.clip(cx + 3*mxi, 0, N - 1))
+        top    = int(np.clip(cy - 3*mxi, 0, N - 1))
+        bottom = int(np.clip(cy + 3*mxi, 0, N - 1))
+        front  = int(np.clip(cz - 3*mxi, 0, N - 1))
+        back   = int(np.clip(cz + 3*mxi, 0, N - 1))
+
+        # enforce non-empty half-open ranges
+        right  = max(right,  left + 1)
+        bottom = max(bottom, top + 1)
+        back   = max(back,   front + 1)
+
+        # local coordinate blocks (broadcasted)
+        zz = (np.arange(front, back, dtype=np.float32) - cz)[:, None, None]   # (Dz,1,1)
+        yy = (np.arange(top, bottom, dtype=np.float32) - cy)[None, :, None]   # (1,Dy,1)
+        xx = (np.arange(left, right, dtype=np.float32) - cx)[None, None, :]   # (1,1,Dx)
+
+        # rotate into object frame: P' = R^T P
+        Xp = R[0, 0]*xx + R[1, 0]*yy + R[2, 0]*zz
+        Yp = R[0, 1]*xx + R[1, 1]*yy + R[2, 1]*zz
+        Zp = R[0, 2]*xx + R[1, 2]*yy + R[2, 2]*zz
+
+        # ellipsoidal metric
+        q = (Xp/(sx_ + 1e-6))**2 + (Yp/(sy_ + 1e-6))**2 + (Zp/(sz_ + 1e-6))**2
+        base = (q/2.0)*(3.0**2)
+
+        # class-dependent mask shape + optional bumps
+        if cli <= 1:
+            mask = np.exp(-(base)**(1 + 2*cli)).astype(np.float32)
+        else:
+            mask = np.exp(-(base)**4).astype(np.float32)
+            bumps = gaussian_filter(np.random.randn(*mask.shape).astype(np.float32), 1)
+            mask *= np.exp(bumps).astype(np.float32)
+
+        # add object to volume
+        color = (color0*0.95 + np.random.rand(d).astype(np.float32)*0.05).astype(np.float32)
+        I[front:back, top:bottom, left:right, :] += mask[..., None] * color[None, None, None, :]
+
+        # bbox from thresholded mask support within ROI
+        thr = float(mask.max()) * float(thr_rel)
+        keep = mask > thr
+
+        if np.any(keep):
+            zz_idx, yy_idx, xx_idx = np.where(keep)
+            z0 = front + int(zz_idx.min())
+            z1 = front + int(zz_idx.max()) + 1  # half-open
+            y0 = top   + int(yy_idx.min())
+            y1 = top   + int(yy_idx.max()) + 1
+            x0 = left  + int(xx_idx.min())
+            x1 = left  + int(xx_idx.max()) + 1
+        else:
+            # fallback: 1-voxel box at rounded center (rare)
+            x0 = int(np.clip(round(cx), 0, N-1))
+            x1 = min(x0 + 1, N)
+            y0 = int(np.clip(round(cy), 0, N-1))
+            y1 = min(y0 + 1, N)
+            z0 = int(np.clip(round(cz), 0, Z-1))
+            z1 = min(z0 + 1, Z)
+
+        bbox[i] = np.array([x0, y0, z0, x1-x0, y1-y0, z1-z0], dtype=np.float32)
+
+    # --- global artifacts (computed without allocating a full meshgrid) ---
+    z = np.arange(N, dtype=np.float32)[:, None, None]
+    y = np.arange(N, dtype=np.float32)[None, :, None]
+    x = np.arange(N, dtype=np.float32)[None, None, :]
+
+    # Gaussian "sheet" artifact (thin plane)
+    n = np.random.randn(3).astype(np.float32)
+    n /= (np.linalg.norm(n) + 1e-6)
+    p0 = np.array([np.random.rand()*(N-1),
+                   np.random.rand()*(N-1),
+                   np.random.rand()*(N-1)], dtype=np.float32)
+    dist = n[0]*(x - p0[0]) + n[1]*(y - p0[1]) + n[2]*(z - p0[2])
+    width = np.float32(1 + np.random.rand()*20)
+    sheet = np.exp(-(dist/width)**2).astype(np.float32)
+    I += sheet[..., None] * (np.random.rand(d).astype(np.float32)*2)[None, None, None, :]
+
+    # Logistic "slab" artifact (smooth plane transition)
+    n2 = np.random.randn(3).astype(np.float32)
+    n2 /= (np.linalg.norm(n2) + 1e-6)
+    p1 = np.array([np.random.rand()*(N-1),
+                   np.random.rand()*(N-1),
+                   np.random.rand()*(N-1)], dtype=np.float32)
+    dist2 = n2[0]*(x - p1[0]) + n2[1]*(y - p1[1]) + n2[2]*(z - p1[2])
+    sharp = np.float32(1 + np.random.rand()*10)
+    slab = (1.0/(1.0 + np.exp(-(dist2/sharp)))).astype(np.float32)
+    I += slab[..., None] * np.random.rand(d).astype(np.float32)[None, None, None, :]
+
+    # optional intensity warp
+    if np.random.rand() > 0.5:
+        mu = np.float32(np.random.rand()*4)
+        I = np.exp(-mu * I).astype(np.float32)
+
+    # blur (3D per channel)
+    sigma = np.random.rand()*2
+    for ch in range(d):
+        I[..., ch] = gaussian_filter(I[..., ch], sigma)
+
+    # additive smooth noise
+    noise = (np.random.rand(*I.shape).astype(np.float32) * (np.random.rand()*0.5)).astype(np.float32)
+    sigma_n = np.random.rand()*2
+    for ch in range(d):
+        noise[..., ch] = gaussian_filter(noise[..., ch], sigma_n)
+    I += noise
+
+    return I, bbox, cl
+
+def orthogonal_to_3D(down_xy, down_xz, down_yz, tile_dim = 256):
+    """
+    Stitch together 3 volumes of orthogonal slices with 2D bbox info stored at each voxel into 1 volume with 3D bbox info stored at each voxel.
+
+    Parameters:
+    ===========
+    down_xy: array
+        The 3D reconstruction of XY slices, downsampled by a factor of 'ds_factor'. 
+    down_xz: array
+        The 3D reconstruction of XZ slices, downsampled by a factor of 'ds_factor'. 
+    down_yz: array
+        The 3D reconstruction of YZ slices, downsampled by a factor of 'ds_factor'. 
+    tile_dim : int
+        The size of the original 3D reconstruction
+
+    Returns:
+    ========
+    
+    """
+    start = time.time()
+    ds_factor = 8
+    down_dim = int(tile_dim/ds_factor)
+    
+    bbox_dim = 7
+    num_classes = 3
+    recon_total = np.ones((down_dim, down_dim, down_dim, bbox_dim+num_classes))*(-np.inf)
+    for i in np.arange(down_dim):
+        for j in np.arange(down_dim):
+            for k in np.arange(down_dim):
             
-            # now build the loss function
-            data_assigned = data[assignment_inds]
-            targets = np.stack((shiftx,shifty,scalex,scaley,ious),-1)
+                # From meeting 02/26/26
+                xmin = (down_xy[i,j,k,1] + down_xz[i,j,k,1]) / 2
+                xmax = (down_xy[i,j,k,3] + down_xz[i,j,k,3]) / 2
+                ymin = (down_xy[i,j,k,0] + down_yz[i,j,k,1]) / 2
+                ymax = (down_xy[i,j,k,2] + down_yz[i,j,k,3]) / 2
+                zmin = (down_xz[i,j,k,0] + down_yz[i,j,k,0]) / 2
+                zmax = (down_xz[i,j,k,2] + down_yz[i,j,k,2]) / 2
+                
+                # conf = np.max([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
+                conf = np.min([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
+                # conf = down_xy[i,j,k,4] * down_xz[i,j,k,4] * down_yz[i,j,k,4]
+                # conf = np.sum([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]]) / 3
+                
+                cl0 = np.max([down_xy[i,j,k,5], down_xz[k,i,j,5], down_yz[j,k,i,5]])
+                cl1 = np.max([down_xy[i,j,k,6], down_xz[k,i,j,6], down_yz[j,k,i,6]])
+                cl2 = np.max([down_xy[i,j,k,7], down_xz[k,i,j,7], down_yz[j,k,i,7]])
+                
+                recon_total[i,j,k] = [xmin, xmax, ymin, ymax, zmin, zmax, conf, cl0, cl1, cl2]
+    
+    print(f'Finished combining outputs in {time.time()-start:.2f}s')
+    return recon_total
+        
+def recon_down(recon_xy, recon_xz, recon_yz, tile_dim = 256):
+    """
+    Dowsample each volume along their respective 'slice' dimensions by taking the bbox of highest confidence at every pixel across 'ds_factor' consecutive slices.
+
+    Parameters:
+    ===========
+    recon_xy: array
+        The 3D reconstruction generated from applying the model to XY slices. 
+    recon_xz: array
+        The 3D reconstruction generated from applying the model to XZ slices. 
+    recon_yz: array
+        The 3D reconstruction generated from applying the model to YZ slices. 
+
+    Returns:
+    ========
+    down_xy: array
+        The 3D reconstruction of XY slices, downsampled by a factor of 'ds_factor'. 
+    down_xz: array
+        The 3D reconstruction of XZ slices, downsampled by a factor of 'ds_factor'. 
+    down_yz: array
+        The 3D reconstruction of YZ slices, downsampled by a factor of 'ds_factor'. 
+    """
+    conf_idx = 4
+    ds_factor = 8
+    down_dim = int(tile_dim/ds_factor)
+    
+    down_xy = []
+    down_xz = []
+    down_yz = []
+    
+    start = time.time()
+    for idx in np.arange(down_dim):
+    
+        # Extract subset of 8 XY-slices to be downsampled into 1 slice
+        recon_xy_down = recon_xy[:,:,(idx*ds_factor):((idx+1)*ds_factor),:]
+    
+        # Get idx of bbox with highest confidence at each pixel
+        inds_xy = np.argmax(recon_xy_down[..., conf_idx], axis = 2)
+    
+        # Downsample along relevant axis using the above indeces
+        recon_xy_down = np.take_along_axis(recon_xy_down, inds_xy[:, :, None, None], axis=2)
+    
+        # Append downsampled slice to final output for XY-slices
+        down_xy.append(recon_xy_down)
+    
+        # Repeat for XZ-slices
+        recon_xz_down = recon_xz[:,(idx*ds_factor):((idx+1)*ds_factor),:,:]
+        inds_xz = np.argmax(recon_xz_down[..., conf_idx], axis = 1)
+        recon_xz_down = np.take_along_axis(recon_xz_down, inds_xz[:, None, :, None], axis=1)
+        down_xz.append(recon_xz_down)
+    
+        # Repear for YZ-slices
+        recon_yz_down = recon_yz[(idx*ds_factor):((idx+1)*ds_factor),:,:,:]
+        inds_yz = np.argmax(recon_yz_down[..., conf_idx], axis = 0)
+        recon_yz_down = np.take_along_axis(recon_yz_down, inds_yz[None, :, :, None], axis=0)
+        down_yz.append(recon_yz_down)
+    
+    # Concat lists so that they are now each 32x32x32 cubes
+    down_xy = np.concatenate(down_xy, axis=2)
+    down_xz = np.concatenate(down_xz, axis=1)
+    down_yz = np.concatenate(down_yz, axis=0)
+    
+    print(f'Finished downsampling outputs in {time.time()-start:.2f}s')
+    return down_xy, down_xz, down_yz
+
+# Downsample 3D image along one axis. Useful for overlaying bbox outputs on MIPs
+def vol_to_mip(vol, ax_idx, ds_factor = 8, slice_idx = -1):
+    """
+    Convert a 3D image volume (vol) into a stack of 2D MIPs along an axis (ax_idx). 
+    This is useful for visualizing outputs from the YOLO_3D pipeline.
+
+    Parameters:
+    ===========
+    vol : array of shape N x M x K
+        The image volume to be 'downsampled'
+    ax_idx : int
+        The axis along which MIPs should be generated
+    ds_factor : int
+        The number of slices to use in each MIP
+    slice_idx : int
+        Default - -1; If -1, return the downsampled 3d volume of 2d slices along 'ax_idx'. Else, Return the MIP of [slice_idx:slice_idx+ds_factor] along 'ax_idx'.
+        
+    Returns:
+    ========
+    vol_mip : array 
+        A stack of MIPs along the 'ax_idx' axis
+    """
+    if slice_idx == -1:
+        vol_mip = []
+        vol_dim = vol.shape[ax_idx]
+        for i in np.arange(int(vol_dim/ds_factor)):
             
-            # this is the mean square error for assigned
-            # they used a weight of 0.5 for noobj
-            # note that in the paper they used a different loss for the scales (take the square root first)
-            Ecoord = torch.sum((data_assigned[:,:4]-torch.tensor(targets[:,:4]))**2)*5
-            # if it is assigned ot an object we want to predict the iou
-            Eobj = torch.sum((data_assigned[:,-1]-torch.tensor(targets[:,-1]))**2)
-            # if there is no object assigned we want to predict 0
-            Enoobj = torch.sum((data[unassigned_inds,-1]-0)**2)*0.5
-            # and we want to classify
-            classprobs = out[:,-nclasses:].reshape(nclasses,-1)
-            classprobs_assigned = classprobs[...,assignment_inds%(out.shape[-1]*out.shape[-2])]
-            # note the paper uses mean square error on the probability vector
-            # here I use cross entropy
-            Ec = cls_loss(classprobs_assigned[None],torch.tensor(cl)[None])
+            if ax_idx == 0:
+                vol_slice_stack = vol[(i*ds_factor):((i+1)*ds_factor), :, :]
+            elif ax_idx == 1:
+                vol_slice_stack = vol[:, (i*ds_factor):((i+1)*ds_factor), :]
+            elif ax_idx == 2:
+                vol_slice_stack = vol[:, :, (i*ds_factor):((i+1)*ds_factor)]
+            else:
+                raise Exception(f'vol only has {len(vol.shape)} axes, but ax_idx = {ax_idx} was passed')
+                
+            vol_slice_max = np.max(vol_slice_stack, axis=ax_idx)
+            vol_mip.append(vol_slice_max)
+                
+        vol_mip = np.stack(vol_mip, axis=ax_idx)
+        return vol_mip
+    else:
+        if ax_idx == 0:
+            vol_slice_stack = vol[(slice_idx):(slice_idx+ds_factor-1), :, :]
+        elif ax_idx == 1:
+            vol_slice_stack = vol[:, (slice_idx):(slice_idx+ds_factor-1), :]
+        elif ax_idx == 2:
+            vol_slice_stack = vol[:, :, (slice_idx):(slice_idx+ds_factor-1)]
+        else:
+            raise Exception(f'vol only has {len(vol.shape)} axes, but ax_idx = {ax_idx} was passed')
             
-            E = Ecoord + Eobj + Enoobj + Ec
-            Esave_.append(E.item())
-            E.backward()
-            optimizer.step()
-            count += 1
-            if count >= len(groundtruth): break
-        
-        # draw        
-        Esave.append(np.mean(Esave_))
-        ax[0].cla()
-        ax[0].plot(Esave,label='loss')
-        ax[0].legend()
-        ax[0].set_yscale('log')
-        ax[0].set_title('training loss')
-        
-        
-        ax[1].cla()
-        imshow(net.color.out.clone().detach()[0],ax[1])
-        ax[1].add_collection(bbox_to_rectangles(bbox,fc='none',ec=[0.5,0.5,0.5,0.5]))
-        
-        # get better colors
-        p = torch.softmax(classprobs.clone().detach(),0)
-        c0 = torch.tensor([1.0,0.0,0.0])
-        c1 = torch.tensor([0.0,1.0,0.0])
-        colors = ( (p[0]*c0[...,None]) + (p[1]*c1[...,None])  ).T.numpy()    
-        if nclasses == 3:
-            c2 = torch.tensor([0.0,0.0,1.0])
-            colors = ( (p[0]*c0[...,None]) + (p[1]*c1[...,None]) + (p[2]*c2[...,None]) ).T.numpy()    
+        vol_slice_max = np.max(vol_slice_stack, axis=ax_idx)
+        return vol_slice_max
 
-        bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,data[:,-1].clone().detach(),net.B)
-        ax[1].add_collection(bbox_to_rectangles(bboxes_,fc='none',ec=colors,ls='-',alpha=scores_))
-        ax[1].set_title('Annotations')
-        
-        classprob = torch.softmax(out.clone().detach()[0,-nclasses:],0)
-        mask = torch.sigmoid(out[0,4].clone().detach())
-        ax[2].cla()
-        ax[2].imshow(mask,vmin=0,vmax=1,interpolation='gaussian')
-        ax[2].set_title('Predicted score (pobj*iou)')
+def vol_to_mip_rgb(vol, ax_idx, ds_factor = 8):
+    """
+    Convert a 3D image volume (vol) into a stack of 2D MIPs along an axis (ax_idx). 
+    This is useful for visualizing outputs from the YOLO_3D pipeline.
 
-        ax[3].cla()    
-        ax[3].imshow(   classprob[0]*mask  ,vmin=0,vmax=1,interpolation='gaussian')
-        ax[3].set_title('Class 0 (smooth) prob map')
-        
-        ax[4].cla()
-        ax[4].imshow(   classprob[1]*mask   ,vmin=0,vmax=1,interpolation='gaussian')
-        ax[4].set_title('Class 1 (sharp) prob map')
-        
-        if nclasses == 3:
-            ax[5].cla()
-            ax[5].imshow(   classprob[2]*mask   ,vmin=0,vmax=1,interpolation='gaussian')
-            ax[5].set_title('Class 2 (bumpy) prob map')
-        fig.canvas.draw()
-        
-        
-        if J_path is not None:
-            with torch.no_grad():
-                net.eval()
-                for r in range(3):
-                    for c in range(3):
-                        ax1[r,c].cla()
-                        sl = (slice(r*2000+2000,r*2000+2000+256),slice(c*2000+2000,c*2000+2000+256)) # Note: '2000' may need to be changed for different images. 
-                        out = net(torch.tensor(J[(slice(None),)+sl][None],dtype=torch.float32))
-        
-                        # convert the data into bbox format
-                        bboxes,data = convert_data(out,net.B,net.stride)
-                        imshow(net.color.out.clone().detach()[0],ax1[r,c])
-        
-                        classprobs = out[:,-nclasses:].reshape(nclasses,-1)
-                        p = torch.softmax(classprobs.clone().detach(),0)
-                        c0 = torch.tensor([1.0,0.0,0.0])
-                        c1 = torch.tensor([0.0,1.0,0.0])
-                        colors = 'r'
-                        bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,data[:,-1].clone().detach(),net.B)
-                        alpha = scores_.clone().detach()
-                        alpha = alpha * (alpha>0.5)
-                        
-                        ax1[r,c].add_collection(bbox_to_rectangles(bboxes_,fc='none',ec=colors,ls='-',alpha=alpha))
-                        ax1[r,c].axis('off')
-                net.train()
-            fig1.canvas.draw()
-            if not e%10:
-                fig1.savefig(os.path.join(outdir,f'example_e_{e:06d}.png'))
+    Parameters:
+    ===========
+    vol : array of shape 256x256x256x3
+        The image volume to be 'downsampled'
+    ax_idx : int
+        The axis along which MIPs should be generated
+    ds_factor : int
+        The number of slices to use in each MIP
 
-        if verbose:
-            print(f'Finished epoch {e} in {time.time() - start:.2f}s')        
+    Returns:
+    ========
+    vol_mip : array 
+        A stack of MIPs along the 'ax_idx' axis
+    """
+    vol_mip = []
+    vol_dim = vol.shape[ax_idx]
+    for i in np.arange(int(vol_dim/ds_factor)):
         
-        # save data
-        torch.save(net.state_dict(),os.path.join(outdir,modelname))
-        torch.save(optimizer.state_dict(),os.path.join(outdir,optimizername))
-        torch.save([Esave],os.path.join(outdir,lossname))  
-
-    return net
+        if ax_idx == 0:
+            vol_slice_stack = vol[(i*ds_factor):((i+1)*ds_factor), :, :, :]
+        elif ax_idx == 1:
+            vol_slice_stack = vol[:, (i*ds_factor):((i+1)*ds_factor), :, :]
+        elif ax_idx == 2:
+            vol_slice_stack = vol[:, :, (i*ds_factor):((i+1)*ds_factor), :]
+        else:
+            raise Exception(f'vol only has {len(vol.shape)} axes, but ax_idx = {ax_idx} was passed')
+            
+        vol_slice_max = np.max(vol_slice_stack, axis=ax_idx)
+        vol_mip.append(vol_slice_max)
+            
+    vol_mip = np.stack(vol_mip, axis=ax_idx)
+    return vol_mip

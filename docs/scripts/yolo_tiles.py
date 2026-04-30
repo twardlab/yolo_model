@@ -460,3 +460,23 @@ def remove_bbox_in_overlap(out, B, stride, tile_dim, boundary_cond = [16,16]):
     out[:, 9] = torch.where(remove_bb1, neg_inf1, out[:, 9]) # Update conf values for bbox1
 
     return out
+
+def tiles_to_orig(tiles, pads):
+    tiles_out = []
+    for tile in tiles:
+        I = tile['img']
+        p = tile['p']
+        bg = tile['bg']
+        r_idx = tile['r_idx']
+        c_idx = tile['c_idx']
+
+        # Shift the anchor point by the padded amount on each ax
+        p -= pads
+
+        # Reduce anchor point by upsampling factor
+        p = np.asarray(p)/2
+        
+        new_tile = {'img':None, 'p':list(p), 'bg':bg, 'r_idx':r_idx, 'c_idx':c_idx}
+        tiles_out.append(new_tile)
+
+    return tiles_out
