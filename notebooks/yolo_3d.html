@@ -38,7 +38,7 @@
           <div class="body" role="main">
             
   <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -56,7 +56,8 @@ from scipy.ndimage import gaussian_filter
 
 import importlib as imp
 import sys
-sys.path.append(&#39;/home/abenneck/Desktop/yolo_tiles/docs/scripts&#39;)
+# sys.path.append(&#39;/home/abenneck/Desktop/yolo_tiles/docs/scripts&#39;)
+sys.path.append(os.path.join(os.path.split(os.getcwd())[0], &#39;scripts&#39;))
 
 import yolo_tiles
 imp.reload(yolo_tiles)
@@ -72,7 +73,7 @@ from yolo_post_help import remove_low_conf_bboxes, postprocess, bb_to_rec
 
 import yolo_help_3D
 imp.reload(yolo_help_3D)
-from yolo_help_3D import apply_model_to_orthogonal_slices, gen_3D_GT, recon_down, vol_to_mip_rgb, orthogonal_to_3D
+from yolo_help_3D import apply_model_to_orthogonal_slices, gen_3D_GT, recon_down, vol_to_mip_rgb, orthogonal_to_3D, vol_to_mip
 </pre></div>
 </div>
 </div>
@@ -4050,99 +4051,150 @@ Saved cube (3,8,7) with shape (131, 98, 38, 10) in 21.73s as i0003_j0008_k0007_d
 </div>
 <section id="Plot-Results">
 <h3>Plot Results<a class="headerlink" href="#Plot-Results" title="Link to this heading">¶</a></h3>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[38]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Set key parameters
+
+outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes&#39;
 ds_factor = 4
 out_dim = 256
-orig_slice_dim = out_dim * ds_factor
-mid_slice_dim = int(orig_slice_dim / 2)
-shift = 768
 
-# Load output data cube + extract data from relevant slices
+# outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes_128&#39;
+# ds_factor = 8
+# out_dim = 128
+
+orig_slice_dim = out_dim * ds_factor # 1024
+# shift = 1024 - 64
+shift = 0
+
+
+# Load output cube + extract data from relevant slices
 time_start = time.time()
-outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes&#39;
-i, j, k = 2, 3, 3
+i, j, k = 1,3,3
 out_fname = f&#39;i{i:04d}_j{j:04d}_k{k:04d}_d{out_dim}_Ex_488_Em_525.npy&#39;
 data = np.load(os.path.join(outdir, out_fname))
 
-orig_slice_idx0 = (i*1024)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax0
-down_slice_idx0 = int((orig_slice_idx0 % 1024) / ds_factor)
+orig_slice_idx0 = (i*orig_slice_dim)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax0
+down_slice_idx0 = int((orig_slice_idx0 % orig_slice_dim) / ds_factor)
 data0 = data[down_slice_idx0,:,:,:]
 
-orig_slice_idx1 = (j*1024)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax1
-down_slice_idx1 = int((orig_slice_idx1 % 1024) / ds_factor)
+orig_slice_idx1 = (j*orig_slice_dim)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax1
+down_slice_idx1 = int((orig_slice_idx1 % orig_slice_dim) / ds_factor)
 data1 = data[:,down_slice_idx1,:,:]
 
-orig_slice_idx2 = (k*1024)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax2
-down_slice_idx2 = int((orig_slice_idx2 % 1024) / ds_factor)
+orig_slice_idx2 = (k*orig_slice_dim)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax2
+down_slice_idx2 = int((orig_slice_idx2 % orig_slice_dim) / ds_factor)
 data2 = data[:,:,down_slice_idx2,:]
 print(f&#39;Finished loading bbox data in {time.time()-time_start:.2f}s&#39;)
 
+
 # Load original HDF5 3D images + convert to MIPs for visualization
 time_start = time.time()
+
 fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5&#39;
 vol = h5py.File(fname)
 vol_stack = vol[&#39;stack&#39;]
 img_mip0 = vol_to_mip(vol_stack, 0, ds_factor = 4, slice_idx = orig_slice_idx0)
+img_mip0 = preprocess(img_mip0, gamma = True, upsample = False)
 
 fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5&#39;
 vol = h5py.File(fname)
 vol_stack = vol[&#39;stack&#39;]
 img_mip1 = vol_to_mip(vol_stack, 1, ds_factor = 4, slice_idx = orig_slice_idx1)
+img_mip1 = preprocess(img_mip1, gamma = True, upsample = False)
 
 fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_full_sag.h5&#39;
 vol = h5py.File(fname)
 vol_stack = vol[&#39;stack&#39;]
 img_mip2 = vol_to_mip(vol_stack, 2, ds_factor = 4, slice_idx = orig_slice_idx2)
+img_mip2 = preprocess(img_mip2, gamma = True, upsample = False)
 print(f&#39;Finished loading images in {time.time()-time_start:.2f}s&#39;)
 
 # Initialize output figure
 time_start = time.time()
 nrow, ncol = 6,1
 fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;)
-axs[0].imshow(img_mip0)
-axs[0].add_patch(Rectangle((orig_slice_idx1-512,orig_slice_idx2-512),1024-shift,1024-shift,fc=&#39;none&#39;,ec=&#39;r&#39;))
-axs[0].set_title(f&#39;ax0=yz[{orig_slice_idx0},:,:]&#39;)
-axs[2].imshow(img_mip1)
-axs[2].set_title(f&#39;ax1=xz[:,{orig_slice_idx1},:]&#39;)
-axs[2].add_patch(Rectangle((orig_slice_idx2-512,orig_slice_idx0-512),1024-shift,1024-shift,fc=&#39;none&#39;,ec=&#39;r&#39;))
-axs[4].imshow(img_mip2)
-axs[4].set_title(f&#39;ax2=xy[:,:,{orig_slice_idx2}]&#39;)
-axs[4].add_patch(Rectangle((orig_slice_idx1-512,orig_slice_idx0-512),1024-shift,1024-shift,fc=&#39;none&#39;,ec=&#39;r&#39;))
 
 print(&#39;Plotting bboxes . . .&#39;)
 
-scores = data0[:,:,-4].ravel()
-predicted_rectangles = bb_to_rec(data0, pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+# Plot ax0 (img + bboxes) AND (zoomed img + bboxes)
+scores0 = data0[:,:,-4].ravel()
+xlim0 = [orig_slice_idx2-512, orig_slice_idx2+512-shift]
+ylim0 = [orig_slice_idx1-512, orig_slice_idx1+512-shift]
+pos0 = [4, 2, 5, 3]
+axs[0].imshow(img_mip0)
+predicted_rectangles = bb_to_rec(data0, pos = pos0, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores0)
+axs[0].add_collection(predicted_rectangles)
+axs[0].add_patch(Rectangle((xlim0[0],ylim0[0]),xlim0[1]-xlim0[0],ylim0[1]-ylim0[0],fc=&#39;none&#39;,ec=&#39;r&#39;))
+axs[0].set_title(f&#39;ax0=yz[{orig_slice_idx0},:,:]&#39;)
+
+predicted_rectangles = bb_to_rec(data0, pos = pos0, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores0)
 axs[1].imshow(img_mip0)
 axs[1].add_collection(predicted_rectangles)
-axs[1].set_xlim([orig_slice_idx1-512, orig_slice_idx1+512-shift])
-axs[1].set_ylim([orig_slice_idx2-512, orig_slice_idx2+512-shift])
+axs[1].set_xlim(xlim0)
+axs[1].set_ylim([ylim0[1], ylim0[0]])
 
-scores = data1[:,:,-4].ravel()
-predicted_rectangles = bb_to_rec(data1, pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+# Plot ax1 (img + bboxes) AND (zoomed img + bboxes)
+scores1 = data1[:,:,-4].ravel()
+xlim1 = [orig_slice_idx2-512, orig_slice_idx2+512-shift]
+ylim1 = [orig_slice_idx0-512, orig_slice_idx0+512-shift]
+pos1 = [4, 0, 5, 1]
+axs[2].imshow(img_mip1)
+predicted_rectangles = bb_to_rec(data1, pos = pos1, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores1)
+axs[2].add_collection(predicted_rectangles)
+axs[2].set_title(f&#39;ax1=xz[:,{orig_slice_idx1},:]&#39;)
+axs[2].add_patch(Rectangle((xlim1[0],ylim1[0]),xlim1[1]-xlim1[0],ylim1[1]-ylim1[0],fc=&#39;none&#39;,ec=&#39;r&#39;))
+
+predicted_rectangles = bb_to_rec(data1, pos = pos1, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores1)
 axs[3].imshow(img_mip1)
 axs[3].add_collection(predicted_rectangles)
-axs[3].set_xlim([orig_slice_idx2-512, orig_slice_idx2+512-shift])
-axs[3].set_ylim([orig_slice_idx0-512, orig_slice_idx0+512-shift])
+axs[3].set_xlim(xlim1)
+axs[3].set_ylim([ylim1[1], ylim1[0]])
 
-scores = data2[:,:,-4].ravel()
-predicted_rectangles = bb_to_rec(data2, pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores)
+# Plot ax2 (img + bboxes) AND (zoomed img + bboxes)
+scores2 = data2[:,:,-4].ravel()
+xlim2 = [orig_slice_idx1-512, orig_slice_idx1+512-shift]
+ylim2 = [orig_slice_idx0-512, orig_slice_idx0+512-shift]
+pos2 = [2, 0, 3, 1]
+axs[4].imshow(img_mip2)
+predicted_rectangles = bb_to_rec(data2, pos = pos2, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores2)
+axs[4].add_collection(predicted_rectangles)
+axs[4].set_title(f&#39;ax2=xy[:,:,{orig_slice_idx2}]&#39;)
+axs[4].add_patch(Rectangle((xlim2[0],ylim2[0]),xlim2[1]-xlim2[0],ylim2[1]-ylim2[0],fc=&#39;none&#39;,ec=&#39;r&#39;))
+
+predicted_rectangles = bb_to_rec(data2, pos = pos2, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores2)
 axs[5].imshow(img_mip2)
 axs[5].add_collection(predicted_rectangles)
-axs[5].set_xlim([orig_slice_idx1-512, orig_slice_idx1+512-shift])
-axs[5].set_ylim([orig_slice_idx0-512, orig_slice_idx0+512-shift])
+axs[5].set_xlim(xlim2)
+axs[5].set_ylim([ylim2[1], ylim2[0]])
 
 fig.set_size_inches(ncol*8, nrow*5)
 # plt.savefig(os.path.join(outdir, f&#39;recon_slice_{slice_idx:03d}.png&#39;))
 print(f&#39;Finished plotting everything in {time.time()-time_start:.2f}s&#39;)
 
 if False:
-    fig.savefig(os.path.join(&#39;/home/abenneck/Desktop/yolo3d_outputs/&#39;,&#39;slices_cube_i2_j3_k3_refined2.jpg&#39;))
+    fig.savefig(os.path.join(&#39;/home/abenneck/Desktop/yolo3d_outputs/&#39;,f&#39;slices_cube_i{i}_j{j}_k{k}_refined2.jpg&#39;))
 </pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished loading bbox data in 0.07s
+Finished loading images in 101.60s
+Plotting bboxes . . .
+Finished plotting everything in 4.74s
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_yolo_3d_63_1.png" src="../_images/notebooks_yolo_3d_63_1.png" />
 </div>
 </div>
 </section>
@@ -4255,8 +4307,8 @@ print(data1.shape)
 </section>
 <section id="(2.4)-Average-downsampling-on-ijk-cubes-(s=128)-by-a-factor-of-2">
 <h2>(2.4) Average downsampling on ijk cubes (s=128) by a factor of 2<a class="headerlink" href="#(2.4)-Average-downsampling-on-ijk-cubes-(s=128)-by-a-factor-of-2" title="Link to this heading">¶</a></h2>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>indir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes_128&#39;
@@ -4322,6 +4374,39 @@ for idx, fname in enumerate(sorted(os.listdir(indir))):
     # break
 </pre></div>
 </div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Starting (179/288) i0002_j0004_k0003_d128_Ex_488_Em_525.npy . . .
+Finished average downsampling i0002_j0004_k0003_d128_Ex_488_Em_525.npy in 5.03s, (128, 128, 128, 10) =&gt; (64, 64, 64, 5)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">PermissionError</span>                           Traceback (most recent call last)
+Cell <span class="ansi-green-fg">In[15], line 58</span>
+<span class="ansi-green-intense-fg ansi-bold">     55</span> <span style="color: rgb(0,135,0)">print</span>(<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">Finished average downsampling </span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>fname<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)"> in </span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>time<span style="color: rgb(98,98,98)">.</span>time()<span style="color: rgb(188,188,188)"> </span><span style="color: rgb(98,98,98)">-</span><span style="color: rgb(188,188,188)"> </span>time_start<span class="ansi-bold" style="color: rgb(175,95,135)">:</span><span style="color: rgb(175,0,0)">.2f</span><span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">s, </span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>data<span style="color: rgb(98,98,98)">.</span>shape<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)"> =&gt; </span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>data_out<span style="color: rgb(98,98,98)">.</span>shape<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>)
+<span class="ansi-green-intense-fg ansi-bold">     57</span> out_fname <span style="color: rgb(98,98,98)">=</span> fname<span style="color: rgb(98,98,98)">.</span>replace(<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">d</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>data<span style="color: rgb(98,98,98)">.</span>shape[<span style="color: rgb(98,98,98)">0</span>]<span class="ansi-bold" style="color: rgb(175,95,135)">:</span><span style="color: rgb(175,0,0)">.0f</span><span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>,<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">d</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>data<span style="color: rgb(98,98,98)">.</span>shape[<span style="color: rgb(98,98,98)">0</span>]<span style="color: rgb(188,188,188)"> </span><span style="color: rgb(98,98,98)">/</span><span style="color: rgb(188,188,188)"> </span>ds_factor<span class="ansi-bold" style="color: rgb(175,95,135)">:</span><span style="color: rgb(175,0,0)">.0f</span><span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>)
+<span class="ansi-green-fg">---&gt; 58</span> <span class="ansi-yellow-bg">np</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">save</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">os</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">path</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">join</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">outdir</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">out_fname</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">data_out</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">     60</span> <span style="color: rgb(0,135,0)">print</span>(<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">Saved </span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>out_fname<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span class="ansi-bold" style="color: rgb(175,95,0)">\n</span><span style="color: rgb(175,0,0)">&#39;</span>)
+<span class="ansi-green-intense-fg ansi-bold">     61</span> <span style="color: rgb(95,135,135)"># break</span>
+
+File <span class="ansi-green-fg">/nafs/dtward/intelpython3/lib/python3.9/site-packages/numpy/lib/npyio.py:542</span>, in <span class="ansi-cyan-fg">save</span><span class="ansi-blue-fg">(file, arr, allow_pickle, fix_imports)</span>
+<span class="ansi-green-intense-fg ansi-bold">    540</span>     <span class="ansi-bold" style="color: rgb(0,135,0)">if</span> <span class="ansi-bold" style="color: rgb(175,0,255)">not</span> file<span style="color: rgb(98,98,98)">.</span>endswith(<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">.npy</span><span style="color: rgb(175,0,0)">&#39;</span>):
+<span class="ansi-green-intense-fg ansi-bold">    541</span>         file <span style="color: rgb(98,98,98)">=</span> file <span style="color: rgb(98,98,98)">+</span> <span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">.npy</span><span style="color: rgb(175,0,0)">&#39;</span>
+<span class="ansi-green-fg">--&gt; 542</span>     file_ctx <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg" style="color: rgb(0,135,0)">open</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">file</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#34;</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">wb</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#34;</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">    544</span> <span class="ansi-bold" style="color: rgb(0,135,0)">with</span> file_ctx <span class="ansi-bold" style="color: rgb(0,135,0)">as</span> fid:
+<span class="ansi-green-intense-fg ansi-bold">    545</span>     arr <span style="color: rgb(98,98,98)">=</span> np<span style="color: rgb(98,98,98)">.</span>asanyarray(arr)
+
+<span class="ansi-red-fg">PermissionError</span>: [Errno 13] Permission denied: &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes_64/i0002_j0004_k0003_d64_Ex_488_Em_525.npy&#39;
+</pre></div></div>
 </div>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
