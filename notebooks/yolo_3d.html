@@ -38,7 +38,7 @@
           <div class="body" role="main">
             
   <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -1199,9 +1199,10 @@ print(data.shape)
 data_flat = yolo_output_to_list(data)
 print(data_flat[0])
 
-def get_mAP(gt_bboxes, pred_bboxes):
+def get_mAP(gt_bboxes, pred_bboxes, conf_idx = -4):
 
     # Compute IOU between gt_bboxes and pred_bboxes
+
 
     # Assign each gt_bbox to a pred_bbox, if applicable
 
@@ -4052,7 +4053,7 @@ Saved cube (3,8,7) with shape (131, 98, 38, 10) in 21.73s as i0003_j0008_k0007_d
 <section id="Plot-Results">
 <h3>Plot Results<a class="headerlink" href="#Plot-Results" title="Link to this heading">¶</a></h3>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[38]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Set key parameters
@@ -4060,15 +4061,17 @@ Saved cube (3,8,7) with shape (131, 98, 38, 10) in 21.73s as i0003_j0008_k0007_d
 outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes&#39;
 ds_factor = 4
 out_dim = 256
+filterLowConf, c_thresh = False, 0.25
 
 # outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes_128&#39;
 # ds_factor = 8
 # out_dim = 128
 
-orig_slice_dim = out_dim * ds_factor # 1024
-# shift = 1024 - 64
+orig_slice_dim = out_dim * ds_factor # 1024 - The size (in pixels) of a slice after being processed by the YOLO model BEFORE any postprocessing
+shiftx = 512-32
+shifty = 512-32
+view_dim = 64
 shift = 0
-
 
 # Load output cube + extract data from relevant slices
 time_start = time.time()
@@ -4076,15 +4079,17 @@ i, j, k = 1,3,3
 out_fname = f&#39;i{i:04d}_j{j:04d}_k{k:04d}_d{out_dim}_Ex_488_Em_525.npy&#39;
 data = np.load(os.path.join(outdir, out_fname))
 
-orig_slice_idx0 = (i*orig_slice_dim)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax0
+orig_slice_idx0 = int((i + 0.5) * orig_slice_dim) # Idx of the first img slice in the stack to be downsampled, from the middle of ax0
+# print(orig_slice_idx0)
 down_slice_idx0 = int((orig_slice_idx0 % orig_slice_dim) / ds_factor)
+# print(down_slice_idx0)
 data0 = data[down_slice_idx0,:,:,:]
 
-orig_slice_idx1 = (j*orig_slice_dim)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax1
+orig_slice_idx1 = int((j + 0.5) * orig_slice_dim) # Idx of the first img slice in the stack to be downsampled, from the middle of ax1
 down_slice_idx1 = int((orig_slice_idx1 % orig_slice_dim) / ds_factor)
 data1 = data[:,down_slice_idx1,:,:]
 
-orig_slice_idx2 = (k*orig_slice_dim)+512 # Idx of the first img slice in the stack to be downsampled, from the middle of ax2
+orig_slice_idx2 = int((k + 0.5) * orig_slice_dim) # Idx of the first img slice in the stack to be downsampled, from the middle of ax2
 down_slice_idx2 = int((orig_slice_idx2 % orig_slice_dim) / ds_factor)
 data2 = data[:,:,down_slice_idx2,:]
 print(f&#39;Finished loading bbox data in {time.time()-time_start:.2f}s&#39;)
@@ -4112,63 +4117,81 @@ img_mip2 = vol_to_mip(vol_stack, 2, ds_factor = 4, slice_idx = orig_slice_idx2)
 img_mip2 = preprocess(img_mip2, gamma = True, upsample = False)
 print(f&#39;Finished loading images in {time.time()-time_start:.2f}s&#39;)
 
+print(&#39;Plotting bboxes . . .&#39;)
+
 # Initialize output figure
 time_start = time.time()
 nrow, ncol = 6,1
 fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;)
 
-print(&#39;Plotting bboxes . . .&#39;)
-
 # Plot ax0 (img + bboxes) AND (zoomed img + bboxes)
 scores0 = data0[:,:,-4].ravel()
-xlim0 = [orig_slice_idx2-512, orig_slice_idx2+512-shift]
-ylim0 = [orig_slice_idx1-512, orig_slice_idx1+512-shift]
+if filterLowConf:
+    scores0 = [0 if elem &lt; c_thresh else 1 for elem in scores0]
+xlim0 = [orig_slice_idx2 - (orig_slice_dim / 2) + shiftx, orig_slice_idx2 - (orig_slice_dim / 2) + shiftx + view_dim]
+ylim0 = [orig_slice_idx1 - (orig_slice_dim / 2) + shifty, orig_slice_idx1 - (orig_slice_dim / 2) + shifty + view_dim]
 pos0 = [4, 2, 5, 3]
 axs[0].imshow(img_mip0)
 predicted_rectangles = bb_to_rec(data0, pos = pos0, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores0)
 axs[0].add_collection(predicted_rectangles)
 axs[0].add_patch(Rectangle((xlim0[0],ylim0[0]),xlim0[1]-xlim0[0],ylim0[1]-ylim0[0],fc=&#39;none&#39;,ec=&#39;r&#39;))
-axs[0].set_title(f&#39;ax0=yz[{orig_slice_idx0},:,:]&#39;)
+axs[0].set_title(f&#39;ax0=yz[{orig_slice_idx0}:{orig_slice_idx0+ds_factor},:,:]&#39;)
+axs[0].set_xlabel(&#39;Left =&gt; Right&#39;)
+axs[0].set_ylabel(&#39;Posterior =&gt; Anterior&#39;)
 
 predicted_rectangles = bb_to_rec(data0, pos = pos0, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores0)
 axs[1].imshow(img_mip0)
 axs[1].add_collection(predicted_rectangles)
 axs[1].set_xlim(xlim0)
 axs[1].set_ylim([ylim0[1], ylim0[0]])
+axs[1].set_xlabel(&#39;Left =&gt; Right&#39;)
+axs[1].set_ylabel(&#39;Posterior =&gt; Anterior&#39;)
 
 # Plot ax1 (img + bboxes) AND (zoomed img + bboxes)
 scores1 = data1[:,:,-4].ravel()
-xlim1 = [orig_slice_idx2-512, orig_slice_idx2+512-shift]
-ylim1 = [orig_slice_idx0-512, orig_slice_idx0+512-shift]
+if filterLowConf:
+    scores1 = [0 if elem &lt; c_thresh else 1 for elem in scores1]
+xlim1 = [orig_slice_idx2 - (orig_slice_dim / 2) + shiftx, orig_slice_idx2 - (orig_slice_dim / 2) + shiftx + view_dim]
+ylim1 = [orig_slice_idx0 - (orig_slice_dim / 2) + shifty, orig_slice_idx0 - (orig_slice_dim / 2) + shifty + view_dim]
 pos1 = [4, 0, 5, 1]
 axs[2].imshow(img_mip1)
 predicted_rectangles = bb_to_rec(data1, pos = pos1, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores1)
 axs[2].add_collection(predicted_rectangles)
-axs[2].set_title(f&#39;ax1=xz[:,{orig_slice_idx1},:]&#39;)
+axs[2].set_title(f&#39;ax1=xz[:,{orig_slice_idx1}:{orig_slice_idx1+ds_factor},:]&#39;)
 axs[2].add_patch(Rectangle((xlim1[0],ylim1[0]),xlim1[1]-xlim1[0],ylim1[1]-ylim1[0],fc=&#39;none&#39;,ec=&#39;r&#39;))
+axs[2].set_xlabel(&#39;Left =&gt; Right&#39;)
+axs[2].set_ylabel(&#39;Ventral =&gt; Dorsal&#39;)
 
 predicted_rectangles = bb_to_rec(data1, pos = pos1, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores1)
 axs[3].imshow(img_mip1)
 axs[3].add_collection(predicted_rectangles)
 axs[3].set_xlim(xlim1)
 axs[3].set_ylim([ylim1[1], ylim1[0]])
+axs[3].set_xlabel(&#39;Left =&gt; Right&#39;)
+axs[3].set_ylabel(&#39;Ventral =&gt; Dorsal&#39;)
 
 # Plot ax2 (img + bboxes) AND (zoomed img + bboxes)
 scores2 = data2[:,:,-4].ravel()
-xlim2 = [orig_slice_idx1-512, orig_slice_idx1+512-shift]
-ylim2 = [orig_slice_idx0-512, orig_slice_idx0+512-shift]
+if filterLowConf:
+    scores2 = [0 if elem &lt; c_thresh else 1 for elem in scores2]
+xlim2 = [orig_slice_idx1 - (orig_slice_dim / 2) + shiftx, orig_slice_idx1 - (orig_slice_dim / 2) + shiftx + view_dim]
+ylim2 = [orig_slice_idx0 - (orig_slice_dim / 2) + shifty, orig_slice_idx0 - (orig_slice_dim / 2) + shifty + view_dim]
 pos2 = [2, 0, 3, 1]
 axs[4].imshow(img_mip2)
 predicted_rectangles = bb_to_rec(data2, pos = pos2, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores2)
 axs[4].add_collection(predicted_rectangles)
-axs[4].set_title(f&#39;ax2=xy[:,:,{orig_slice_idx2}]&#39;)
+axs[4].set_title(f&#39;ax2=xy[:,:,{orig_slice_idx2}:{orig_slice_idx2+ds_factor}]&#39;)
 axs[4].add_patch(Rectangle((xlim2[0],ylim2[0]),xlim2[1]-xlim2[0],ylim2[1]-ylim2[0],fc=&#39;none&#39;,ec=&#39;r&#39;))
+axs[4].set_xlabel(&#39;Anterior =&gt; Posterior&#39;)
+axs[4].set_ylabel(&#39;Ventral =&gt; Dorsal&#39;)
 
 predicted_rectangles = bb_to_rec(data2, pos = pos2, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores2)
 axs[5].imshow(img_mip2)
 axs[5].add_collection(predicted_rectangles)
 axs[5].set_xlim(xlim2)
 axs[5].set_ylim([ylim2[1], ylim2[0]])
+axs[5].set_xlabel(&#39;Anterior =&gt; Posterior&#39;)
+axs[5].set_ylabel(&#39;Ventral =&gt; Dorsal&#39;)
 
 fig.set_size_inches(ncol*8, nrow*5)
 # plt.savefig(os.path.join(outdir, f&#39;recon_slice_{slice_idx:03d}.png&#39;))
@@ -4184,10 +4207,12 @@ if False:
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Finished loading bbox data in 0.07s
-Finished loading images in 101.60s
+1536
+128
+Finished loading bbox data in 0.49s
+Finished loading images in 95.92s
 Plotting bboxes . . .
-Finished plotting everything in 4.74s
+Finished plotting everything in 8.20s
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -4221,7 +4246,7 @@ for idx, fname in enumerate(sorted(os.listdir(indir))):
         continue
 
     data = np.load(os.path.join(indir, fname))
-    d_in = int(np.max(data.shape[:-1])) if idx + 1 != n_cubes else 256 # For the 1 corner
+    d_in = int(np.max(data.shape[:-1])) if idx + 1 != n_cubes else 256 # For the 1 cube opposite cube 0,0,0
     d_out = int(d_in / ds_factor)
     n_bbox = data.shape[-1]
     print(f&#39;Input Shape: {data.shape}&#39;)
@@ -4313,7 +4338,7 @@ print(data1.shape)
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>indir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes_128&#39;
 n_cubes = len(os.listdir(indir))
-next_idx = 179
+next_idx = 0
 
 outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes_64&#39;
 
@@ -4349,9 +4374,9 @@ for idx, fname in enumerate(sorted(os.listdir(indir))):
                 E_num_cells = np.sum(sub_data[:, conf_idx])
                 vol = (sub_data[:, 1] - sub_data[:, 0])*(sub_data[:, 3]-sub_data[:, 2])*(sub_data[:, 5]-sub_data[:, 4])
                 avg_vol = (vol @ sub_data[:,conf_idx]) / E_num_cells
-                avg_f1 = sub_data[:,-3] @ sub_data[:,conf_idx]
-                avg_f2 = sub_data[:,-2] @ sub_data[:,conf_idx]
-                avg_f3 = sub_data[:,-1] @ sub_data[:,conf_idx]
+                avg_f1 = (sub_data[:,-3] @ sub_data[:,conf_idx]) / E_num_cells
+                avg_f2 = (sub_data[:,-2] @ sub_data[:,conf_idx]) / E_num_cells
+                avg_f3 = (sub_data[:,-1] @ sub_data[:,conf_idx]) / E_num_cells
 
                 avg_voxel = [avg_vol, E_num_cells, avg_f1, avg_f2, avg_f3]
 
@@ -4407,14 +4432,6 @@ File <span class="ansi-green-fg">/nafs/dtward/intelpython3/lib/python3.9/site-pa
 
 <span class="ansi-red-fg">PermissionError</span>: [Errno 13] Permission denied: &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes_64/i0002_j0004_k0003_d64_Ex_488_Em_525.npy&#39;
 </pre></div></div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
-</pre></div>
-</div>
 </div>
 </section>
 </section>
