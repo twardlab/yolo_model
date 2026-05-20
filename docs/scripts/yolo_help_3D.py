@@ -8,8 +8,20 @@ import torch
 import time
 from matplotlib.collections import PolyCollection
 import os
+import sys
+import imp
 
 from scipy.ndimage import gaussian_filter
+
+sys.path.append(os.path.join(os.path.split(os.getcwd())[0], 'scripts'))
+
+import yolo_help
+imp.reload(yolo_help)
+from yolo_help import Net
+
+import yolo_post_help
+imp.reload(yolo_post_help)
+from yolo_post_help import postprocess
 
 class GroundTruthDataset3D(torch.utils.data.Dataset):
     """ This dataset will generate a set of random images of size N x N. And they will contain poisson distributed cells with mean M.
@@ -161,146 +173,146 @@ class GroundTruthDataset3D(torch.utils.data.Dataset):
         
         return I,bbox,cl
 
-class Net(torch.nn.Module):
-    """
-    A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of variable shape. 
+# class Net(torch.nn.Module):
+#     """
+#     A neural network using the YOLO framework, with a batch size of 1 and an input layer capable of accepting inputs of variable shape. 
 
-    Parameters:
-    -----------
-    nclasses : int
-        Default - 3; The number of distinct classes in the dataset
+#     Parameters:
+#     -----------
+#     nclasses : int
+#         Default - 3; The number of distinct classes in the dataset
 
-    Returns:
-    --------
-    Net : torch.nn.Module
-        A neural network which can take input images with any number of channels
+#     Returns:
+#     --------
+#     Net : torch.nn.Module
+#         A neural network which can take input images with any number of channels
     
-    """
-    def __init__(self, nclasses = 3):
-        """
-        Init method for the yolo network class. Most hyperparameters are hard-coded (See the comments within the below function)
+#     """
+#     def __init__(self, nclasses = 3):
+#         """
+#         Init method for the yolo network class. Most hyperparameters are hard-coded (See the comments within the below function)
         
-        Parameters:
-        -----------
-        nclasses : int
-            Default - 3; The number of distinct classes in the dataset
-        """
-        super().__init__()
+#         Parameters:
+#         -----------
+#         nclasses : int
+#             Default - 3; The number of distinct classes in the dataset
+#         """
+#         super().__init__()
         
-        self.chin = 16 # The number of channels are VariableInputConv2D() layer will map to
-        self.ch0 = 32 # The number of channels our first convolution layer will map to. Every other conv layer halves the resolution and doubles the number of channels.
+#         self.chin = 16 # The number of channels our VariableInputConv2D() layer will map to
+#         self.ch0 = 32 # The number of channels our first convolution layer will map to. Every other conv layer halves the resolution and doubles the number of channels.
         
-        self.padding_mode='reflect' # Padding for convolution, reflect behaves nicely at boundaries
+#         self.padding_mode='reflect' # Padding for convolution, reflect behaves nicely at boundaries
         
-        self.B = 2 # bounding boxes per block (The original yolo model uses 2)
-        self.C = nclasses # number of classes, conditioned on their being an object
-        self.chout = self.B*5 + self.C # 5 numbers per box, cx, cy, width, height, confidence (confidence is a predition of p(object)*IOU). AND 1 probability score per class.
+#         self.B = 2 # bounding boxes per block (The original yolo model uses 2)
+#         self.C = nclasses # number of classes, conditioned on their being an object
+#         self.chout = self.B*5 + self.C # 5 numbers per box, cx, cy, width, height, confidence (confidence is a predition of p(object)*IOU). AND 1 probability score per class.
         
-        self.color = VariableInputConv2d(self.chin)
+#         self.color = VariableInputConv2d(self.chin)
 
-        self.bn_kwargs = {'track_running_stats':False, 'affine':True}
+#         self.bn_kwargs = {'track_running_stats':False, 'affine':True}
         
-        # self.bn = torch.nn.BatchNorm2d # i also set track running stats to false, so eval mode will be the same as train mode
-        self.bn = torch.nn.InstanceNorm3d # i also set track running stats to false, so eval mode will be the same as train mode
-        #self.bn = BatchNorm2dRunningOnly
+#         # self.bn = torch.nn.BatchNorm2d # i also set track running stats to false, so eval mode will be the same as train mode
+#         self.bn = torch.nn.InstanceNorm3d # i also set track running stats to false, so eval mode will be the same as train mode
+#         #self.bn = BatchNorm2dRunningOnly
         
-        self.c0 = torch.nn.Conv3d(self.chin,self.ch0,3,1,1,padding_mode=self.padding_mode) # no downsampling
-        self.b0 = self.bn(self.ch0,**self.bn_kwargs)
-        self.c0a = torch.nn.Conv3d(self.ch0,self.ch0,3,1,1,padding_mode=self.padding_mode)
-        self.b0a = self.bn(self.ch0,**self.bn_kwargs)
+#         self.c0 = torch.nn.Conv3d(self.chin,self.ch0,3,1,1,padding_mode=self.padding_mode) # no downsampling
+#         self.b0 = self.bn(self.ch0,**self.bn_kwargs)
+#         self.c0a = torch.nn.Conv3d(self.ch0,self.ch0,3,1,1,padding_mode=self.padding_mode)
+#         self.b0a = self.bn(self.ch0,**self.bn_kwargs)
         
-        self.c1 = torch.nn.Conv3d(self.ch0,self.ch0*2,3,2,1,padding_mode=self.padding_mode)
-        self.b1 = self.bn(self.ch0*2,**self.bn_kwargs)
-        self.c1a = torch.nn.Conv3d(self.ch0*2,self.ch0*2,3,1,1,padding_mode=self.padding_mode)
-        self.b1a = self.bn(self.ch0*2,**self.bn_kwargs)
+#         self.c1 = torch.nn.Conv3d(self.ch0,self.ch0*2,3,2,1,padding_mode=self.padding_mode)
+#         self.b1 = self.bn(self.ch0*2,**self.bn_kwargs)
+#         self.c1a = torch.nn.Conv3d(self.ch0*2,self.ch0*2,3,1,1,padding_mode=self.padding_mode)
+#         self.b1a = self.bn(self.ch0*2,**self.bn_kwargs)
         
-        self.c2 = torch.nn.Conv3d(self.ch0*2,self.ch0*4,3,2,1,padding_mode=self.padding_mode)
-        self.b2 = self.bn(self.ch0*4,**self.bn_kwargs)
-        self.c2a = torch.nn.Conv3d(self.ch0*4,self.ch0*4,3,1,1,padding_mode=self.padding_mode)
-        self.b2a = self.bn(self.ch0*4,**self.bn_kwargs)
-        
-        
-        
-        self.c3 = torch.nn.Conv3d(self.ch0*4,self.ch0*8,3,2,1,padding_mode=self.padding_mode)
-        self.b3 = self.bn(self.ch0*8,**self.bn_kwargs)
-        self.c3a = torch.nn.Conv3d(self.ch0*8,self.ch0*8,3,1,1,padding_mode=self.padding_mode)
-        self.b3a = self.bn(self.ch0*8,**self.bn_kwargs)
+#         self.c2 = torch.nn.Conv3d(self.ch0*2,self.ch0*4,3,2,1,padding_mode=self.padding_mode)
+#         self.b2 = self.bn(self.ch0*4,**self.bn_kwargs)
+#         self.c2a = torch.nn.Conv3d(self.ch0*4,self.ch0*4,3,1,1,padding_mode=self.padding_mode)
+#         self.b2a = self.bn(self.ch0*4,**self.bn_kwargs)
         
         
-        self.c4 = torch.nn.Conv3d(self.ch0*8,self.chout,1,1,padding_mode=self.padding_mode)
         
-
+#         self.c3 = torch.nn.Conv3d(self.ch0*4,self.ch0*8,3,2,1,padding_mode=self.padding_mode)
+#         self.b3 = self.bn(self.ch0*8,**self.bn_kwargs)
+#         self.c3a = torch.nn.Conv3d(self.ch0*8,self.ch0*8,3,1,1,padding_mode=self.padding_mode)
+#         self.b3a = self.bn(self.ch0*8,**self.bn_kwargs)
         
-        # the total stride is important for interpretting the bounding box in the rpn
-        self.stride = 8        
+        
+#         self.c4 = torch.nn.Conv3d(self.ch0*8,self.chout,1,1,padding_mode=self.padding_mode)
+        
 
         
-        # the total stride is important for interpretting the bounding box in the rpn
-        self.stride = 8
+#         # the total stride is important for interpretting the bounding box in the rpn
+#         self.stride = 8        
+
+        
+#         # the total stride is important for interpretting the bounding box in the rpn
+#         self.stride = 8
         
         
-    def forward(self,x):
-        """
-        Forward method for the yolo network.
+#     def forward(self,x):
+#         """
+#         Forward method for the yolo network.
         
-        Inputs
-        ======
-        x : torch.Tensor 
-            Object is of size 1 x CH x ROW x COL. # of channels, rows, and columns are arbitrary. This differs from the original yolo paper, which requires a fixed number of channels, rows, and columns.
+#         Inputs
+#         ======
+#         x : torch.Tensor 
+#             Object is of size 1 x CH x ROW x COL. # of channels, rows, and columns are arbitrary. This differs from the original yolo paper, which requires a fixed number of channels, rows, and columns.
             
-        Outputs
-        =======
-        x : torch.Tensor
-            Object is of size 5 * bbox_per_cell (2) + num_classes (3) x ROW x COL, where ROW and COL are equal to the input image size divided by the network's stride (8). The five numbers per cell are [cx, cy, scalex, scaley, confidence].
+#         Outputs
+#         =======
+#         x : torch.Tensor
+#             Object is of size 5 * bbox_per_cell (2) + num_classes (3) x ROW x COL, where ROW and COL are equal to the input image size divided by the network's stride (8). The five numbers per cell are [cx, cy, scalex, scaley, confidence].
 
-        """
+#         """
         
-        # color         
-        x = self.color(x)
+#         # color         
+#         x = self.color(x)
         
-        # here x is a batch of images
-        x = self.c0(x)
-        x = self.b0(x)
-        x = torch.relu(x)
+#         # here x is a batch of images
+#         x = self.c0(x)
+#         x = self.b0(x)
+#         x = torch.relu(x)
         
-        x = self.c0a(x)
-        x = self.b0a(x)
-        x = torch.relu(x)
-        
-        
-        
-        x = self.c1(x)
-        x = self.b1(x)
-        x = torch.relu(x)
-        
-        x = self.c1a(x)
-        x = self.b1a(x)
-        x = torch.relu(x)
-        
-
+#         x = self.c0a(x)
+#         x = self.b0a(x)
+#         x = torch.relu(x)
         
         
-        x = self.c2(x)
-        x = self.b2(x)
-        x = torch.relu(x)
-
-        x = self.c2a(x)
-        x = self.b2a(x)
-        x = torch.relu(x)
+        
+#         x = self.c1(x)
+#         x = self.b1(x)
+#         x = torch.relu(x)
+        
+#         x = self.c1a(x)
+#         x = self.b1a(x)
+#         x = torch.relu(x)
+        
 
         
-        x = self.c3(x)
-        x = self.b3(x)
-        x = torch.relu(x)
         
-        x = self.c3a(x)
-        x = self.b3a(x)
-        x = torch.relu(x)
+#         x = self.c2(x)
+#         x = self.b2(x)
+#         x = torch.relu(x)
+
+#         x = self.c2a(x)
+#         x = self.b2a(x)
+#         x = torch.relu(x)
+
         
-        x = self.c4(x)
+#         x = self.c3(x)
+#         x = self.b3(x)
+#         x = torch.relu(x)
+        
+#         x = self.c3a(x)
+#         x = self.b3a(x)
+#         x = torch.relu(x)
+        
+#         x = self.c4(x)
         
         
-        return x
+#         return x
         
 class VariableInputConv2d(torch.nn.Module):
     ''' Note the assumption here is that we have batch size one, so I can work with the batch dimension.
@@ -399,9 +411,9 @@ def apply_model_to_orthogonal_slices(model_path, I):
     pads = np.array([0,0])
     
     # Initialize reconstruction containers
-    recon_xy = np.ones((int(tile_dim/ds_factor), int(tile_dim/ds_factor), tile_dim, bbox_dim+num_classes))*(-np.inf)
-    recon_xz = np.ones((int(tile_dim/ds_factor), tile_dim, int(tile_dim/ds_factor), bbox_dim+num_classes))*(-np.inf)
-    recon_yz = np.ones((tile_dim, int(tile_dim/ds_factor), int(tile_dim/ds_factor), bbox_dim+num_classes))*(-np.inf)
+    recon_xy = np.zeros((int(tile_dim/ds_factor), int(tile_dim/ds_factor), tile_dim, bbox_dim+num_classes))
+    recon_xz = np.zeros((int(tile_dim/ds_factor), tile_dim, int(tile_dim/ds_factor), bbox_dim+num_classes))
+    recon_yz = np.zeros((tile_dim, int(tile_dim/ds_factor), int(tile_dim/ds_factor), bbox_dim+num_classes))
     
     start = time.time()
     for idx in np.arange(tile_dim):

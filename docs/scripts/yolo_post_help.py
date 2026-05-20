@@ -96,7 +96,7 @@ def bb_to_rec(out, pos = [0,1,2,3], **kwargs):
     Parameters:
     -----------
     out : torch.Tensor
-        The output object from the primary YOLO neural network after the best bbox per cell has been selected and the coordinate values have been reformated in the postprocessing stage.
+        The output object from the primary YOLO neural network after the best bbox per cell has been selected and the coordinate values have been reformated in the postprocessing stage. Note: this can also be a list or n-dimensional tensor of bounding boxes
     pos : ndarray of int
         The indeces corresponding to the [left, top, right, bottom] points at out[i,j]
 
@@ -106,11 +106,12 @@ def bb_to_rec(out, pos = [0,1,2,3], **kwargs):
         Contains N rectangles to be plotted later
     
     """
-    left = torch.Tensor(out[:,:,pos[0]].ravel())
-    top = torch.Tensor(out[:,:,pos[1]].ravel())
-    right = torch.Tensor(out[:,:,pos[2]].ravel())
-    bottom = torch.Tensor(out[:,:,pos[3]].ravel())
-    
+
+    left = torch.Tensor(out[...,pos[0]].ravel())
+    top = torch.Tensor(out[...,pos[1]].ravel())
+    right = torch.Tensor(out[...,pos[2]].ravel())
+    bottom = torch.Tensor(out[...,pos[3]].ravel())
+        
     p0 = torch.stack( (left, top), dim=1)
     p1 = torch.stack( (right, top), dim=1)
     p2 = torch.stack( (right, bottom), dim=1)
