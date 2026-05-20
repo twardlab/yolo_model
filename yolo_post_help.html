@@ -77,7 +77,7 @@
 <section id="id1">
 <h2>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
 <dl class="simple">
-<dt>out<span class="classifier">torch.Tensor</span></dt><dd><p>The output object from the primary YOLO neural network after the best bbox per cell has been selected and the coordinate values have been reformated in the postprocessing stage.</p>
+<dt>out<span class="classifier">torch.Tensor</span></dt><dd><p>The output object from the primary YOLO neural network after the best bbox per cell has been selected and the coordinate values have been reformated in the postprocessing stage. Note: this can also be a list or n-dimensional tensor of bounding boxes</p>
 </dd>
 <dt>pos<span class="classifier">ndarray of int</span></dt><dd><p>The indeces corresponding to the [left, top, right, bottom] points at out[i,j]</p>
 </dd>

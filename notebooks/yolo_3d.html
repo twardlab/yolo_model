@@ -38,7 +38,7 @@
           <div class="body" role="main">
             
   <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -74,6 +74,10 @@ from yolo_post_help import remove_low_conf_bboxes, postprocess, bb_to_rec
 import yolo_help_3D
 imp.reload(yolo_help_3D)
 from yolo_help_3D import apply_model_to_orthogonal_slices, gen_3D_GT, recon_down, vol_to_mip_rgb, orthogonal_to_3D, vol_to_mip
+
+import yolo_avg_prec
+imp.reload(yolo_avg_prec)
+from yolo_avg_prec import get_AP, gt_bbox_to_pred_bbox_format, IOU_3D, yolo_output_to_list
 </pre></div>
 </div>
 </div>
@@ -598,8 +602,8 @@ for i in np.arange(down_dim):
             zmax = (down_xz[i,j,k,2] + down_yz[i,j,k,2]) / 2
 
             # conf = np.max([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
-            # conf = np.min([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
-            conf = down_xy[i,j,k,4] * down_xz[i,j,k,4] * down_yz[i,j,k,4]
+            conf = np.min([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
+            # conf = down_xy[i,j,k,4] * down_xz[i,j,k,4] * down_yz[i,j,k,4]
             # conf = np.sum([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]]) / 3
 
             cl0 = np.max([down_xy[i,j,k,5], down_xz[k,i,j,5], down_yz[j,k,i,5]])
@@ -753,204 +757,10 @@ if False:
 <h1>(1) Quantify model performance on a 3D simulated dataset<a class="headerlink" href="#(1)-Quantify-model-performance-on-a-3D-simulated-dataset" title="Link to this heading">¶</a></h1>
 <section id="(1.1)-Initialize-a-3D-volume-w/-cells-+-artifacts">
 <h2>(1.1) Initialize a 3D volume w/ cells + artifacts<a class="headerlink" href="#(1.1)-Initialize-a-3D-volume-w/-cells-+-artifacts" title="Link to this heading">¶</a></h2>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def gen_3D_GT(N, M, nclasses, thr_rel=0.15):
-    &quot;&quot;&quot;
-    Generate a synthetic 3D volume with ellipsoidal blobs (&quot;cells&quot;) and several artifacts
-    commonly found in natural microscopy data.
-
-    Output volume is channels-last: (Z, Y, X, d).
-
-    Bounding boxes are computed by:
-      1) Synthesizing each object&#39;s mask in a local ROI
-      2) Thresholding the mask at (thr_rel * max(mask))
-      3) Taking the tight axis-aligned bounding box of the thresholded support
-
-    Parameters
-    ----------
-    N : int
-        Spatial size for X, Y, and Z (volume is N x N x N).
-    M : int
-        Upper bound for number of objects (m = 1 + randint(M)).
-    nclasses : int
-        Number of classes (labels in [0, nclasses-1]).
-    thr_rel : float
-        Relative threshold for bbox extraction: keep = mask &gt; thr_rel * mask.max().
-
-    Returns
-    -------
-    I : np.ndarray
-        Image volume of shape (N, N, N, d) float32  (Z, Y, X, d)
-    bbox : np.ndarray
-        Bounding boxes of shape (m, 6) float32
-        Each row: (x0, y0, z0, w, h, depth) with half-open extents
-    cl : np.ndarray
-        Class labels of shape (m,)
-    &quot;&quot;&quot;
-    # number of channels
-    d = 3
-    bg = np.random.rand(d).astype(np.float32)
-
-    # channels-last volume: (Z, Y, X, d)
-    I = np.zeros((N, N, N, d), dtype=np.float32) + bg[None, None, None, :]
-
-    # how many objects
-    m = 1 + np.random.randint(M)
-    cl = np.random.randint(0, nclasses, size=m)
-
-    # centers in voxel coordinates: (x, y, z)
-    c = (np.random.rand(m, 3) * (np.array([N, N, N]) - 1)).astype(np.float32)
-
-    # sizes (sigmas) per axis: (sx, sy, sz)
-    s = (3 + np.random.rand(m, 3) * 20).astype(np.float32)
-
-    # Euler angles (rx, ry, rz)
-    angles = (np.random.rand(m, 3) * 2 * np.pi).astype(np.float32)
-
-    color0 = np.random.rand(d).astype(np.float32)
-    bbox = np.zeros((m, 6), dtype=np.float32)
-
-    def euler_R(rx, ry, rz):
-        &quot;&quot;&quot;Rotation matrix R = Rz @ Ry @ Rx.&quot;&quot;&quot;
-        cx, sx = np.cos(rx), np.sin(rx)
-        cy, sy = np.cos(ry), np.sin(ry)
-        cz, sz = np.cos(rz), np.sin(rz)
-
-        Rx = np.array([[1, 0, 0],
-                       [0, cx, -sx],
-                       [0, sx,  cx]], dtype=np.float32)
-        Ry = np.array([[ cy, 0, sy],
-                       [  0,  1,  0],
-                       [-sy, 0, cy]], dtype=np.float32)
-        Rz = np.array([[cz, -sz, 0],
-                       [sz,  cz, 0],
-                       [ 0,   0, 1]], dtype=np.float32)
-        return (Rz @ Ry @ Rx).astype(np.float32)
-
-    for i in range(m):
-        cx, cy, cz = c[i]
-        sx_, sy_, sz_ = s[i]
-        cli = int(cl[i])
-        R = euler_R(*angles[i])
-
-        # ROI for synthesis: center +/- 3*max(sigma)
-        mxi = float(max(sx_, sy_, sz_))
-        left   = int(np.clip(cx - 3*mxi, 0, N - 1))
-        right  = int(np.clip(cx + 3*mxi, 0, N - 1))
-        top    = int(np.clip(cy - 3*mxi, 0, N - 1))
-        bottom = int(np.clip(cy + 3*mxi, 0, N - 1))
-        front  = int(np.clip(cz - 3*mxi, 0, N - 1))
-        back   = int(np.clip(cz + 3*mxi, 0, N - 1))
-
-        # enforce non-empty half-open ranges
-        right  = max(right,  left + 1)
-        bottom = max(bottom, top + 1)
-        back   = max(back,   front + 1)
-
-        # local coordinate blocks (broadcasted)
-        zz = (np.arange(front, back, dtype=np.float32) - cz)[:, None, None]   # (Dz,1,1)
-        yy = (np.arange(top, bottom, dtype=np.float32) - cy)[None, :, None]   # (1,Dy,1)
-        xx = (np.arange(left, right, dtype=np.float32) - cx)[None, None, :]   # (1,1,Dx)
-
-        # rotate into object frame: P&#39; = R^T P
-        Xp = R[0, 0]*xx + R[1, 0]*yy + R[2, 0]*zz
-        Yp = R[0, 1]*xx + R[1, 1]*yy + R[2, 1]*zz
-        Zp = R[0, 2]*xx + R[1, 2]*yy + R[2, 2]*zz
-
-        # ellipsoidal metric
-        q = (Xp/(sx_ + 1e-6))**2 + (Yp/(sy_ + 1e-6))**2 + (Zp/(sz_ + 1e-6))**2
-        base = (q/2.0)*(3.0**2)
-
-        # class-dependent mask shape + optional bumps
-        if cli &lt;= 1:
-            mask = np.exp(-(base)**(1 + 2*cli)).astype(np.float32)
-        else:
-            mask = np.exp(-(base)**4).astype(np.float32)
-            bumps = gaussian_filter(np.random.randn(*mask.shape).astype(np.float32), 1)
-            mask *= np.exp(bumps).astype(np.float32)
-
-        # add object to volume
-        color = (color0*0.95 + np.random.rand(d).astype(np.float32)*0.05).astype(np.float32)
-        I[front:back, top:bottom, left:right, :] += mask[..., None] * color[None, None, None, :]
-
-        # bbox from thresholded mask support within ROI
-        thr = float(mask.max()) * float(thr_rel)
-        keep = mask &gt; thr
-
-        if np.any(keep):
-            zz_idx, yy_idx, xx_idx = np.where(keep)
-            z0 = front + int(zz_idx.min())
-            z1 = front + int(zz_idx.max()) + 1  # half-open
-            y0 = top   + int(yy_idx.min())
-            y1 = top   + int(yy_idx.max()) + 1
-            x0 = left  + int(xx_idx.min())
-            x1 = left  + int(xx_idx.max()) + 1
-        else:
-            # fallback: 1-voxel box at rounded center (rare)
-            x0 = int(np.clip(round(cx), 0, N-1))
-            x1 = min(x0 + 1, N)
-            y0 = int(np.clip(round(cy), 0, N-1))
-            y1 = min(y0 + 1, N)
-            z0 = int(np.clip(round(cz), 0, Z-1))
-            z1 = min(z0 + 1, Z)
-
-        bbox[i] = np.array([x0, y0, z0, x1-x0, y1-y0, z1-z0], dtype=np.float32)
-
-    # --- global artifacts (computed without allocating a full meshgrid) ---
-    z = np.arange(N, dtype=np.float32)[:, None, None]
-    y = np.arange(N, dtype=np.float32)[None, :, None]
-    x = np.arange(N, dtype=np.float32)[None, None, :]
-
-    # Gaussian &quot;sheet&quot; artifact (thin plane)
-    n = np.random.randn(3).astype(np.float32)
-    n /= (np.linalg.norm(n) + 1e-6)
-    p0 = np.array([np.random.rand()*(N-1),
-                   np.random.rand()*(N-1),
-                   np.random.rand()*(N-1)], dtype=np.float32)
-    dist = n[0]*(x - p0[0]) + n[1]*(y - p0[1]) + n[2]*(z - p0[2])
-    width = np.float32(1 + np.random.rand()*20)
-    sheet = np.exp(-(dist/width)**2).astype(np.float32)
-    I += sheet[..., None] * (np.random.rand(d).astype(np.float32)*2)[None, None, None, :]
-
-    # Logistic &quot;slab&quot; artifact (smooth plane transition)
-    n2 = np.random.randn(3).astype(np.float32)
-    n2 /= (np.linalg.norm(n2) + 1e-6)
-    p1 = np.array([np.random.rand()*(N-1),
-                   np.random.rand()*(N-1),
-                   np.random.rand()*(N-1)], dtype=np.float32)
-    dist2 = n2[0]*(x - p1[0]) + n2[1]*(y - p1[1]) + n2[2]*(z - p1[2])
-    sharp = np.float32(1 + np.random.rand()*10)
-    slab = (1.0/(1.0 + np.exp(-(dist2/sharp)))).astype(np.float32)
-    I += slab[..., None] * np.random.rand(d).astype(np.float32)[None, None, None, :]
-
-    # optional intensity warp
-    if np.random.rand() &gt; 0.5:
-        mu = np.float32(np.random.rand()*4)
-        I = np.exp(-mu * I).astype(np.float32)
-
-    # blur (3D per channel)
-    sigma = np.random.rand()*2
-    for ch in range(d):
-        I[..., ch] = gaussian_filter(I[..., ch], sigma)
-
-    # additive smooth noise
-    noise = (np.random.rand(*I.shape).astype(np.float32) * (np.random.rand()*0.5)).astype(np.float32)
-    sigma_n = np.random.rand()*2
-    for ch in range(d):
-        noise[..., ch] = gaussian_filter(noise[..., ch], sigma_n)
-    I += noise
-
-    return I, bbox, cl
-</pre></div>
-</div>
-</div>
 <section id="Generate-the-3D-simulated-dataset">
 <h3>Generate the 3D simulated dataset<a class="headerlink" href="#Generate-the-3D-simulated-dataset" title="Link to this heading">¶</a></h3>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[150]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>applyPipelineToSimulatedData = False
@@ -969,7 +779,7 @@ ax.set_title(f&#39;Example slice&#39;)
 </div>
 </div>
 <div class="nboutput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[150]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
@@ -981,7 +791,7 @@ Text(0.5, 1.0, &#39;Example slice&#39;)
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_3d_31_1.png" src="../_images/notebooks_yolo_3d_31_1.png" />
+<img alt="../_images/notebooks_yolo_3d_30_1.png" src="../_images/notebooks_yolo_3d_30_1.png" />
 </div>
 </div>
 </section>
@@ -1067,8 +877,8 @@ if False:
 <h2>(1.2) Apply our earlier pipeline to the simulated 3D dataset + quantify performance<a class="headerlink" href="#(1.2)-Apply-our-earlier-pipeline-to-the-simulated-3D-dataset-+-quantify-performance" title="Link to this heading">¶</a></h2>
 <section id="Apply-2D-model-to-orthogonal-slices">
 <h3>Apply 2D model to orthogonal slices<a class="headerlink" href="#Apply-2D-model-to-orthogonal-slices" title="Link to this heading">¶</a></h3>
-NOTE: Earlier data was shape [256,256,256] and simulated dataset is shape [256,256,256,3]<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+NOTE: Earlier data was shape [256,256,256] and simulated dataset is shape [256,256,256,3]<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
@@ -1078,11 +888,19 @@ NOTE: Earlier data was shape [256,256,256] and simulated dataset is shape [256,2
 </pre></div>
 </div>
 </div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished 0/256
+</pre></div></div>
+</div>
 </section>
 <section id="Downsample-along-the-slice-dimension">
 <h3>Downsample along the slice dimension<a class="headerlink" href="#Downsample-along-the-slice-dimension" title="Link to this heading">¶</a></h3>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
@@ -1090,8 +908,16 @@ NOTE: Earlier data was shape [256,256,256] and simulated dataset is shape [256,2
 </pre></div>
 </div>
 </div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished downsampling outputs in 0.02s
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(&#39;recon_output.shape =&gt; downsampled_output.shape&#39;)
@@ -1101,11 +927,22 @@ print(f&#39;yz: {recon_yz.shape} =&gt; {down_yz.shape}&#39;)
 </pre></div>
 </div>
 </div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+recon_output.shape =&gt; downsampled_output.shape
+xy: (32, 32, 256, 8) =&gt; (32, 32, 32, 8)
+xz: (32, 256, 32, 8) =&gt; (32, 32, 32, 8)
+yz: (256, 32, 32, 8) =&gt; (32, 32, 32, 8)
+</pre></div></div>
+</div>
 </section>
 <section id="Generate-MIP-volumes-along-each-axis">
 <h3>Generate MIP-volumes along each axis<a class="headerlink" href="#Generate-MIP-volumes-along-each-axis" title="Link to this heading">¶</a></h3>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
@@ -1118,14 +955,22 @@ print(f&#39;yz: {recon_yz.shape} =&gt; {down_yz.shape}&#39;)
 </section>
 <section id="Combine-3-2D-outputs-into-1-3D-output">
 <h3>Combine 3 2D outputs into 1 3D output<a class="headerlink" href="#Combine-3-2D-outputs-into-1-3D-output" title="Link to this heading">¶</a></h3>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[31]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
     recon_total = orthogonal_to_3D(down_xy, down_xz, down_yz)
 </pre></div>
 </div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished combining outputs in 0.73s
+</pre></div></div>
 </div>
 </section>
 <section id="Visualize-the-outputs">
@@ -1179,69 +1024,64 @@ print(f&#39;yz: {recon_yz.shape} =&gt; {down_yz.shape}&#39;)
 </section>
 <section id="(1.3)-Quantify-Model-Performance-wrt-GT-bboxes">
 <h2>(1.3) Quantify Model Performance wrt GT bboxes<a class="headerlink" href="#(1.3)-Quantify-Model-Performance-wrt-GT-bboxes" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
+    AP, performance = get_AP(bbox, recon_total, iou_thresh = 0.01)
+</pre></div>
+</div>
+</div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[72]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def yolo_output_to_list(bb_grid):
-
-    if len(bb_grid.shape) == 2:
-        return bb_grid
-
-    if len(bb_grid.shape) == 3:
-        bb_list = bb_grid.reshape(bb_grid.shape[0] * bb_grid.shape[1], bb_grid.shape[2])
-
-    return bb_list
-
-indir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0&#39;
-data = np.load(os.path.join(indir, os.listdir(indir)[0]))
-print(data.shape)
-data_flat = yolo_output_to_list(data)
-print(data_flat[0])
-
-def get_mAP(gt_bboxes, pred_bboxes, conf_idx = -4):
-
-    # Compute IOU between gt_bboxes and pred_bboxes
-
-
-    # Assign each gt_bbox to a pred_bbox, if applicable
-
-    # Compute (P,R) points for c_thresh = 0:0.01:1 at each iou_thresh = 0:0.05:1
-
-    # Compute AP as area under each PR curve
-    AP = [0,0]
-
-    return AP, np.mean(AP)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fig, ax = plt.subplots()
+ax.plot(pr_plot[:,2], pr_plot[:,1])
+ax.set_xlabel(&#39;Recall&#39;)
+ax.set_ylabel(&#39;Precision&#39;)
+ax.set_title(f&#39;AP = {AP:.3f}&#39;)
 </pre></div>
 </div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[72]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Text(0.5, 1.0, &#39;AP = 0.058&#39;)
+</pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<div class="highlight"><pre>
-(2148, 1832, 8)
-[-3.75 -2.75 -3.75 -2.75  0.    -inf  -inf  -inf]
-</pre></div></div>
+<img alt="../_images/notebooks_yolo_3d_48_1.png" src="../_images/notebooks_yolo_3d_48_1.png" />
+</div>
 </div>
 </section>
 <section id="(1.4)-The-Complete-Pipeline">
 <h2>(1.4) The Complete Pipeline<a class="headerlink" href="#(1.4)-The-Complete-Pipeline" title="Link to this heading">¶</a></h2>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Generate a synthetic dataset
-np.random.seed(0)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>time_overall = time.time()
+# Generate a synthetic dataset
+np.random.seed(5)
 N = 256
 M = 350
 nclasses = 2
 I, bbox, cl = gen_3D_GT(N, M, nclasses, thr_rel=0.15)
 
 # Apply our model to the orthogonal slices
+time_start = time.time()
 # model_path = &#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854/modelsave.pt&#39;
 model_path = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_saved_weights/modelsave_bright_on_dark.pt&#39;
 recon_xy, recon_xz, recon_yz = apply_model_to_orthogonal_slices(model_path, I)
+print(f&#39;Finished applying model to all 3 orthogonal views of I in {time.time() - time_start:.2f}s&#39;)
 
 # Downsample along the corresponding slice axis
 down_xy, down_xz, down_yz = recon_down(recon_xy, recon_xz, recon_yz)
@@ -1255,21 +1095,107 @@ vol_2 = vol_to_mip_rgb(I, 2)
 recon_total = orthogonal_to_3D(down_xy, down_xz, down_yz)
 
 # Quantify the performance of the model
-<br/></pre></div>
+AP, performance = get_AP(bbox, recon_total)
+
+print(f&#39;Finished entire pipeline in {time_overall - time.time():.2f}s&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Finished 0/256
+Finished 25/256
+Finished 50/256
+Finished 75/256
+Finished 100/256
+Finished 125/256
+Finished 150/256
+Finished 175/256
+Finished 200/256
+Finished 225/256
+Finished 250/256
+Finished applying model to 3 orthogonal views in 1914.37s
+Finished applying model to all 3 orthogonal views of I in 1914.55s
+Finished downsampling outputs in 0.03s
+Finished combining outputs in 0.72s
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">NameError</span>                                 Traceback (most recent call last)
+Cell <span class="ansi-green-fg">In[3], line 28</span>
+<span class="ansi-green-intense-fg ansi-bold">     25</span> recon_total <span style="color: rgb(98,98,98)">=</span> orthogonal_to_3D(down_xy, down_xz, down_yz)
+<span class="ansi-green-intense-fg ansi-bold">     27</span> <span style="color: rgb(95,135,135)"># Quantify the performance of the model</span>
+<span class="ansi-green-fg">---&gt; 28</span> AP, performance <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">get_AP</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">bbox</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">recon_total</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">     30</span> <span style="color: rgb(0,135,0)">print</span>(<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">Finished entire pipeline in </span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>time_overall<span style="color: rgb(188,188,188)"> </span><span style="color: rgb(98,98,98)">-</span><span style="color: rgb(188,188,188)"> </span>time<span style="color: rgb(98,98,98)">.</span>time()<span class="ansi-bold" style="color: rgb(175,95,135)">:</span><span style="color: rgb(175,0,0)">.2f</span><span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">s</span><span style="color: rgb(175,0,0)">&#39;</span>)
+
+File <span class="ansi-green-fg">~/docs_public/yolo_model/docs/scripts/yolo_avg_prec.py:7</span>, in <span class="ansi-cyan-fg">get_AP</span><span class="ansi-blue-fg">(gt_bboxes, pred_bboxes, conf_idx, iou_thresh)</span>
+<span class="ansi-green-intense-fg ansi-bold">      3</span> <span class="ansi-bold" style="color: rgb(0,135,0)">def</span> <span style="color: rgb(0,0,255)">get_AP</span>(gt_bboxes, pred_bboxes, conf_idx <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(98,98,98)">-</span><span style="color: rgb(98,98,98)">4</span>, iou_thresh <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(98,98,98)">0.3</span>):
+<span class="ansi-green-intense-fg ansi-bold">      4</span>
+<span class="ansi-green-intense-fg ansi-bold">      5</span>     <span style="color: rgb(95,135,135)"># Convert inputs to lists</span>
+<span class="ansi-green-intense-fg ansi-bold">      6</span>     gt_bboxes <span style="color: rgb(98,98,98)">=</span> yolo_output_to_list(gt_bboxes)
+<span class="ansi-green-fg">----&gt; 7</span>     gt_bboxes <span style="color: rgb(98,98,98)">=</span> gt_bbox_to_pred_bbox_format(<span class="ansi-yellow-bg">bbox</span>) <span style="color: rgb(95,135,135)"># (cx, cy, cz, l, w, d) =&gt; (xmin, xmax, ymin, ymax, zmin, zmax)</span>
+<span class="ansi-green-intense-fg ansi-bold">      8</span>     pred_bboxes <span style="color: rgb(98,98,98)">=</span> yolo_output_to_list(pred_bboxes)
+<span class="ansi-green-intense-fg ansi-bold">     10</span>     <span style="color: rgb(95,135,135)"># Sort all detections by confidence</span>
+
+<span class="ansi-red-fg">NameError</span>: name &#39;bbox&#39; is not defined
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>AP, performance = get_AP(bbox, recon_total)
+</pre></div>
 </div>
 </div>
 <section id="Visualize-results-on-input-image-volume">
 <h3>Visualize results on input image volume<a class="headerlink" href="#Visualize-results-on-input-image-volume" title="Link to this heading">¶</a></h3>
-<div class="nbinput docutils container">
+<div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>slice_idx = 15 # 0:31
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ds_factor = 8 # No upsampling in this case
+slice_idx = 0 # 0:31
+orig_slice = slice_idx * ds_factor
 
-outdir = &#39;/home/abenneck/Desktop/yolo3d_outputs/gif_frames_0&#39;
-# for slice_idx in np.arange(down_dim):
+x_orig_slice = (slice_idx) * ds_factor
+y_orig_slice = (slice_idx) * ds_factor
+z_orig_slice = (slice_idx) * ds_factor
 
-nrow, ncol = 2, 3
+gt_bbox = gt_bbox_to_pred_bbox_format(bbox)
+bb_present = []
+for bb in gt_bbox:
+
+    x_valid, y_valid, z_valid = False, False, False
+    if bb[0] &lt;= x_orig_slice and bb[1] &gt;= x_orig_slice:
+        x_valid = True
+    if bb[1] &lt;= y_orig_slice and bb[2] &gt;= y_orig_slice:
+        y_valid = True
+    if bb[3] &lt;= z_orig_slice and bb[4] &gt;= z_orig_slice:
+        z_valid = True
+
+    bb_present.append([x_valid, y_valid, z_valid])
+bb_present = np.asarray(bb_present)
+
+x_bbox_plot = gt_bbox[bb_present[:,0]]
+y_bbox_plot = gt_bbox[bb_present[:,1]]
+z_bbox_plot = gt_bbox[bb_present[:,2]]
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>nrow, ncol = 2, 3
 fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;, sharex=True, sharey=True)
 axs[0,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
 axs[0,0].set_title(f&#39;yz[{slice_idx},:,:]&#39;)
@@ -1284,16 +1210,22 @@ scores = recon_total[slice_idx,:,:,-4].ravel()
 predicted_rectangles = bb_to_rec(recon_total[slice_idx,:,:,:], pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
 axs[1,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
 axs[1,0].add_collection(predicted_rectangles)
+gt_rectangles = bb_to_rec(x_bbox_plot, pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;lime&#39;)
+axs[1,0].add_collection(gt_rectangles)
 
 scores = recon_total[:,slice_idx,:,-4].ravel()
 predicted_rectangles = bb_to_rec(recon_total[:,slice_idx,:,:], pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
 axs[1,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
 axs[1,1].add_collection(predicted_rectangles)
+gt_rectangles = bb_to_rec(y_bbox_plot, pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;lime&#39;)
+axs[1,1].add_collection(gt_rectangles)
 
 scores = recon_total[:,:,slice_idx,-4].ravel()
 predicted_rectangles = bb_to_rec(recon_total[:,:,slice_idx,:], pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
 axs[1,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
 axs[1,2].add_collection(predicted_rectangles)
+gt_rectangles = bb_to_rec(z_bbox_plot, pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;lime&#39;)
+axs[1,2].add_collection(gt_rectangles)
 
 fig.set_size_inches(ncol*3, nrow*3)
 # plt.savefig(os.path.join(outdir, f&#39;recon_slice_{slice_idx:03d}.png&#39;))
@@ -1312,7 +1244,7 @@ Plotting bboxes . . .
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_3d_52_1.png" src="../_images/notebooks_yolo_3d_52_1.png" />
+<img alt="../_images/notebooks_yolo_3d_54_1.png" src="../_images/notebooks_yolo_3d_54_1.png" />
 </div>
 </div>
 </section>
@@ -1322,6 +1254,21 @@ Plotting bboxes . . .
 <h1>(2) Apply the above pipeline to real HDF5 data<a class="headerlink" href="#(2)-Apply-the-above-pipeline-to-real-HDF5-data" title="Link to this heading">¶</a></h1>
 <section id="(2.0)-Apply-model-to-2D-slices-from-3D-volume,-using-tile-method-since-images-are-relatively-large">
 <h2>(2.0) Apply model to 2D slices from 3D volume, using tile method since images are relatively large<a class="headerlink" href="#(2.0)-Apply-model-to-2D-slices-from-3D-volume,-using-tile-method-since-images-are-relatively-large" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fname = &#39;/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5&#39;
+vol = h5py.File(fname)
+vol_stack = vol[&#39;stack&#39;]
+
+fig, ax = plt.subplots(1,3)
+ax[0].imshow(vol_stack[vol_stack.shape[0] // 2, :, :])
+ax[1].imshow(vol_stack[:, vol_stack.shape[1] // 2, :])
+ax[2].imshow(vol_stack[:, :, vol_stack.shape[2] // 2])
+<br/></pre></div>
+</div>
+</div>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
@@ -3220,7 +3167,7 @@ Finished ds bboxes in 37.54s
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_3d_59_1.png" src="../_images/notebooks_yolo_3d_59_1.png" />
+<img alt="../_images/notebooks_yolo_3d_62_1.png" src="../_images/notebooks_yolo_3d_62_1.png" />
 </div>
 </div>
 </section>
@@ -3228,37 +3175,34 @@ Finished ds bboxes in 37.54s
 <section id="(2.2)-Stitch-together-downsampled-slices-+-save-ijk-cubes">
 <h2>(2.2) Stitch together downsampled slices + save ijk cubes<a class="headerlink" href="#(2.2)-Stitch-together-downsampled-slices-+-save-ijk-cubes" title="Link to this heading">¶</a></h2>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>saveOutputs = False
 
 outdir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/cubes&#39;
 
+# Transverse / Axial / Horizontal slices - [DV, AP, LR]
 indir0 = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0_down&#39;
 data0 = np.load(os.path.join(indir0,os.listdir(indir0)[0]))
 shape0 = data0.shape
 
+# Coronal slices - [AP, DV, LR]
 indir1 = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax1_down&#39;
 data1 = np.load(os.path.join(indir1,os.listdir(indir1)[0]))
 shape1 = data1.shape
 
+# Sagittal slices - [LR, DV, AP]
 indir2 = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax2_down&#39;
 data2 = np.load(os.path.join(indir2,os.listdir(indir2)[0]))
 shape2 = data2.shape
 
-out_dim = 256
-final_shape = np.array([shape1[0], shape0[0], shape0[1]])
-bbox_dim = 7 # Used to init 3D recon
-num_classes = 3 # Used to init 3D recon
+out_dim = 256 # The desired shape of the output cube
+final_shape = np.array([shape1[0], shape0[0], shape0[1]]) # [DV, AP, LR]
+bbox_dim = 7 # Used to init 3D recon (Number of scalars at each pixel which define a bbox at a voxel in the output)
+num_classes = 3 # Used to init 3D recon (Number of class probabilities in the original data)
 
-# Original
-# n_cube_i = final_shape[0] // out_dim # Num complete cubes along respective axis
-# n_cube_j = final_shape[1] // out_dim # Num complete cubes along respective axis
-# n_cube_k = final_shape[2] // out_dim # Num complete cubes along respective axis
-# print(f&#39;{n_cube_i}, {n_cube_j}, {n_cube_k}&#39;)
-
-# (05/14/26) Revised
+# (05/14/26) Revised - {i: DV, j: AP, k: LR}
 n_cube_i = int(np.ceil(final_shape[0] / out_dim)) # Num complete cubes along respective axis
 n_cube_j = int(np.ceil(final_shape[1] / out_dim)) # Num complete cubes along respective axis
 n_cube_k = int(np.ceil(final_shape[2] / out_dim)) # Num complete cubes along respective axis
@@ -3290,14 +3234,7 @@ for i in np.arange(n_cube_i): # NOTE: Originally, included a (+1) to each np.ara
                 continue
 
             # If cube lies on edge of volume, adjust relative idx accordingly
-            # Original
-            edge_str = &#39;edge &#39; if i == n_cube_i or j == n_cube_j or k == n_cube_k else &#39;&#39;
-            # edge_i_end_idx = final_shape[0] - 1 if i == n_cube_i else (i+1)*(out_dim)
-            # edge_j_end_idx = final_shape[1] - 2 if j == n_cube_j else (j+1)*(out_dim)
-            # edge_k_end_idx = final_shape[2] - 2 if k == n_cube_k else (k+1)*(out_dim)
-            # print(f&#39;End idx: ({edge_i_end_idx}, {edge_j_end_idx}, {edge_k_end_idx})&#39;)
-
-            # (05/14/26) Revised - (i0, i1)
+            edge_str = &#39;edge &#39; if i == n_cube_i - 1 or j == n_cube_j - 1 or k == n_cube_k - 1 else &#39;&#39;
             i_start, i_end = i*out_dim, min((i+1)*out_dim, final_shape[0])
             j_start, j_end = j*out_dim, min((j+1)*out_dim, final_shape[1])
             k_start, k_end = k*out_dim, min((k+1)*out_dim, final_shape[2])
@@ -3305,7 +3242,7 @@ for i in np.arange(n_cube_i): # NOTE: Originally, included a (+1) to each np.ara
             print(f&#39;Starting {edge_str}cube ({i},{j},{k}) . . .&#39;)
             time_total = time.time()
 
-            # Load and stack outputs from ax0 slices
+            # Load and stack outputs from ax0 (DV) slices
             time_start = time.time()
             out_stack0 = []
             count0 = 0
@@ -3325,9 +3262,10 @@ for i in np.arange(n_cube_i): # NOTE: Originally, included a (+1) to each np.ara
                     count0 = 0
                     break
             out_stack0 = np.stack(out_stack0, axis = 0)
+            # After stacking, shape is [DV, LR, AP], so bbox info is [LR, AP]
             print(f&#39;Finished ax0 in {time.time()-time_start:.2f}s with shape {out_stack0.shape}&#39;)
 
-            # Load and stack outputs from ax1 slices
+            # Load and stack outputs from ax1 (AP) slices
             time_start = time.time()
             out_stack1 = []
             count1 = 0
@@ -3347,9 +3285,11 @@ for i in np.arange(n_cube_i): # NOTE: Originally, included a (+1) to each np.ara
                     count1 = 0
                     break
             out_stack1 = np.stack(out_stack1, axis = 0).transpose(1,0,2,3)
+            # After stacking, shape is [AP, LR, DV] CHANGED FROM MEETING (formerly [AP, DV, LR])
+            # After transposing, shape is [LR, AP, DV], BUT bbox info is still [LR, DV]
             print(f&#39;Finished ax1 in {time.time()-time_start:.2f}s with shape {out_stack1.shape}&#39;)
 
-            # Load and stack outputs from ax2 slices
+            # Load and stack outputs from ax2 (LR) slices
             time_start = time.time()
             out_stack2 = []
             count2 = 0
@@ -3369,16 +3309,11 @@ for i in np.arange(n_cube_i): # NOTE: Originally, included a (+1) to each np.ara
                     count2 = 0
                     break
             out_stack2 = np.stack(out_stack2, axis = 0).transpose(1,2,0,3)
+            # After stacking, shape is [LR, AP, DV] CHANGED FROM MEETING (formerly [LR, DV, AP])
+            # After transposing, shape is [DV, AP, LR], BUT bbox info is still [AP, DV]
             print(f&#39;Finished ax2 in {time.time()-time_start:.2f}s with shape {out_stack2.shape}&#39;)
 
             # Combine the 3 volumes into 1 volume where each elem is a bounding cube
-            # Original
-            # i_lim = final_shape[0] % out_dim - 1 if i == n_cube_i else out_dim
-            # j_lim = final_shape[1] % out_dim - 2 if j == n_cube_j else out_dim
-            # k_lim = final_shape[2] % out_dim - 2 if k == n_cube_k else out_dim
-            # recon_total = np.zeros((i_lim, j_lim, k_lim, bbox_dim+num_classes))
-
-            # (05/14/26) Revised
             i_lim = i_end - i_start
             j_lim = j_end - j_start
             k_lim = k_end - k_start
@@ -3405,41 +3340,57 @@ for i in np.arange(n_cube_i): # NOTE: Originally, included a (+1) to each np.ara
 
             #             recon_total[i_,j_,k_] = [xmin, xmax, ymin, ymax, zmin, zmax, conf, cl0, cl1, cl2]
 
-            # (05/14/26) Revised - Vectorized lists instead of triple nested for loop
-            imin = (out_stack1[..., 0] + out_stack2[..., 0]) / 2
-            imax = (out_stack1[..., 2] + out_stack2[..., 2]) / 2
+            # (05/15/26) Revised - Vectorized instead of loops
+            # x: {DV}, y: {AP}, z: {LR}
+            # xmin = (out_stack2[..., 1] + out_stack1[..., 1]) / 2
+            # xmax = (out_stack2[..., 3] + out_stack1[..., 3]) / 2
+            # ymin = (out_stack2[..., 0] + out_stack0[..., 1]) / 2
+            # ymax = (out_stack2[..., 2] + out_stack0[..., 3]) / 2
+            # zmin = (out_stack1[..., 0] + out_stack0[..., 0]) / 2
+            # zmax = (out_stack1[..., 2] + out_stack0[..., 2]) / 2
 
-            jmin = (out_stack0[..., 0] + out_stack2[..., 1]) / 2
-            jmax = (out_stack0[..., 2] + out_stack2[..., 3]) / 2
+            # xmin = (out_stack2[..., 0] + out_stack1[..., 0]) / 2 # In stack 2: [DVmin, DVmax, APmin, APmax] &amp; in stack 1: [DVmin, DVmax, LRmin, LRmax]
+            # xmax = (out_stack2[..., 1] + out_stack1[..., 1]) / 2 # Same as above, but max instead of min
+            # ymin = (out_stack2[..., 2] + out_stack0[..., 0]) / 2 # In stack 2: [DVmin, DVmax, APmin, APmax] &amp; in stack 0: [APmin, APmax, LRmin, LRmax]
+            # ymax = (out_stack2[..., 3] + out_stack0[..., 1]) / 2 # Same as above, but max instead of min
+            # zmin = (out_stack1[..., 2] + out_stack0[..., 2]) / 2 # In stack 1: [DVmin, DVmax, LRmin, LRmax] &amp; in stack 0: [APmin, APmax, LRmin, LRmax]
+            # zmax = (out_stack1[..., 3] + out_stack0[..., 3]) / 2 # Same as above, but max instead of min
 
-            kmin = (out_stack0[..., 1] + out_stack1[..., 1]) / 2
-            kmax = (out_stack0[..., 3] + out_stack1[..., 3]) / 2
+            xmin = (out_stack2[..., 1] + out_stack1[..., 1]) / 2 # In stack 2: [APmin, DVmin, APmax, DVmax] &amp; in stack 1: [LRmin, DVmin, LRmax, DVmax]
+            xmax = (out_stack2[..., 3] + out_stack1[..., 3]) / 2 # Same as above, but max instead of min
+            ymin = (out_stack2[..., 0] + out_stack0[..., 1]) / 2 # In stack 2: [APmin, DVmin, APmax, DVmax] &amp; in stack 0: [LRmin, APmin, LRmax, APmax]
+            ymax = (out_stack2[..., 2] + out_stack0[..., 3]) / 2 # Same as above, but max instead of min
+            zmin = (out_stack1[..., 0] + out_stack0[..., 0]) / 2 # In stack 1: [LRmin, DVmin, LRmax, DVmax] &amp; in stack 0: [LRmin, APmin, LRmax, APmax]
+            zmax = (out_stack1[..., 2] + out_stack0[..., 2]) / 2 # Same as above, but max instead of min
 
-            conf = np.minimum.reduce([
-                    out_stack0[..., 4],
-                    out_stack1[..., 4],
-                    out_stack2[..., 4],
-                ])
+            # xmin = (out_stack2[..., 0] + out_stack1[..., 0]) / 2 # In stack 2: [DVmin, APmin, DVmax, APmax] &amp; in stack 1: [DVmin, LRmin, DVmax, LRmax]
+            # xmax = (out_stack2[..., 2] + out_stack1[..., 2]) / 2 # Same as above, but max instead of min
+            # ymin = (out_stack2[..., 1] + out_stack0[..., 0]) / 2 # In stack 2: [DVmin, APmin, DVmax, APmax] &amp; in stack 0: [APmin, LRmin, APmax, LRmax]
+            # ymax = (out_stack2[..., 3] + out_stack0[..., 2]) / 2 # Same as above, but max instead of min
+            # zmin = (out_stack1[..., 1] + out_stack0[..., 1]) / 2 # In stack 1: [DVmin, LRmin, DVmax, LRmax] &amp; in stack 0: [APmin, LRmin, APmax, LRmax]
+            # zmax = (out_stack1[..., 3] + out_stack0[..., 3]) / 2 # Same as above, but max instead of min
 
-            classes = (
-                    out_stack0[..., 5:8] +
-                    out_stack1[..., 5:8] +
-                    out_stack2[..., 5:8]
-                ) / 3
+            conf = np.minimum(out_stack0[..., 4], np.minimum(out_stack1[..., 4], out_stack2[..., 4]))
 
-            recon_total[..., 0] = imin
-            recon_total[..., 1] = imax
-            recon_total[..., 2] = jmin
-            recon_total[..., 3] = jmax
-            recon_total[..., 4] = kmin
-            recon_total[..., 5] = kmax
+            cl0 = np.mean(np.stack([out_stack0[..., 5], out_stack1[..., 5], out_stack2[..., 5]], axis = 0), axis = 0)
+            cl1 = np.mean(np.stack([out_stack0[..., 6], out_stack1[..., 6], out_stack2[..., 6]], axis = 0), axis = 0)
+            cl2 = np.mean(np.stack([out_stack0[..., 7], out_stack1[..., 7], out_stack2[..., 7]], axis = 0), axis = 0)
+
+            recon_total[..., 0] = xmin
+            recon_total[..., 1] = xmax
+            recon_total[..., 2] = ymin
+            recon_total[..., 3] = ymax
+            recon_total[..., 4] = zmin
+            recon_total[..., 5] = zmax
             recon_total[..., 6] = conf
-            recon_total[..., 7:10] = classes
+            recon_total[..., 7] = cl0
+            recon_total[..., 8] = cl1
+            recon_total[..., 9] = cl2
 
             # Save output cube using ijk format in fname
             if saveOutputs:
                 out_fname = f&#39;i{i:04d}_j{j:04d}_k{k:04d}_d{out_dim}_Ex_488_Em_525.npy&#39;
-                # out_fname = f&#39;i{i:04d}_j{j:04d}_k{k:04d}_di{ilim}_dj{j_lim}_dk{k_lim}_Ex_488_Em_525.npy&#39;
+                # out_fname = f&#39;i{i:04d}_j{j:04d}_k{k:04d}_di{i_lim}_dj{j_lim}_dk{k_lim}_Ex_488_Em_525.npy&#39;
                 np.save(os.path.join(outdir, out_fname), recon_total)
                 print(f&#39;Saved cube ({i},{j},{k}) with shape {recon_total.shape} in {time.time()-time_total:.2f}s as {out_fname} in {outdir}\n&#39;)
 
@@ -3449,44 +3400,23 @@ for i in np.arange(n_cube_i): # NOTE: Originally, included a (+1) to each np.ara
 <br/></pre></div>
 </div>
 </div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-3, 8, 7
-4, 9, 8
-Starting cube (3,8,7) . . .
-</pre></div></div>
-</div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">PermissionError</span>                           Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[15], line 75</span>
-<span class="ansi-green-intense-fg ansi-bold">     73</span> <span class="ansi-bold" style="color: rgb(0,135,0)">if</span> idx <span style="color: rgb(98,98,98)">&lt;</span> idx_start0:
-<span class="ansi-green-intense-fg ansi-bold">     74</span>     <span class="ansi-bold" style="color: rgb(0,135,0)">continue</span>
-<span class="ansi-green-fg">---&gt; 75</span> out_slice <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">np</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">memmap</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">os</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">path</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">join</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">indir0</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg">fname</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">dtype</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">=</span><span class="ansi-yellow-bg">np</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">float32</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">shape</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">=</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">shape0</span><span class="ansi-yellow-bg">)</span>
-<span class="ansi-green-intense-fg ansi-bold">     77</span> <span style="color: rgb(95,135,135)"># TODO: Extract relevant 256x256 image from whole image before adding image to the stack</span>
-<span class="ansi-green-intense-fg ansi-bold">     78</span> out_slice <span style="color: rgb(98,98,98)">=</span> out_slice[(j<span style="color: rgb(98,98,98)">*</span>out_dim):edge_j_end_idx,(k<span style="color: rgb(98,98,98)">*</span>out_dim):edge_k_end_idx,:]
-
-File <span class="ansi-green-fg">/nafs/dtward/intelpython3/lib/python3.9/site-packages/numpy/core/memmap.py:229</span>, in <span class="ansi-cyan-fg">memmap.__new__</span><span class="ansi-blue-fg">(subtype, filename, dtype, mode, offset, shape, order)</span>
-<span class="ansi-green-intense-fg ansi-bold">    227</span>     f_ctx <span style="color: rgb(98,98,98)">=</span> nullcontext(filename)
-<span class="ansi-green-intense-fg ansi-bold">    228</span> <span class="ansi-bold" style="color: rgb(0,135,0)">else</span>:
-<span class="ansi-green-fg">--&gt; 229</span>     f_ctx <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg" style="color: rgb(0,135,0)">open</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">os_fspath</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">filename</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">r</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg ansi-bold" style="color: rgb(0,135,0)">if</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">mode</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">==</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">c</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg ansi-bold" style="color: rgb(0,135,0)">else</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">mode</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">+</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">b</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg">)</span>
-<span class="ansi-green-intense-fg ansi-bold">    231</span> <span class="ansi-bold" style="color: rgb(0,135,0)">with</span> f_ctx <span class="ansi-bold" style="color: rgb(0,135,0)">as</span> fid:
-<span class="ansi-green-intense-fg ansi-bold">    232</span>     fid<span style="color: rgb(98,98,98)">.</span>seek(<span style="color: rgb(98,98,98)">0</span>, <span style="color: rgb(98,98,98)">2</span>)
-
-<span class="ansi-red-fg">PermissionError</span>: [Errno 13] Permission denied: &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0_down/Ex_488_Em_525_stitched_chunk32_ax0_03072:03075.npy&#39;
+Total Cubes Shape: (4, 9, 8)
+Starting cube (2,1,3) . . .
+Finished ax0 in 54.00s with shape (256, 256, 256, 8)
+Finished ax1 in 44.16s with shape (256, 256, 256, 8)
+Finished ax2 in 0.93s with shape (256, 256, 256, 8)
+valid region=(256,256,256),  output shape=(256,256,256)
 </pre></div></div>
 </div>
 <section id="Plot-Results">
 <h3>Plot Results<a class="headerlink" href="#Plot-Results" title="Link to this heading">¶</a></h3>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Set key parameters
@@ -3501,12 +3431,12 @@ filterLowConf, c_thresh = False, 0.25
 # out_dim = 128
 
 orig_slice_dim = out_dim * ds_factor # 1024 - The size (in pixels) of a slice after being processed by the YOLO model BEFORE any postprocessing
-# view_dim = 1024
-# shiftx = (orig_slice_dim - view_dim) / 2
-# shifty = (orig_slice_dim - view_dim) / 2
-view_dim = 64
-shiftx = 512 - 32
-shifty = 0
+view_dim = 1024
+shiftx = (orig_slice_dim - view_dim) / 2
+shifty = (orig_slice_dim - view_dim) / 2
+# view_dim = 64
+# shiftx = 512 - 32
+# shifty = 512 - 32
 
 # Load output cube + extract data from relevant slices
 i, j, k = 2,1,3
@@ -3566,7 +3496,8 @@ if filterLowConf:
     scores0 = [0 if elem &lt; c_thresh else 1 for elem in scores0]
 xlim0 = [orig_slice_idx2 - (orig_slice_dim / 2) + shiftx, orig_slice_idx2 - (orig_slice_dim / 2) + shiftx + view_dim]
 ylim0 = [orig_slice_idx1 - (orig_slice_dim / 2) + shifty, orig_slice_idx1 - (orig_slice_dim / 2) + shifty + view_dim]
-pos0 = [4, 2, 5, 3]
+pos0 = [4, 2, 5, 3] # Original
+# pos0 = [2, 4, 3, 5] # (05/19/26) Revised
 axs[0].imshow(img_mip0)
 predicted_rectangles = bb_to_rec(data0, pos = pos0, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores0)
 axs[0].add_collection(predicted_rectangles)
@@ -3590,6 +3521,7 @@ if filterLowConf:
 xlim1 = [orig_slice_idx2 - (orig_slice_dim / 2) + shiftx, orig_slice_idx2 - (orig_slice_dim / 2) + shiftx + view_dim]
 ylim1 = [orig_slice_idx0 - (orig_slice_dim / 2) + shifty, orig_slice_idx0 - (orig_slice_dim / 2) + shifty + view_dim]
 pos1 = [4, 0, 5, 1]
+# pos1 = [0, 4, 1, 5] # (05/15/26) Revised
 axs[2].imshow(img_mip1)
 predicted_rectangles = bb_to_rec(data1, pos = pos1, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores1)
 axs[2].add_collection(predicted_rectangles)
@@ -3615,6 +3547,7 @@ ylim2 = [orig_slice_idx0 - (orig_slice_dim / 2) + shifty, orig_slice_idx0 - (ori
 # xlim2 = [1750, 1800]
 # ylim2 = [2900, 2950]
 pos2 = [2, 0, 3, 1]
+# pos2 = [0, 2, 1, 3] # (05/15/26) Revised
 axs[4].imshow(img_mip2)
 predicted_rectangles = bb_to_rec(data2, pos = pos2, fc=&#39;none&#39;, ec=&#39;lime&#39;, alpha=scores2)
 axs[4].add_collection(predicted_rectangles)
@@ -3648,16 +3581,16 @@ if False:
 Ax0 - Orig =&gt; Down idx: 2560 =&gt; 128
 Ax1 - Orig =&gt; Down idx: 1536 =&gt; 128
 Ax2 - Orig =&gt; Down idx: 3584 =&gt; 128
-Finished loading images in 102.89s
+Finished loading images in 117.45s
 Plotting bboxes . . .
-Finished plotting everything in 7.94s
+Finished plotting everything in 10.46s
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_3d_63_1.png" src="../_images/notebooks_yolo_3d_63_1.png" />
+<img alt="../_images/notebooks_yolo_3d_66_1.png" src="../_images/notebooks_yolo_3d_66_1.png" />
 </div>
 </div>
 </section>
