@@ -1,19 +1,19 @@
 import numpy as np
 from sklearn.metrics import auc
 
-def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3):
+def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = False):
 
     # Convert inputs to lists
     gt_bboxes = yolo_output_to_list(gt_bboxes)
-    gt_bboxes = gt_bbox_to_pred_bbox_format(gt_bboxes) # (cx, cy, cz, l, w, d) => (xmin, xmax, ymin, ymax, zmin, zmax)
+    gt_bboxes = gt_bbox_to_pred_bbox_format(gt_bboxes) # (cz, cy, cx, l, w, d) => (xmin, xmax, ymin, ymax, zmin, zmax)
     pred_bboxes = yolo_output_to_list(pred_bboxes)
     
     # Sort all detections by confidence
     inds = np.argsort(pred_bboxes[..., conf_idx], axis = 0) # The sorted indeces from pred_bboxes
-    pred_sorted = np.flip(pred_bboxes[inds], axis=0) # Note that inds sorts from lowest to highest, so flip is necessary to switch sort from highest to lowest
+    pred_sorted = np.flip(pred_bboxes[inds], axis=0) # Note that inds sorts from lowest to highest, so flip is necessary to sort from highest to lowest
     
     # Compute pairwise IOU between all gt_bboxes and pred_bboxes
-    pw_IOU = np.ones((pred_sorted.shape[0], gt_bboxes.shape[0]))*(-1)
+    pw_IOU = np.zeros((pred_sorted.shape[0], gt_bboxes.shape[0]))
     for i, gt_bb in enumerate(pred_sorted):
         for j, p_bb in enumerate(gt_bboxes):
             pw_IOU[i, j] = IOU_3D(gt_bb, p_bb)
@@ -22,7 +22,6 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3):
     tpfp_out = []
     total_TP = 0
     total_FP = 0
-    paired_gt_idx = []
     num_gt_remaining = gt_bboxes.shape[0]
     for i, pred_i in enumerate(pred_sorted):
         best_gt_iou_idx = np.argmax(pw_IOU[i, :])
@@ -43,30 +42,32 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3):
         precision = total_TP / (i+1) # Precision = num TP / all detections considered so far
         recall = total_TP / gt_bboxes.shape[0] # Recall = num TP / all ground truths
 
-        # print(f'i: {i}, conf: {pred_conf}, iou: {best_gt_iou}, TP: {TP}, FP: {FP}')
-
+        if verbose:
+            print(f'i: {i:<5}, conf: {pred_conf:.3f}, iou: {best_gt_iou:.3f}, TP: {TP}, FP: {FP}')
+       
         tpfp_out.append([i, pred_conf, best_gt_iou, TP, FP, total_TP, total_FP, precision, recall])
 
         if num_gt_remaining == 0:
             break
+            
     tpfp_out = np.array(tpfp_out)
     AP = auc(tpfp_out[:,-1], tpfp_out[:,-2])
     
     return AP, tpfp_out
 
-def gt_bbox_to_pred_bbox_format(gt_bbox):
+def gt_bbox_to_pred_bbox_format(gt_bbox, idx = [2,1,0,5,4,3]):
     """
-    Converts gt_bbox from (cx, cy, cz, l, w, d) to (xmin, xmax, ymin, ymax, zmin, zmax)
+    Converts gt_bbox from (cx, cy, cz, l, w, d) to (xmin, xmax, ymin, ymax, zmin, zmax). Note that in the simulated dataset
     """
 
     bb_out = []
     for bb in gt_bbox:
-        cx = bb[0]
-        cy = bb[1]
-        cz = bb[2]
-        l = bb[3]
-        w = bb[4]
-        d = bb[5]
+        cx = bb[idx[0]]
+        cy = bb[idx[1]]
+        cz = bb[idx[2]]
+        l = bb[idx[3]]
+        w = bb[idx[4]]
+        d = bb[idx[5]]
 
         xmin = cx
         xmax = cx + l
