@@ -38,7 +38,7 @@
           <div class="body" role="main">
             
   <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[41]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -1025,47 +1025,87 @@ Finished combining outputs in 0.73s
 <section id="(1.3)-Quantify-Model-Performance-wrt-GT-bboxes">
 <h2>(1.3) Quantify Model Performance wrt GT bboxes<a class="headerlink" href="#(1.3)-Quantify-Model-Performance-wrt-GT-bboxes" title="Link to this heading">¶</a></h2>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[103]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if applyPipelineToSimulatedData:
-    AP, performance = get_AP(bbox, recon_total, iou_thresh = 0.01)
+    AP, performance = get_AP(bbox, recon_total, iou_thresh = 0.5, verbose = False)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[111]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if False:
+    for row in performance:
+        p_str = &#39;TP&#39; if row[3] == 1 else &#39;FP&#39;
+        print(f&#39;{int(row[0]):&lt;5} {p_str}: {row[1]:.3f} (conf) {row[2]:.3f} (iou) {row[7]:.3f} (prec) {row[8]:.3f} (recall)&#39;)
 </pre></div>
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[72]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[102]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>if False:
+    rolling_AP = 0
+    for iou in np.arange(0.5,1,0.05):
+        AP, performance = get_AP(bbox, recon_total, iou_thresh = iou, verbose = False)
+        rolling_AP += AP
+    print(f&#39;mAP: {rolling_AP / 10}&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+mAP: 0.03797125300598227
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[99]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fig, ax = plt.subplots()
-ax.plot(pr_plot[:,2], pr_plot[:,1])
+ax.plot(performance[:,-1], performance[:,-2])
 ax.set_xlabel(&#39;Recall&#39;)
 ax.set_ylabel(&#39;Precision&#39;)
-ax.set_title(f&#39;AP = {AP:.3f}&#39;)
+ax.set_title(f&#39;AP = {AP:.3f} (iou_thresh = 0.5)&#39;)
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+
+# for bb in performance:
+#     # If the bbox was a TP, plot it
+#     if bb[3] == 1:
+#         # print(&#39;Added point&#39;)
+#         ax.scatter(bb[-1], bb[-2], color = &#39;green&#39;, linewidth = 0.5)
 </pre></div>
 </div>
 </div>
 <div class="nboutput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[72]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[99]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Text(0.5, 1.0, &#39;AP = 0.058&#39;)
+(0.0, 1.0)
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_3d_48_1.png" src="../_images/notebooks_yolo_3d_48_1.png" />
+<img alt="../_images/notebooks_yolo_3d_50_1.png" src="../_images/notebooks_yolo_3d_50_1.png" />
 </div>
 </div>
 </section>
 <section id="(1.4)-The-Complete-Pipeline">
 <h2>(1.4) The Complete Pipeline<a class="headerlink" href="#(1.4)-The-Complete-Pipeline" title="Link to this heading">¶</a></h2>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>time_overall = time.time()
@@ -1097,11 +1137,11 @@ recon_total = orthogonal_to_3D(down_xy, down_xz, down_yz)
 # Quantify the performance of the model
 AP, performance = get_AP(bbox, recon_total)
 
-print(f&#39;Finished entire pipeline in {time_overall - time.time():.2f}s&#39;)
+print(f&#39;Finished entire pipeline in {time.time() - time_overall:.2f}s&#39;)
 </pre></div>
 </div>
 </div>
-<div class="nboutput docutils container">
+<div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
@@ -1117,44 +1157,12 @@ Finished 175/256
 Finished 200/256
 Finished 225/256
 Finished 250/256
-Finished applying model to 3 orthogonal views in 1914.37s
-Finished applying model to all 3 orthogonal views of I in 1914.55s
-Finished downsampling outputs in 0.03s
-Finished combining outputs in 0.72s
+Finished applying model to 3 orthogonal views in 20.37s
+Finished applying model to all 3 orthogonal views of I in 20.40s
+Finished downsampling outputs in 0.02s
+Finished combining outputs in 0.77s
+Finished entire pipeline in 51.01s
 </pre></div></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">NameError</span>                                 Traceback (most recent call last)
-Cell <span class="ansi-green-fg">In[3], line 28</span>
-<span class="ansi-green-intense-fg ansi-bold">     25</span> recon_total <span style="color: rgb(98,98,98)">=</span> orthogonal_to_3D(down_xy, down_xz, down_yz)
-<span class="ansi-green-intense-fg ansi-bold">     27</span> <span style="color: rgb(95,135,135)"># Quantify the performance of the model</span>
-<span class="ansi-green-fg">---&gt; 28</span> AP, performance <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">get_AP</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">bbox</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">recon_total</span><span class="ansi-yellow-bg">)</span>
-<span class="ansi-green-intense-fg ansi-bold">     30</span> <span style="color: rgb(0,135,0)">print</span>(<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">Finished entire pipeline in </span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>time_overall<span style="color: rgb(188,188,188)"> </span><span style="color: rgb(98,98,98)">-</span><span style="color: rgb(188,188,188)"> </span>time<span style="color: rgb(98,98,98)">.</span>time()<span class="ansi-bold" style="color: rgb(175,95,135)">:</span><span style="color: rgb(175,0,0)">.2f</span><span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">s</span><span style="color: rgb(175,0,0)">&#39;</span>)
-
-File <span class="ansi-green-fg">~/docs_public/yolo_model/docs/scripts/yolo_avg_prec.py:7</span>, in <span class="ansi-cyan-fg">get_AP</span><span class="ansi-blue-fg">(gt_bboxes, pred_bboxes, conf_idx, iou_thresh)</span>
-<span class="ansi-green-intense-fg ansi-bold">      3</span> <span class="ansi-bold" style="color: rgb(0,135,0)">def</span> <span style="color: rgb(0,0,255)">get_AP</span>(gt_bboxes, pred_bboxes, conf_idx <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(98,98,98)">-</span><span style="color: rgb(98,98,98)">4</span>, iou_thresh <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(98,98,98)">0.3</span>):
-<span class="ansi-green-intense-fg ansi-bold">      4</span>
-<span class="ansi-green-intense-fg ansi-bold">      5</span>     <span style="color: rgb(95,135,135)"># Convert inputs to lists</span>
-<span class="ansi-green-intense-fg ansi-bold">      6</span>     gt_bboxes <span style="color: rgb(98,98,98)">=</span> yolo_output_to_list(gt_bboxes)
-<span class="ansi-green-fg">----&gt; 7</span>     gt_bboxes <span style="color: rgb(98,98,98)">=</span> gt_bbox_to_pred_bbox_format(<span class="ansi-yellow-bg">bbox</span>) <span style="color: rgb(95,135,135)"># (cx, cy, cz, l, w, d) =&gt; (xmin, xmax, ymin, ymax, zmin, zmax)</span>
-<span class="ansi-green-intense-fg ansi-bold">      8</span>     pred_bboxes <span style="color: rgb(98,98,98)">=</span> yolo_output_to_list(pred_bboxes)
-<span class="ansi-green-intense-fg ansi-bold">     10</span>     <span style="color: rgb(95,135,135)"># Sort all detections by confidence</span>
-
-<span class="ansi-red-fg">NameError</span>: name &#39;bbox&#39; is not defined
-</pre></div></div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>AP, performance = get_AP(bbox, recon_total)
-</pre></div>
-</div>
 </div>
 <section id="Visualize-results-on-input-image-volume">
 <h3>Visualize results on input image volume<a class="headerlink" href="#Visualize-results-on-input-image-volume" title="Link to this heading">¶</a></h3>
@@ -1162,73 +1170,110 @@ File <span class="ansi-green-fg">~/docs_public/yolo_model/docs/scripts/yolo_avg_
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ds_factor = 8 # No upsampling in this case
-slice_idx = 0 # 0:31
-orig_slice = slice_idx * ds_factor
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># ds_factor = 8 # No upsampling in this case
+# slice_idx = 15 # 0:31
+# orig_slice = slice_idx * ds_factor
 
-x_orig_slice = (slice_idx) * ds_factor
-y_orig_slice = (slice_idx) * ds_factor
-z_orig_slice = (slice_idx) * ds_factor
+# x_orig_slice = (slice_idx) * ds_factor
+# y_orig_slice = (slice_idx) * ds_factor
+# z_orig_slice = (slice_idx) * ds_factor
 
-gt_bbox = gt_bbox_to_pred_bbox_format(bbox)
-bb_present = []
-for bb in gt_bbox:
+# gt_bbox = gt_bbox_to_pred_bbox_format(bbox)
+# bb_present = []
+# for bb in gt_bbox:
 
-    x_valid, y_valid, z_valid = False, False, False
-    if bb[0] &lt;= x_orig_slice and bb[1] &gt;= x_orig_slice:
-        x_valid = True
-    if bb[1] &lt;= y_orig_slice and bb[2] &gt;= y_orig_slice:
-        y_valid = True
-    if bb[3] &lt;= z_orig_slice and bb[4] &gt;= z_orig_slice:
-        z_valid = True
+#     x_valid, y_valid, z_valid = False, False, False
+#     if bb[0] &lt;= x_orig_slice and bb[1] &gt;= x_orig_slice:
+#         x_valid = True
+#     if bb[1] &lt;= y_orig_slice and bb[2] &gt;= y_orig_slice:
+#         y_valid = True
+#     if bb[3] &lt;= z_orig_slice and bb[4] &gt;= z_orig_slice:
+#         z_valid = True
 
-    bb_present.append([x_valid, y_valid, z_valid])
-bb_present = np.asarray(bb_present)
+#     bb_present.append([x_valid, y_valid, z_valid])
+# bb_present = np.asarray(bb_present)
 
-x_bbox_plot = gt_bbox[bb_present[:,0]]
-y_bbox_plot = gt_bbox[bb_present[:,1]]
-z_bbox_plot = gt_bbox[bb_present[:,2]]
+# x_bbox_plot = gt_bbox[bb_present[:,0]]
+# y_bbox_plot = gt_bbox[bb_present[:,1]]
+# z_bbox_plot = gt_bbox[bb_present[:,2]]
 </pre></div>
 </div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>nrow, ncol = 2, 3
-fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;, sharex=True, sharey=True)
-axs[0,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
-axs[0,0].set_title(f&#39;yz[{slice_idx},:,:]&#39;)
-axs[0,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
-axs[0,1].set_title(f&#39;xz[:,{slice_idx},:]&#39;)
-axs[0,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
-axs[0,2].set_title(f&#39;xy[:,:,{slice_idx}]&#39;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ds_factor = 8 # No upsampling in this case
+slice_idx = 15 # 0:31
+outdir = &#39;/ifshome/abenneck/docs_public/temp_outputs/yolo_gt_gif_frames&#39;
 
-print(&#39;Plotting bboxes . . .&#39;)
+for slice_idx in np.arange(32):
+    orig_slice = slice_idx * ds_factor
 
-scores = recon_total[slice_idx,:,:,-4].ravel()
-predicted_rectangles = bb_to_rec(recon_total[slice_idx,:,:,:], pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
-axs[1,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
-axs[1,0].add_collection(predicted_rectangles)
-gt_rectangles = bb_to_rec(x_bbox_plot, pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;lime&#39;)
-axs[1,0].add_collection(gt_rectangles)
+    x_orig_slice = (slice_idx) * ds_factor
+    y_orig_slice = (slice_idx) * ds_factor
+    z_orig_slice = (slice_idx) * ds_factor
 
-scores = recon_total[:,slice_idx,:,-4].ravel()
-predicted_rectangles = bb_to_rec(recon_total[:,slice_idx,:,:], pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
-axs[1,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
-axs[1,1].add_collection(predicted_rectangles)
-gt_rectangles = bb_to_rec(y_bbox_plot, pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;lime&#39;)
-axs[1,1].add_collection(gt_rectangles)
+    gt_bbox = gt_bbox_to_pred_bbox_format(bbox) # (cz, cy, cx, l, w, d) =&gt; (xmin, xmax, ymin, ymax, zmin, zmax)
 
-scores = recon_total[:,:,slice_idx,-4].ravel()
-predicted_rectangles = bb_to_rec(recon_total[:,:,slice_idx,:], pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
-axs[1,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
-axs[1,2].add_collection(predicted_rectangles)
-gt_rectangles = bb_to_rec(z_bbox_plot, pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;lime&#39;)
-axs[1,2].add_collection(gt_rectangles)
+    # Determine which bounding cubes pass through the current slice
+    bb_present = []
+    for bb in gt_bbox:
 
-fig.set_size_inches(ncol*3, nrow*3)
-# plt.savefig(os.path.join(outdir, f&#39;recon_slice_{slice_idx:03d}.png&#39;))
+        x_valid, y_valid, z_valid = False, False, False
+        if bb[0] &lt;= x_orig_slice and bb[1] &gt;= x_orig_slice:
+            x_valid = True
+        if bb[1] &lt;= y_orig_slice and bb[2] &gt;= y_orig_slice:
+            y_valid = True
+        if bb[3] &lt;= z_orig_slice and bb[4] &gt;= z_orig_slice:
+            z_valid = True
+
+        bb_present.append([x_valid, y_valid, z_valid])
+    bb_present = np.asarray(bb_present)
+
+    x_bbox_plot = gt_bbox[bb_present[:,0]]
+    y_bbox_plot = gt_bbox[bb_present[:,1]]
+    z_bbox_plot = gt_bbox[bb_present[:,2]]
+
+    # Initialize the figure
+    nrow, ncol = 2, 3
+    fig, axs = plt.subplots(nrow, ncol, layout=&#39;constrained&#39;, sharex=True, sharey=True)
+    axs[0,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
+    axs[0,0].set_title(f&#39;yz[{slice_idx},:,:]&#39;)
+    axs[0,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
+    axs[0,1].set_title(f&#39;xz[:,{slice_idx},:]&#39;)
+    axs[0,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
+    axs[0,2].set_title(f&#39;xy[:,:,{slice_idx}]&#39;)
+
+    # print(&#39;Plotting bboxes . . .&#39;)
+
+    scores = recon_total[slice_idx,:,:,-4].ravel()
+    predicted_rectangles = bb_to_rec(recon_total[slice_idx,:,:,:], pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+    axs[1,0].imshow(vol_0[slice_idx,:,:].max(axis=-1))
+    axs[1,0].add_collection(predicted_rectangles)
+    gt_rectangles = bb_to_rec(x_bbox_plot, pos = [4,2,5,3], fc=&#39;none&#39;, ec=&#39;lime&#39;)
+    axs[1,0].add_collection(gt_rectangles)
+
+    scores = recon_total[:,slice_idx,:,-4].ravel()
+    predicted_rectangles = bb_to_rec(recon_total[:,slice_idx,:,:], pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+    axs[1,1].imshow(vol_1[:,slice_idx,:].max(axis=-1))
+    axs[1,1].add_collection(predicted_rectangles)
+    gt_rectangles = bb_to_rec(y_bbox_plot, pos = [4,0,5,1], fc=&#39;none&#39;, ec=&#39;lime&#39;)
+    axs[1,1].add_collection(gt_rectangles)
+
+    scores = recon_total[:,:,slice_idx,-4].ravel()
+    predicted_rectangles = bb_to_rec(recon_total[:,:,slice_idx,:], pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;r&#39;, alpha=scores)
+    axs[1,2].imshow(vol_2[:,:,slice_idx].max(axis=-1))
+    axs[1,2].add_collection(predicted_rectangles)
+    gt_rectangles = bb_to_rec(z_bbox_plot, pos = [2,0,3,1], fc=&#39;none&#39;, ec=&#39;lime&#39;)
+    axs[1,2].add_collection(gt_rectangles)
+
+    fig.set_size_inches(ncol*3, nrow*3)
+    plt.savefig(os.path.join(outdir, f&#39;gt_slice_{slice_idx:03d}.png&#39;))
+
+    print(f&#39;Finished {slice_idx+1}/{32}&#39;)
+    if slice_idx != 15:
+        plt.close(fig)
 </pre></div>
 </div>
 </div>
@@ -1237,14 +1282,64 @@ fig.set_size_inches(ncol*3, nrow*3)
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Plotting bboxes . . .
+Finished 1/32
+Finished 2/32
+Finished 3/32
+Finished 4/32
+Finished 5/32
+Finished 6/32
+Finished 7/32
+Finished 8/32
+Finished 9/32
+Finished 10/32
+Finished 11/32
+Finished 12/32
+Finished 13/32
+Finished 14/32
+Finished 15/32
+Finished 16/32
+Finished 17/32
+Finished 18/32
+Finished 19/32
+Finished 20/32
+Finished 21/32
+Finished 22/32
+Finished 23/32
+Finished 24/32
+Finished 25/32
+Finished 26/32
+Finished 27/32
+Finished 28/32
+Finished 29/32
+Finished 30/32
+Finished 31/32
+Finished 32/32
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_3d_54_1.png" src="../_images/notebooks_yolo_3d_54_1.png" />
+<img alt="../_images/notebooks_yolo_3d_55_1.png" src="../_images/notebooks_yolo_3d_55_1.png" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Generate a gif of all the slices
+indir = &#39;/ifshome/abenneck/docs_public/temp_outputs/yolo_gt_gif_frames&#39;
+outdir = &#39;/ifshome/abenneck/docs_public/temp_outputs&#39;
+
+if True:
+    frames = []
+    for fname in sorted(os.listdir(indir)):
+        if &#39;.ipynb&#39; not in fname:
+            img = imageio.imread(os.path.join(indir, fname))
+            frames.append(img)
+
+    imageio.mimsave(os.path.join(outdir, &#39;gif0.gif&#39;), frames, duration = 1000, loop=0)
+</pre></div>
 </div>
 </div>
 </section>
@@ -3167,7 +3262,7 @@ Finished ds bboxes in 37.54s
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_3d_62_1.png" src="../_images/notebooks_yolo_3d_62_1.png" />
+<img alt="../_images/notebooks_yolo_3d_64_1.png" src="../_images/notebooks_yolo_3d_64_1.png" />
 </div>
 </div>
 </section>
@@ -3590,7 +3685,7 @@ Finished plotting everything in 10.46s
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_yolo_3d_66_1.png" src="../_images/notebooks_yolo_3d_66_1.png" />
+<img alt="../_images/notebooks_yolo_3d_68_1.png" src="../_images/notebooks_yolo_3d_68_1.png" />
 </div>
 </div>
 </section>
