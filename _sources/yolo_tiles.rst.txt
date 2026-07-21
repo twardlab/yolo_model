@@ -1,4 +1,4 @@
-YOLO tile mode Functions:
+YOLO Tile Mode Functions:
 ===============================
 
 .. automodule:: ds_yolo_output
