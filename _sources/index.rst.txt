@@ -13,6 +13,7 @@ Welcome to the YOLO model documentation!
    yolo_help
    yolo_post_help
    yolo_tiles
+   yolo_avg_prec
    ds_yolo_output
 
 .. toctree::
