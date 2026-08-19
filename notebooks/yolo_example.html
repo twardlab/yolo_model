@@ -75,7 +75,7 @@ np.random.seed(seed)
 random.seed(seed)
 
 # Include location of Python source scripts
-sys.path.append(os.path.join(os.path.join(os.path.split(os.getcwd())[0]),&#39;scripts&#39;))
+sys.path.append(os.path.join(os.path.join(os.path.split(os.getcwd())[0]),'scripts'))
 </pre></div>
 </div>
 </div>
@@ -93,8 +93,8 @@ dtype = torch.float32
 cwd = os.getcwd()
 pwd = os.path.join(os.path.split(cwd)[0])
 
-print(f&#39;cwd: {cwd}&#39;)
-print(f&#39;pwd: {pwd}&#39;)
+print(f'cwd: {cwd}')
+print(f'pwd: {pwd}')
 </pre></div>
 </div>
 </div>
@@ -128,8 +128,8 @@ groundtruth = GroundTruthDataset()
 
 I,bbox,cl = groundtruth[0]
 fig,ax = plt.subplots()
-imshow(I,ax,cmap=&#39;gray&#39;)
-polys = bbox_to_rectangles(bbox,fc=&#39;none&#39;)
+imshow(I,ax,cmap='gray')
+polys = bbox_to_rectangles(bbox,fc='none')
 polys.set_edgecolor(plt.cm.jet(cl*255//(nclasses-1)))
 ax.add_collection(polys)
 </pre></div>
@@ -174,7 +174,7 @@ out1 = layer(torch.tensor(I,dtype=dtype)[None]).clone().detach()[0]
 out2 = layer(torch.tensor(I,dtype=dtype)[r][None]).clone().detach()[0]
 imshow(out1,ax[1])
 imshow(out2,ax[2])
-# note the order of components doesn&#39;t matter
+# note the order of components doesn't matter
 </pre></div>
 </div>
 </div>
@@ -216,20 +216,20 @@ bboxes,data = convert_data(out,B,stride)
 fig,ax = plt.subplots()
 x = torch.arange(out.shape[-1])*stride + (stride-1)/2
 y = torch.arange(out.shape[-2])*stride + (stride-1)/2
-YX = torch.stack(torch.meshgrid(y,x,indexing=&#39;ij&#39;),0)
-ax.imshow(I[0],cmap=&#39;gray&#39;)
+YX = torch.stack(torch.meshgrid(y,x,indexing='ij'),0)
+ax.imshow(I[0],cmap='gray')
 ax.scatter(YX[1].ravel(),YX[0].ravel(),s=1,alpha=0.5)
 x = bboxes[...,0]
 y = bboxes[...,1]
 w = bboxes[...,2]
 h = bboxes[...,3]
 c = data[...,-1]
-predicted_rectangles = bbox_to_rectangles(torch.stack( (x.ravel(),y.ravel(),w.ravel(),h.ravel()) ).T,fc=&#39;none&#39;,ec=&#39;b&#39;,alpha=c.clone().detach()*0.5)
+predicted_rectangles = bbox_to_rectangles(torch.stack( (x.ravel(),y.ravel(),w.ravel(),h.ravel()) ).T,fc='none',ec='b',alpha=c.clone().detach()*0.5)
 ax.add_collection(predicted_rectangles,)
 
-true_rectangles = bbox_to_rectangles(bbox,fc=&#39;none&#39;,ec=&#39;r&#39;)
+true_rectangles = bbox_to_rectangles(bbox,fc='none',ec='r')
 ax.add_collection(true_rectangles,)
-fig.legend([&#39;pred_center&#39;,&#39;pred_bbox&#39;,&#39;gt_bbox&#39;])
+fig.legend(['pred_center','pred_bbox','gt_bbox'])
 fig.canvas.draw()
 </pre></div>
 </div>
@@ -263,7 +263,7 @@ y = bboxes_assigned[...,1]
 w = bboxes_assigned[...,2]
 h = bboxes_assigned[...,3]
 c = data[assignment_inds,-1]
-predicted_rectangles = bbox_to_rectangles(torch.stack( (x.ravel(),y.ravel(),w.ravel(),h.ravel()) ).T,fc=&#39;none&#39;,ec=&#39;g&#39;,alpha=c.clone().detach())
+predicted_rectangles = bbox_to_rectangles(torch.stack( (x.ravel(),y.ravel(),w.ravel(),h.ravel()) ).T,fc='none',ec='g',alpha=c.clone().detach())
 ax.add_collection(predicted_rectangles,)
 </pre></div>
 </div>
@@ -289,13 +289,13 @@ ax.add_collection(predicted_rectangles,)
 
 nepochs = 9854
 lr = 1e-4
-cls_loss = torch.nn.CrossEntropyLoss(reduction=&#39;sum&#39;)
+cls_loss = torch.nn.CrossEntropyLoss(reduction='sum')
 resume = True # if True, will load a saved model
 
-modelname = &#39;modelsave.pt&#39;
-optimizername = &#39;optimizersave.pt&#39;
-lossname = &#39;loss.pt&#39;
-outdir_model = os.path.join(cwd,&#39;outputs&#39;,&#39;models&#39;,f&#39;nepochs_{nepochs}&#39;)
+modelname = 'modelsave.pt'
+optimizername = 'optimizersave.pt'
+lossname = 'loss.pt'
+outdir_model = os.path.join(cwd,'outputs','models',f'nepochs_{nepochs}')
 
 net = train_yolo_model(nepochs, lr, cls_loss, outdir_model, modelname, optimizername, lossname, verbose=True, resume=resume)
 </pre></div>
@@ -315,20 +315,20 @@ from yolo_post_help import NMS, remove_low_conf_bboxes
 
 def filter_model_outputs(outdir, net, best_bbox_filter = False, low_conf_filter = False, nms_filter = False):
     if not os.path.exists(outdir):
-        print(f&#39;Making new directory {outdir}&#39;)
+        print(f'Making new directory {outdir}')
         os.makedirs(outdir)
 
-    if os.path.exists(os.path.join(outdir, &#39;all_gt_bbox.pkl&#39;)):
+    if os.path.exists(os.path.join(outdir, 'all_gt_bbox.pkl')):
         # Save the gt_bbox, pred_bbox, and pred_score info for downstream analysis
-        with open(os.path.join(outdir,&#39;all_gt_bbox.pkl&#39;),&#39;rb&#39;) as f:
+        with open(os.path.join(outdir,'all_gt_bbox.pkl'),'rb') as f:
             all_gt_bbox = pickle.load(f)
-        with open(os.path.join(outdir,&#39;all_pred_bbox.pkl&#39;),&#39;rb&#39;) as f:
+        with open(os.path.join(outdir,'all_pred_bbox.pkl'),'rb') as f:
             all_pred_bbox = pickle.load(f)
-        with open(os.path.join(outdir,&#39;all_scores.pkl&#39;),&#39;rb&#39;) as f:
+        with open(os.path.join(outdir,'all_scores.pkl'),'rb') as f:
             all_scores = pickle.load(f)
-        with open(os.path.join(outdir,&#39;all_images.pkl&#39;),&#39;rb&#39;) as f:
+        with open(os.path.join(outdir,'all_images.pkl'),'rb') as f:
             all_images = pickle.load(f)
-        print(f&#39;Loaded 4 files from {outdir}&#39;)
+        print(f'Loaded 4 files from {outdir}')
     else:
         all_pred_bbox = []
         all_scores = []
@@ -338,38 +338,38 @@ def filter_model_outputs(outdir, net, best_bbox_filter = False, low_conf_filter 
 
         groundtruth = GroundTruthDataset(reproducible = True)
         for i, gt in enumerate(groundtruth):
-            # Quantify the model&#39;s performance against &#39;nimages_pq&#39; simulated gt images
+            # Quantify the model's performance against 'nimages_pq' simulated gt images
             if i &gt;= nimages_pq:
                 break
 
             # Initialize gt objects (bbox: [cx, cy, w, h, conf])
             I,bbox,cls = gt
-            print(f&#39;=== Starting groundtruth[{i}] ({len(bbox)} bboxes) ===&#39;)
+            print(f'=== Starting groundtruth[{i}] ({len(bbox)} bboxes) ===')
 
             # Get model outputs for the ith image in the gt dataset
             out = net(torch.tensor(I,dtype=dtype)[None])
             bboxes,data = convert_data(out,net.B,net.stride)
             scores = data[:,-1]
-            print(f&#39;{len(bboxes)} bboxes output from model&#39;)
+            print(f'{len(bboxes)} bboxes output from model')
             bboxes_, scores_ = bboxes, scores
 
             # Reduces # of guesses by factor of 2
             if best_bbox_filter:
                 start = time.time()
                 bboxes_,scores_ = get_best_bounding_box_per_cell(bboxes,scores.clone().detach(),net.B)
-                print(f&#39;{len(bboxes_)} bboxes after getting best bbox per cell; Finished in {time.time() - start:.2f}s&#39;)
+                print(f'{len(bboxes_)} bboxes after getting best bbox per cell; Finished in {time.time() - start:.2f}s')
 
             # Remove bounding boxes below some conf threshold
             if low_conf_filter:
                 start = time.time()
                 bboxes_, scores_ = remove_low_conf_bboxes(bboxes_, scores_)
-                print(f&#39;{len(bboxes_)} bboxes after removing low conf bboxes; Finished in {time.time() - start:.2f}s&#39;)
+                print(f'{len(bboxes_)} bboxes after removing low conf bboxes; Finished in {time.time() - start:.2f}s')
 
             # Perform NMS on filtered guesses (Reduce by a factor of ~2
             if nms_filter:
                 start = time.time()
                 bboxes_,scores_ = NMS(bboxes_, scores_, nms_threshold = 0.9)
-                print(f&#39;{len(bboxes_)} bboxes after NMS; Finished in {time.time() - start:.2f}s\n&#39;)
+                print(f'{len(bboxes_)} bboxes after NMS; Finished in {time.time() - start:.2f}s\n')
 
             # Append outputs from current image to all outputs for downstream performance quantification and visualization
             all_gt_bbox.append(bbox)
@@ -378,20 +378,20 @@ def filter_model_outputs(outdir, net, best_bbox_filter = False, low_conf_filter 
             all_images.append(I)
 
         # Save the gt_bbox, pred_bbox, and pred_score info for downstream analysis
-        with open(os.path.join(outdir,&#39;all_gt_bbox.pkl&#39;),&#39;wb&#39;) as f:
+        with open(os.path.join(outdir,'all_gt_bbox.pkl'),'wb') as f:
             pickle.dump(all_gt_bbox,f)
-        with open(os.path.join(outdir,&#39;all_pred_bbox.pkl&#39;),&#39;wb&#39;) as f:
+        with open(os.path.join(outdir,'all_pred_bbox.pkl'),'wb') as f:
             pickle.dump(all_pred_bbox,f)
-        with open(os.path.join(outdir,&#39;all_scores.pkl&#39;),&#39;wb&#39;) as f:
+        with open(os.path.join(outdir,'all_scores.pkl'),'wb') as f:
             pickle.dump(all_scores,f)
-        with open(os.path.join(outdir,&#39;all_images.pkl&#39;),&#39;wb&#39;) as f:
+        with open(os.path.join(outdir,'all_images.pkl'),'wb') as f:
             pickle.dump(all_images,f)
-        print(f&#39;Saved output .pkl files to {outdir}&#39;)
+        print(f'Saved output .pkl files to {outdir}')
 
     return all_pred_bbox, all_scores, all_gt_bbox, all_images
 
 # Load filtered outputs, or generate new ones if none exist in outdir
-outdir_data = os.path.join(cwd,&#39;outputs&#39;,&#39;data&#39;,f&#39;nepochs_{nepochs}_raw&#39;)
+outdir_data = os.path.join(cwd,'outputs','data',f'nepochs_{nepochs}_raw')
 all_pred_bbox, all_scores, all_gt_bbox, all_images = filter_model_outputs(outdir_data, net)
 </pre></div>
 </div>
@@ -405,7 +405,7 @@ all_pred_bbox, all_scores, all_gt_bbox, all_images = filter_model_outputs(outdir
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>nrow = 50
 ncol = 2
-fig, axs = plt.subplots(nrow, ncol, layout = &#39;tight&#39;)
+fig, axs = plt.subplots(nrow, ncol, layout = 'tight')
 i,j = 0,0
 
 for idx, I in enumerate(all_images):
@@ -413,14 +413,14 @@ for idx, I in enumerate(all_images):
     pred_s = all_scores[idx]
     gt_bb = all_gt_bbox[idx]
 
-    imshow(I, axs[i,j], cmap = &#39;gray&#39;)
-    gt_polys = bbox_to_rectangles(np.asarray(gt_bb),fc=&#39;none&#39;)
-    gt_polys.set_edgecolor(&#39;blue&#39;)
+    imshow(I, axs[i,j], cmap = 'gray')
+    gt_polys = bbox_to_rectangles(np.asarray(gt_bb),fc='none')
+    gt_polys.set_edgecolor('blue')
     axs[i,j].add_collection(gt_polys)
 
-    # imshow(I,axs[i,j],cmap=&#39;gray&#39;)
-    pred_polys = bbox_to_rectangles(np.asarray(pred_bb),fc=&#39;none&#39;)
-    pred_polys.set_edgecolor(&#39;red&#39;)
+    # imshow(I,axs[i,j],cmap='gray')
+    pred_polys = bbox_to_rectangles(np.asarray(pred_bb),fc='none')
+    pred_polys.set_edgecolor('red')
     axs[i,j].add_collection(pred_polys)
 
     j += 1
@@ -429,7 +429,7 @@ for idx, I in enumerate(all_images):
         j = 0
         i += 1
 
-fig.legend([&#39;gt&#39;,&#39;pred&#39;])
+fig.legend(['gt','pred'])
 fig.set_size_inches(ncol*3,nrow*3)
 plt.show()
 </pre></div>
@@ -453,7 +453,7 @@ out = compute_pr_curves(all_gt_bbox, all_pred_bbox, all_scores, outdir_data, ver
 fig, axs = plot_pr_curves(out)
 fig, axs = plot_pr_curves(out, condense = False)
 mAP = get_mAP(out)
-print(f&#39;mAP: {mAP}&#39;)
+print(f'mAP: {mAP}')
 
 # TODO: Only compute (p,r) if there is a score below conf_thresh. Otherwise, all tp/fp/fn labels remain the same (Should save &lt;10min on first 10)
 </pre></div>
@@ -510,7 +510,7 @@ min_score_below_conf = conf_threshold &lt; np.min(all_pred_ravel)
 #     I,bbox,cls = gt
 #     imshow(I,ax)
 
-#     gtrect = bbox_to_rectangles(bbox,facecolor=&#39;none&#39;,ec=&#39;b&#39;)
+#     gtrect = bbox_to_rectangles(bbox,facecolor='none',ec='b')
 #     ax.add_collection(gtrect)
 #     with torch.no_grad():
 #         out = net(torch.tensor(I[None],dtype=dtype))
@@ -518,7 +518,7 @@ min_score_below_conf = conf_threshold &lt; np.min(all_pred_ravel)
 #     bboxes,data = convert_data(out,net.B,net.stride)
 #     scores = data[:,-1]
 #     bboxes_,scores_ = bboxes,scores
-#     prrect = bbox_to_rectangles(bboxes_,facecolor=&#39;none&#39;,ec=&#39;r&#39;,ls=&#39;:&#39;,alpha=scores_)
+#     prrect = bbox_to_rectangles(bboxes_,facecolor='none',ec='r',ls=':',alpha=scores_)
 #     ax.add_collection(prrect)
 
 #     # loop through the ground truth
@@ -527,7 +527,7 @@ min_score_below_conf = conf_threshold &lt; np.min(all_pred_ravel)
 #             bboxes__ = bboxes_[scores_&gt;t]
 #             # we need to find which ones in bboxes__ are matched ot which ones in in bbox
 #             # and we need to know how many are left over in each set
-#             # we need to make sure that this assignment is 1-1, or we&#39;re essentially double coun
+#             # we need to make sure that this assignment is 1-1, or we're essentially double coun
 
 #             ious = iou(bboxes__,bbox)
 
@@ -567,21 +567,21 @@ min_score_below_conf = conf_threshold &lt; np.min(all_pred_ravel)
 #     recall = tp / tppfn
 #     mean_precision = np.abs(np.sum( np.diff(recall)*(precision[1:]+precision[:-1])/2 ))
 #     ax1.cla()
-#     ax1.plot(recall,precision,marker=&#39;.&#39;)
-#     ax1.scatter(recall[0],precision[0],c=&#39;r&#39;)
-#     ax1.scatter(recall[-1],precision[-1],c=&#39;g&#39;)
+#     ax1.plot(recall,precision,marker='.')
+#     ax1.scatter(recall[0],precision[0],c='r')
+#     ax1.scatter(recall[-1],precision[-1],c='g')
 #     ax1.set_xlim(0,1)
 #     ax1.set_ylim(0,1)
-#     ax1.set_xlabel(&#39;Recall&#39;)
-#     ax1.set_ylabel(&#39;Precision&#39;)
+#     ax1.set_xlabel('Recall')
+#     ax1.set_ylabel('Precision')
 
 #     ax2.cla()
-#     ax2.set_title(&#39;Total TP over epoch&#39;)
-#     ax2.plot(tp,marker=&#39;.&#39;)
+#     ax2.set_title('Total TP over epoch')
+#     ax2.plot(tp,marker='.')
 
 #     ax3.cla()
-#     ax3.set_title(&#39;Total FP over epoch&#39;)
-#     ax3.plot(fp,marker=&#39;.&#39;)
+#     ax3.set_title('Total FP over epoch')
+#     ax3.plot(fp,marker='.')
 
 #     fig.canvas.draw()
 #     hfig.update(fig)

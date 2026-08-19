@@ -51,7 +51,7 @@
 # import random
 
 # import sys
-# sys.path.append(&#39;/home/abenneck/Desktop/yolo_model/docs/scripts&#39;)
+# sys.path.append('/home/abenneck/Desktop/yolo_model/docs/scripts')
 # from yolo_help import bbox_to_rectangles, imshow, convert_data
 
 # num_ch, tile_dim0, tile_dim1 = 3, 256, 256
@@ -68,7 +68,7 @@ import tifffile
 import importlib as imp
 import sys
 
-sys.path.append(&#39;/home/abenneck/Desktop/yolo_tiles/docs/scripts&#39;)
+sys.path.append('/home/abenneck/Desktop/yolo_tiles/docs/scripts')
 
 import yolo_tiles
 imp.reload(yolo_tiles)
@@ -93,7 +93,7 @@ from yolo_post_help import remove_low_conf_bboxes, postprocess, bb_to_rec
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># img_dim0 = 1000
 # img_dim1 = 2000
 # img = np.random.rand(img_dim0, img_dim1)
-img = plt.imread(&#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;)
+img = plt.imread('/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg')
 ch_idx = 0
 img = img[:,:,ch_idx]
 print(np.shape(img))
@@ -139,7 +139,7 @@ ax.imshow(img)
 # # img_dim1 = 2300
 # # img = np.random.rand(img_dim0, img_dim1)
 
-# img = plt.imread(&#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;)
+# img = plt.imread('/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg')
 # ch_idx = 0
 # img = img[:,:,ch_idx]
 # img_dim0, img_dim1 = np.shape(img)
@@ -147,9 +147,9 @@ ax.imshow(img)
 # # Define the dimensions of the tiles to be extracted + minimum desired overlap between 2 adjacent tiles
 # tile_dim0, tile_dim1 = 256,256
 # min_overlap = 16
-# outdir = &#39;/home/abenneck/Desktop/yolo_model/tiles_all_ch&#39;
+# outdir = '/home/abenneck/Desktop/yolo_model/tiles_all_ch'
 
-# # If the &#39;threshold_perc&#39;th percentile of a tile is &gt;= &#39;threshold_bg&#39;, mark it as background
+# # If the 'threshold_perc'th percentile of a tile is &gt;= 'threshold_bg', mark it as background
 # threshold_bg = 210 # The threshold to determine whether a tile is bg or fg
 # threshold_perc = 0.95 # The percentile of all pixels in the tile to check against threshold_bg
 
@@ -158,7 +158,7 @@ ax.imshow(img)
 # # Compute necessary values along axis 0
 # tile_n0 = int(np.floor(img_dim0 / tile_dim0) + 1) # Number of tiles to extract along axis 0
 # rem0 = tile_n0 * tile_dim0 - img_dim0 # # Number of REMAINING pixels if all tiles are placed adjacent + not overlapping over the original image
-# while rem0 &lt; min_overlap * tile_n0: # If there aren&#39;t enough pixels remaining, add another tile, and recompute the remainder. Continue until enough tiles have been added
+# while rem0 &lt; min_overlap * tile_n0: # If there aren't enough pixels remaining, add another tile, and recompute the remainder. Continue until enough tiles have been added
 #     tile_n0 += 1
 #     rem0 = tile_n0 * tile_dim0 - img_dim0
 
@@ -173,8 +173,8 @@ ax.imshow(img)
 # overlap0 = np.max([min_overlap, int(np.floor(rem0 / (tile_n0 - 1)))])
 # overlap1 = np.max([min_overlap, int(np.floor(rem1 / (tile_n1 - 1)))])
 
-# print(f&#39;Dim0: {tile_n0} tiles, with {rem0} extra pixels ({overlap0} overlap)&#39;)
-# print(f&#39;Dim1: {tile_n1} tiles, with {rem1} extra pixels ({overlap1} overlap)&#39;)
+# print(f'Dim0: {tile_n0} tiles, with {rem0} extra pixels ({overlap0} overlap)')
+# print(f'Dim1: {tile_n1} tiles, with {rem1} extra pixels ({overlap1} overlap)')
 
 # # Determine the upper-left corner of each tile
 # all_upper_left_corners = []
@@ -194,10 +194,10 @@ ax.imshow(img)
 
 # for idx, p in enumerate(all_upper_left_corners):
 #     if idx % 6 == 0:
-#         fc = &#39;b&#39;
+#         fc = 'b'
 #     else:
-#         fc=&#39;none&#39;
-#     bbox = Rectangle([p[1], p[0]], tile_dim0, tile_dim1, ec=&#39;r&#39;, fc=fc)
+#         fc='none'
+#     bbox = Rectangle([p[1], p[0]], tile_dim0, tile_dim1, ec='r', fc=fc)
 #     ax.add_patch(bbox)
 
 #     idx0 = p[2]
@@ -205,7 +205,7 @@ ax.imshow(img)
 #     p = p[:2]
 
 #     sub_img = img[p[0]:p[0]+tile_dim0, p[1]:p[1]+tile_dim1]
-#     # print(f&#39;img[{p[0]}:{p[0]+tile_dim0}, {p[1]}:{p[1]+tile_dim1}]&#39;)
+#     # print(f'img[{p[0]}:{p[0]+tile_dim0}, {p[1]}:{p[1]+tile_dim1}]')
 #     # print(sub_img)
 #     if np.percentile(sub_img, threshold_perc) &gt;= threshold_bg:
 #         bg = True
@@ -213,11 +213,11 @@ ax.imshow(img)
 #         bg = False
 
 #     # p: The (r,c) coord of the corner of the tile closest to the origin
-#     np.savez(os.path.join(outdir, f&#39;sub_img_r{idx0}_c{idx1}.npz&#39;), img = sub_img, p = p, bg = bg)
-#     # print(f&#39;Saved tile [{idx0},{idx1}]&#39;)
+#     np.savez(os.path.join(outdir, f'sub_img_r{idx0}_c{idx1}.npz'), img = sub_img, p = p, bg = bg)
+#     # print(f'Saved tile [{idx0},{idx1}]')
 
 
-# # ax.set_title(f&#39;(over_r, over_c) = ({overlap0},{overlap1})&#39;)
+# # ax.set_title(f'(over_r, over_c) = ({overlap0},{overlap1})')
 # # ax.plot(all_upper_left_corners)
 </pre></div>
 </div>
@@ -232,16 +232,16 @@ ax.imshow(img)
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>start = time.time()
 
 # Define dimensions of the input image
-img = plt.imread(&#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;)
+img = plt.imread('/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg')
 img_dim0, img_dim1, num_ch = np.shape(img)
 
 # Define the dimensions of the tiles to be extracted + minimum desired overlap between 2 adjacent tiles
 tile_dim0, tile_dim1 = 256,256
 min_overlap = 32 # Changed from 16 on 8/26/25
-outdir = &#39;/home/abenneck/Desktop/yolo_model/tiles_all_ch&#39;
+outdir = '/home/abenneck/Desktop/yolo_model/tiles_all_ch'
 os.makedirs(outdir, exist_ok=True)
 
-# If the &#39;threshold_perc&#39;th percentile of a tile is &gt;= &#39;threshold_bg&#39;, mark it as background
+# If the 'threshold_perc'th percentile of a tile is &gt;= 'threshold_bg', mark it as background
 threshold_bg = 210 # The threshold to determine whether a tile is bg or fg
 threshold_perc = 0.95 # The percentile of all pixels in the tile to check against threshold_bg
 
@@ -255,8 +255,8 @@ tile_n1 = int(np.floor(img_dim1 / (tile_dim1-min_overlap))) + 1
 overlap0 = min_overlap
 overlap1 = min_overlap
 
-print(f&#39;Dim0: {tile_n0} tiles with {min_overlap} overlap&#39;)
-print(f&#39;Dim1: {tile_n1} tiles with {min_overlap} overlap&#39;)
+print(f'Dim0: {tile_n0} tiles with {min_overlap} overlap')
+print(f'Dim1: {tile_n1} tiles with {min_overlap} overlap')
 
 # Determine the upper-left corner of each tile
 all_upper_left_corners = []
@@ -276,10 +276,10 @@ ax.imshow(img)
 
 for idx, p in enumerate(all_upper_left_corners):
     if idx % 6 == 0:
-        fc = &#39;b&#39;
+        fc = 'b'
     else:
-        fc=&#39;none&#39;
-    bbox = Rectangle([p[1], p[0]], tile_dim0, tile_dim1, ec=&#39;r&#39;, fc=fc)
+        fc='none'
+    bbox = Rectangle([p[1], p[0]], tile_dim0, tile_dim1, ec='r', fc=fc)
     ax.add_patch(bbox)
 
     idx0 = p[2]
@@ -299,9 +299,9 @@ for idx, p in enumerate(all_upper_left_corners):
 
     # p: The (r,c) coord of the corner of the tile closest to the origin
     if False:
-        np.savez(os.path.join(outdir, f&#39;sub_img_r{idx0}_c{idx1}.npz&#39;), img = sub_img, p = p, bg = bg)
+        np.savez(os.path.join(outdir, f'sub_img_r{idx0}_c{idx1}.npz'), img = sub_img, p = p, bg = bg)
 
-print(f&#39;Finished extracting + saving all tiles in {time.time()-start:.2f}s&#39;)
+print(f'Finished extracting + saving all tiles in {time.time()-start:.2f}s')
 </pre></div>
 </div>
 </div>
@@ -335,20 +335,20 @@ Finished extracting + saving all tiles in 3.79s
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from yolo_help import Net
 import torch
 
-outdir_model = os.path.join(&#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854&#39;)
+outdir_model = os.path.join('/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854')
 dtype = torch.float32
-# cls_loss = torch.nn.CrossEntropyLoss(reduction=&#39;sum&#39;)
+# cls_loss = torch.nn.CrossEntropyLoss(reduction='sum')
 
 net = Net()
-modelname = &#39;modelsave.pt&#39;
+modelname = 'modelsave.pt'
 net.load_state_dict(torch.load(os.path.join(outdir_model,modelname)))
 
 lr = 1e-4
 optimizer = torch.optim.Adam(net.parameters(),lr=lr)
-optimizername = &#39;optimizersave.pt&#39;
+optimizername = 'optimizersave.pt'
 optimizer.load_state_dict(torch.load(os.path.join(outdir_model,optimizername)))
 
-lossname = &#39;loss.pt&#39;
+lossname = 'loss.pt'
 Esave = torch.load(os.path.join(outdir_model,lossname))[0]
 </pre></div>
 </div>
@@ -360,7 +360,7 @@ Esave = torch.load(os.path.join(outdir_model,lossname))[0]
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Check if &#39;bbox&#39; meets our criteria using &#39;boundary_cond&#39;
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Check if 'bbox' meets our criteria using 'boundary_cond'
 def isValid(bbox, boundary_cond, verbose=False):
     # boundary_cond for exclusion zone and boundary_cond*2 for overlap/buffer zone
     cx, cy, w, h = bbox
@@ -372,25 +372,25 @@ def isValid(bbox, boundary_cond, verbose=False):
     if left_bound &lt; boundary_cond[0] or upper_bound &lt; boundary_cond[1]:
         # Part of bbox lies in the Upper/Left EXCLUSION zone
         if verbose:
-            print(f&#39;PART - Removed bbox with bounds ({left_bound:.2f},{upper_bound:.2f})&#39;)
+            print(f'PART - Removed bbox with bounds ({left_bound:.2f},{upper_bound:.2f})')
         return False
     elif (left_bound &gt;= (tile_dim0 - boundary_cond[0])) or (upper_bound &gt;= (tile_dim1 - boundary_cond[1])):
         # Entire bbox lies in the Lower/Right EXCLUSION zone
         if verbose:
-            print(f&#39;ENTIRE - Removed bbox with bounds ({left_bound:.2f},{upper_bound:.2f})&#39;)
+            print(f'ENTIRE - Removed bbox with bounds ({left_bound:.2f},{upper_bound:.2f})')
         return False
     else:
         if verbose:
-            print(f&#39;Kept bbox with bounds ({left_bound:.2f},{upper_bound:.2f})&#39;)
+            print(f'Kept bbox with bounds ({left_bound:.2f},{upper_bound:.2f})')
         return True
 
-# Remove invalid bboxes from &#39;out&#39; by setting the corresponding conf value in &#39;out&#39; to -inf
+# Remove invalid bboxes from 'out' by setting the corresponding conf value in 'out' to -inf
 def remove_bbox_in_overlap(out, B, stride, boundary_cond = [16,16]):
 
     # Get the positions of the grid cells
     x = torch.arange(out.shape[-1])*stride + (stride-1)/2
     y = torch.arange(out.shape[-2])*stride + (stride-1)/2
-    YX = torch.stack(torch.meshgrid(y,x,indexing=&#39;ij&#39;),0)
+    YX = torch.stack(torch.meshgrid(y,x,indexing='ij'),0)
 
     # Convert bbox0 data to dimensions that are relative to the original input
     outB = out[:,:5]
@@ -424,7 +424,7 @@ def remove_bbox_in_overlap(out, B, stride, boundary_cond = [16,16]):
             h_ = h0[:,r,c].detach().numpy().item()
             bb0 = np.asarray([x_, y_, w_, h_])
 
-            # print(f&#39;(0,{r},{c}) - {bb0} : &#39;, end=&#39;&#39;)
+            # print(f'(0,{r},{c}) - {bb0} : ', end='')
             if isValid(bb0, boundary_cond):
                 numKeep += 1
             else:
@@ -438,7 +438,7 @@ def remove_bbox_in_overlap(out, B, stride, boundary_cond = [16,16]):
             h_ = h1[:,r,c].detach().numpy().item()
             bb1 = np.asarray([x_, y_, w_, h_])
 
-            # print(f&#39;(1,{r},{c}) - {bb1} : &#39;, end=&#39;&#39;)
+            # print(f'(1,{r},{c}) - {bb1} : ', end='')
             if isValid(bb1, boundary_cond):
                 numKeep += 1
             else:
@@ -472,15 +472,15 @@ def remove_bbox_in_overlap(out, B, stride, boundary_cond = [16,16]):
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>boundary_cond = [16,16]
 start = time.time()
 
-src_dir = &#39;/home/abenneck/Desktop/yolo_model/tiles_all_ch&#39;
+src_dir = '/home/abenneck/Desktop/yolo_model/tiles_all_ch'
 for i, fname in enumerate(os.listdir(src_dir)):
     data = np.load(os.path.join(src_dir, fname))
-    I = data[&#39;img&#39;]
-    p = data[&#39;p&#39;]
-    bg = data[&#39;bg&#39;]
+    I = data['img']
+    p = data['p']
+    bg = data['bg']
 
     if bg:
-        print(f&#39;Skipping background tile {fname}&#39;)
+        print(f'Skipping background tile {fname}')
         # I = np.zeros(np.shape(I))
         pass
 
@@ -494,8 +494,8 @@ for i, fname in enumerate(os.listdir(src_dir)):
     fig,ax = plt.subplots()
     x = torch.arange(out.shape[-1])*stride + (stride-1)/2
     y = torch.arange(out.shape[-2])*stride + (stride-1)/2
-    YX = torch.stack(torch.meshgrid(y,x,indexing=&#39;ij&#39;),0)
-    ax.imshow(I[0],cmap=&#39;gray&#39;)
+    YX = torch.stack(torch.meshgrid(y,x,indexing='ij'),0)
+    ax.imshow(I[0],cmap='gray')
     ax.scatter(YX[1].ravel(),YX[0].ravel(),s=1,alpha=0.5)
     # x = bboxes[...,0]
     # y = bboxes[...,1]
@@ -515,27 +515,27 @@ for i, fname in enumerate(os.listdir(src_dir)):
 
     # Plot all bboxes as rectangles
     conf = bbox_keep[:,-1]
-    predicted_rectangles = bbox_to_rectangles(bbox_keep[:,:4].detach().numpy(),fc=&#39;none&#39;,ec=&#39;b&#39;,alpha=conf.clone().detach()*0.5)
+    predicted_rectangles = bbox_to_rectangles(bbox_keep[:,:4].detach().numpy(),fc='none',ec='b',alpha=conf.clone().detach()*0.5)
     ax.add_collection(predicted_rectangles)
 
     conf = bbox_remove[:,-1]
-    removed_rectangles = bbox_to_rectangles(bbox_remove[:,:4].detach().numpy(),fc=&#39;none&#39;,ec=&#39;r&#39;,alpha=np.ones([len(conf)])*0.25)
+    removed_rectangles = bbox_to_rectangles(bbox_remove[:,:4].detach().numpy(),fc='none',ec='r',alpha=np.ones([len(conf)])*0.25)
     ax.add_collection(removed_rectangles)
 
     # Plot exclusion/buffer zone lines (color=lime)
-    ax.plot(np.ones(I.shape[1]-1)*boundary_cond[0], np.linspace(0,I.shape[1],I.shape[1]-1), color=&#39;lime&#39;)
-    ax.plot(np.linspace(0,I.shape[2],I.shape[2]-1), np.ones(I.shape[2]-1)*boundary_cond[1], color=&#39;lime&#39;)
-    ax.plot(np.ones(I.shape[1]-1)*(tile_dim0-boundary_cond[0]), np.linspace(0,I.shape[1],I.shape[1]-1), color=&#39;lime&#39;)
-    ax.plot(np.linspace(0,I.shape[2],I.shape[2]-1), np.ones(I.shape[2]-1)*(tile_dim0-boundary_cond[1]), color=&#39;lime&#39;)
+    ax.plot(np.ones(I.shape[1]-1)*boundary_cond[0], np.linspace(0,I.shape[1],I.shape[1]-1), color='lime')
+    ax.plot(np.linspace(0,I.shape[2],I.shape[2]-1), np.ones(I.shape[2]-1)*boundary_cond[1], color='lime')
+    ax.plot(np.ones(I.shape[1]-1)*(tile_dim0-boundary_cond[0]), np.linspace(0,I.shape[1],I.shape[1]-1), color='lime')
+    ax.plot(np.linspace(0,I.shape[2],I.shape[2]-1), np.ones(I.shape[2]-1)*(tile_dim0-boundary_cond[1]), color='lime')
 
     # Plot overlap zone lines (color=indigo)
-    # ax.plot(np.ones(I.shape[1]-1)*boundary_cond[0]*2, np.linspace(0,I.shape[1],I.shape[1]-1), color=&#39;indigo&#39;)
-    # ax.plot(np.linspace(0,I.shape[2],I.shape[2]-1), np.ones(I.shape[2]-1)*boundary_cond[1]*2, color=&#39;indigo&#39;)
+    # ax.plot(np.ones(I.shape[1]-1)*boundary_cond[0]*2, np.linspace(0,I.shape[1],I.shape[1]-1), color='indigo')
+    # ax.plot(np.linspace(0,I.shape[2],I.shape[2]-1), np.ones(I.shape[2]-1)*boundary_cond[1]*2, color='indigo')
 
-    fig.legend([&#39;pred_center&#39;,&#39;keep&#39;,&#39;remove&#39;])
+    fig.legend(['pred_center','keep','remove'])
     fig.canvas.draw()
 
-    print(f&#39;Finished tile {i} in {time.time()-start:.2f}s&#39;)
+    print(f'Finished tile {i} in {time.time()-start:.2f}s')
     start = time.time()
 
     if i == 0:
@@ -579,18 +579,18 @@ recon_blank = np.zeros((bbox_dim*2+num_ch, int(img_dim0/ds_factor), int(img_dim1
 
 ntile_complete = 0
 fig,ax = plt.subplots()
-src_dir = &#39;/home/abenneck/Desktop/yolo_model/tiles_all_ch&#39;
+src_dir = '/home/abenneck/Desktop/yolo_model/tiles_all_ch'
 for r in range(tile_n0)[::-1]:
     for c in range(tile_n1)[::-1]:
-        fname = f&#39;sub_img_r{r}_c{c}.npz&#39;
+        fname = f'sub_img_r{r}_c{c}.npz'
         data = np.load(os.path.join(src_dir, fname))
-        I = data[&#39;img&#39;]
-        p = data[&#39;p&#39;]
-        bg = data[&#39;bg&#39;]
+        I = data['img']
+        p = data['p']
+        bg = data['bg']
         ntile_complete += 1
 
         if bg:
-            print(f&#39;Skipping background tile {fname}&#39;)
+            print(f'Skipping background tile {fname}')
         else:
             # Plot this tile on the empty canvas
             img_blank[:,p[0]:p[0]+tile_dim0, p[1]:p[1]+tile_dim0] = I
@@ -609,23 +609,23 @@ for r in range(tile_n0)[::-1]:
 
             # Plot all bboxes as rectangles
             conf = bbox_keep[:,-1]
-            predicted_rectangles = bbox_to_rectangles(bbox_keep[:,:4].detach().numpy(),fc=&#39;none&#39;,ec=&#39;b&#39;,alpha=conf.clone().detach()*0.5)
+            predicted_rectangles = bbox_to_rectangles(bbox_keep[:,:4].detach().numpy(),fc='none',ec='b',alpha=conf.clone().detach()*0.5)
             ax.add_collection(predicted_rectangles)
 
             conf = bbox_remove[:,-1]
-            removed_rectangles = bbox_to_rectangles(bbox_remove[:,:4].detach().numpy(),fc=&#39;none&#39;,ec=&#39;r&#39;,alpha=np.ones([len(conf)])*0.25)
+            removed_rectangles = bbox_to_rectangles(bbox_remove[:,:4].detach().numpy(),fc='none',ec='r',alpha=np.ones([len(conf)])*0.25)
             ax.add_collection(removed_rectangles)
 
             # Append model output to reconstruction
             recon_blank[:,int(p[0]/ds_factor):int((p[0]+tile_dim0)/ds_factor), int(p[1]/ds_factor):int((p[1]+tile_dim0)/ds_factor)] = out[0].detach().numpy()
 
-            print(f&#39;Finished tile {ntile_complete}/{tile_n0*tile_n1} in {time.time()-start:.2f}s&#39;)
+            print(f'Finished tile {ntile_complete}/{tile_n0*tile_n1} in {time.time()-start:.2f}s')
             start = time.time()
 
     # if i == 1:
     #     break
 
-fig.legend([&#39;pred_center&#39;,&#39;keep&#39;,&#39;remove&#39;])
+fig.legend(['pred_center','keep','remove'])
 ax.imshow(img_blank[0])
 # ax.set_xlim([3000,4000])
 # ax.set_ylim([5000,4000])
@@ -633,8 +633,8 @@ ax.imshow(img_blank[0])
 # ax.set_ylim([4800,4500])
 fig.canvas.draw()
 if False:
-    np.savez(os.path.join(outdir, f&#39;recon.npz&#39;), data = recon_blank)
-print(f&#39;Finished entire image in {time.time()-start_total:.2f}s&#39;)
+    np.savez(os.path.join(outdir, f'recon.npz'), data = recon_blank)
+print(f'Finished entire image in {time.time()-start_total:.2f}s')
 </pre></div>
 </div>
 </div>
@@ -2156,9 +2156,9 @@ Finished entire image in 140.89s
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[374]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>outdir = &#39;/home/abenneck/Desktop/yolo_model/tiles_all_ch&#39;
-recon_data = np.load(os.path.join(outdir, f&#39;recon.npz&#39;))
-recon_data = recon_data[&#39;data&#39;]
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>outdir = '/home/abenneck/Desktop/yolo_model/tiles_all_ch'
+recon_data = np.load(os.path.join(outdir, f'recon.npz'))
+recon_data = recon_data['data']
 
 # np.shape(recon_data)
 # recon_data[:,400,600]
@@ -2169,7 +2169,7 @@ vis_transformed = torch.sigmoid(torch.Tensor(vis_data))
 vis_transformed[vis_transformed==0.5] = 0
 # vis_data = np.reshape(vis_data), (np.shape(vis_data)[1], np.shape(vis_data)[2], np.shape(vis_data)[0]))
 
-ax.imshow(vis_transformed, cmap = &#39;inferno&#39;, vmin=0, vmax=1)
+ax.imshow(vis_transformed, cmap = 'inferno', vmin=0, vmax=1)
 </pre></div>
 </div>
 </div>
@@ -2193,7 +2193,7 @@ ax.imshow(vis_transformed, cmap = &#39;inferno&#39;, vmin=0, vmax=1)
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># def img_to_tiles(img, outdir=&#39;&#39;, min_overlap = 32, tile_dim = 256, upper_threshold_bg = np.inf, lower_threshold_bg = -np.inf,verbose = True):
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># def img_to_tiles(img, outdir='', min_overlap = 32, tile_dim = 256, upper_threshold_bg = np.inf, lower_threshold_bg = -np.inf,verbose = True):
 #     start = time.time()
 
 #     # Define dimensions of the input image
@@ -2201,13 +2201,13 @@ ax.imshow(vis_transformed, cmap = &#39;inferno&#39;, vmin=0, vmax=1)
 #         img_dim0, img_dim1, num_ch = np.shape(img)
 #         ndim = 3
 #     else:
-#         raise Exception(f&#39;Input image should be 2 or 3 dimensions, but {len(np.shape(img))} were found&#39;)
+#         raise Exception(f'Input image should be 2 or 3 dimensions, but {len(np.shape(img))} were found')
 
 #     # Define the dimensions of the tiles to be extracted + minimum desired overlap between 2 adjacent tiles
-#     if outdir != &#39;&#39;:
+#     if outdir != '':
 #         os.makedirs(outdir, exist_ok=True)
 
-#     # If the &#39;threshold_perc&#39;th percentile of a tile is &gt;= &#39;threshold_bg&#39;, mark it as background
+#     # If the 'threshold_perc'th percentile of a tile is &gt;= 'threshold_bg', mark it as background
 #     threshold_perc = 0.95 # The percentile of all pixels in the tile to check against threshold_bg
 
 #     # Compute number of tiles needed along each axis + necessary padding to preserve stride across tiles
@@ -2255,14 +2255,14 @@ ax.imshow(vis_transformed, cmap = &#39;inferno&#39;, vmin=0, vmax=1)
 #         else:
 #             bg = False
 
-#         tile = {&#39;img&#39;:sub_img, &#39;p&#39;:p, &#39;bg&#39;:bg, &#39;r_idx&#39;:idx0, &#39;c_idx&#39;:idx1}
+#         tile = {'img':sub_img, 'p':p, 'bg':bg, 'r_idx':idx0, 'c_idx':idx1}
 #         tiles.append(tile)
 
-#     if outdir != &#39;&#39;:
-#         np.savez(os.path.join(outdir, &#39;tiles.npz&#39;))
+#     if outdir != '':
+#         np.savez(os.path.join(outdir, 'tiles.npz'))
 
 #     if verbose:
-#         print(f&#39;Finished extracting all tiles in {time.time()-start:.2f}s&#39;)
+#         print(f'Finished extracting all tiles in {time.time()-start:.2f}s')
 
 #     # Reverse the order, so now tiles will be parsed in a reverse lexicographic order
 #     tiles = tiles[::-1]
@@ -2274,11 +2274,11 @@ ax.imshow(vis_transformed, cmap = &#39;inferno&#39;, vmin=0, vmax=1)
 #     start_total = time.time()
 
 #     # Define dimensions of the input image
-#     if len(np.shape(tiles[0][&#39;img&#39;])) == 3:
-#         num_ch, tile_dim, _ = np.shape(tiles[0][&#39;img&#39;])
+#     if len(np.shape(tiles[0]['img'])) == 3:
+#         num_ch, tile_dim, _ = np.shape(tiles[0]['img'])
 #         tile_ndim = 3
 #     else:
-#         raise Exception(f&#39;Input image should be 3 dimensions, but {len(np.shape(img))} were found&#39;)
+#         raise Exception(f'Input image should be 3 dimensions, but {len(np.shape(img))} were found')
 
 #     boundary_cond = [16,16]
 #     # TODO: when implementing UI using argparse, Boundary_cond = min_overlap / 2
@@ -2293,14 +2293,14 @@ ax.imshow(vis_transformed, cmap = &#39;inferno&#39;, vmin=0, vmax=1)
 
 #     ntile_complete = 0
 #     for tile in tiles:
-#         I = tile[&#39;img&#39;]
-#         p = tile[&#39;p&#39;]
-#         bg = tile[&#39;bg&#39;]
-#         r_idx = tile[&#39;r_idx&#39;]
-#         c_idx = tile[&#39;c_idx&#39;]
+#         I = tile['img']
+#         p = tile['p']
+#         bg = tile['bg']
+#         r_idx = tile['r_idx']
+#         c_idx = tile['c_idx']
 
 #         if bg:
-#             print(f&#39;Skipping background tile (r,c):({r_idx},{c_idx})&#39;)
+#             print(f'Skipping background tile (r,c):({r_idx},{c_idx})')
 #         else:
 #             # Plot this tile on the empty canvas
 #             # img_blank[:,p[0]:p[0]+tile_dim, p[1]:p[1]+tile_dim] = I
@@ -2320,7 +2320,7 @@ ax.imshow(vis_transformed, cmap = &#39;inferno&#39;, vmin=0, vmax=1)
 #             # Append model output to reconstruction
 #             recon_blank[:,int(p[0]/ds_factor):int((p[0]+tile_dim)/ds_factor), int(p[1]/ds_factor):int((p[1]+tile_dim)/ds_factor)] = out[0].detach().numpy()
 
-#             print(f&#39;Finished tile {ntile_complete}/{len(tiles)} in {time.time()-start:.2f}s&#39;)
+#             print(f'Finished tile {ntile_complete}/{len(tiles)} in {time.time()-start:.2f}s')
 #             start = time.time()
 
 #         ntile_complete += 1
@@ -2344,7 +2344,7 @@ ax.imshow(vis_transformed, cmap = &#39;inferno&#39;, vmin=0, vmax=1)
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img = plt.imread(&#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img = plt.imread('/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg')
 padded_img, tiles = img_to_tiles(img, upper_threshold_bg = 210)
 out = apply_model_to_tiles(tiles, padded_img.shape[0], padded_img.shape[1], verbose=True)
 </pre></div>
@@ -2371,19 +2371,19 @@ scores = data[:,-1]
 # Plot all bboxes as rectangles
 bbox_keep = bboxes[np.where(scores&gt;0)]
 s_keep = scores[np.where(scores&gt;0)]
-predicted_rectangles = bbox_to_rectangles(bbox_keep[:,:4].detach().numpy(),fc=&#39;none&#39;,ec=&#39;b&#39;,alpha=s_keep.clone().detach()*0.5)
+predicted_rectangles = bbox_to_rectangles(bbox_keep[:,:4].detach().numpy(),fc='none',ec='b',alpha=s_keep.clone().detach()*0.5)
 ax.add_collection(predicted_rectangles)
 
 bbox_remove = bboxes[np.where(scores&lt;=0)]
 s_remove = scores[np.where(scores&lt;=0)]
 if len(s_remove) &gt; 0:
-    removed_rectangles = bbox_to_rectangles(bbox_remove[:,:4].detach().numpy(),fc=&#39;none&#39;,ec=&#39;r&#39;,alpha=np.ones([len(s_remove)])*0.25)
+    removed_rectangles = bbox_to_rectangles(bbox_remove[:,:4].detach().numpy(),fc='none',ec='r',alpha=np.ones([len(s_remove)])*0.25)
     ax.add_collection(removed_rectangles)
 
 ax.set_xlim([1000,2000])
 ax.set_ylim([2000,1000])
 
-print(f&#39;Finished entire image in {time.time()-start:.2f}s&#39;)
+print(f'Finished entire image in {time.time()-start:.2f}s')
 </pre></div>
 </div>
 </div>
@@ -3438,7 +3438,7 @@ list(zip(u_arr,c_arr))
 scores = data[:,-1]
 bb_keep = bboxes[np.where(scores&gt;0)]
 bb_remove = bboxes[np.where(scores&lt;=0)]
-print(f&#39;Keep: {len(bb_keep)}, Remove: {len(bb_remove)}&#39;)
+print(f'Keep: {len(bb_keep)}, Remove: {len(bb_remove)}')
 </pre></div>
 </div>
 </div>
@@ -3475,7 +3475,7 @@ for i in range(int(img_dim0/scale)):
             img[mask,:]=1
             total_bbox += 1
 
-# Extract &#39;tiles&#39; from larger input img
+# Extract 'tiles' from larger input img
 padded_img, tiles = img_to_tiles(img, upper_threshold_bg = 210)
 
 # Apply model to tiles + apply bbox edge filtering
@@ -3483,7 +3483,7 @@ out = apply_model_to_tiles(tiles, padded_img.shape[0], padded_img.shape[1])
 
 # Count the number of bboxes output from the model
 n_bbox = count_bbox(out)
-print(f&#39;{n_bbox}/{out.shape[1]*out.shape[2]*2} bbox counted, {total_bbox} cells present&#39;)
+print(f'{n_bbox}/{out.shape[1]*out.shape[2]*2} bbox counted, {total_bbox} cells present')
 
 start = time.time()
 start_total = time.time()
@@ -3504,20 +3504,20 @@ s_remove = scores[np.where(scores&lt;=0)]
 
 # Plot all bboxes as rectangles
 conf = s_keep
-predicted_rectangles = bbox_to_rectangles(bbox_keep[:,:4].detach().numpy(),fc=&#39;none&#39;,ec=&#39;b&#39;)#,alpha=conf.clone().detach()*0.5)
+predicted_rectangles = bbox_to_rectangles(bbox_keep[:,:4].detach().numpy(),fc='none',ec='b')#,alpha=conf.clone().detach()*0.5)
 ax.add_collection(predicted_rectangles)
 
 conf = s_remove
 if len(conf) &gt; 0:
-    removed_rectangles = bbox_to_rectangles(bbox_remove[:,:4].detach().numpy(),fc=&#39;none&#39;,ec=&#39;r&#39;,alpha=np.ones([len(conf)])*0.25)
+    removed_rectangles = bbox_to_rectangles(bbox_remove[:,:4].detach().numpy(),fc='none',ec='r',alpha=np.ones([len(conf)])*0.25)
     ax.add_collection(removed_rectangles)
 else:
-    print(&#39;No bboxes removed from overlap&#39;)
+    print('No bboxes removed from overlap')
 
 # ax.set_xlim([1000,2000])
 # ax.set_ylim([2000,1000])
 
-print(f&#39;Finished entire image in {time.time()-start_total:.2f}s&#39;)
+print(f'Finished entire image in {time.time()-start_total:.2f}s')
 </pre></div>
 </div>
 </div>
@@ -3566,10 +3566,10 @@ from matplotlib.patches import Rectangle
 from yolo_help import get_best_bounding_box_per_cell, convert_data
 from yolo_post_help import remove_low_conf_bboxes, NMS
 
-img_real = plt.imread(&#39;/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg&#39;)
-outdir = &#39;/home/abenneck/Desktop/yolo_model/tiles_all_ch&#39;
-recon_data = np.load(os.path.join(outdir, f&#39;recon.npz&#39;))
-recon_data = torch.Tensor(recon_data[&#39;data&#39;])
+img_real = plt.imread('/home/abenneck/Desktop/yolo_model/images/section_000197_30800.jpeg')
+outdir = '/home/abenneck/Desktop/yolo_model/tiles_all_ch'
+recon_data = np.load(os.path.join(outdir, f'recon.npz'))
+recon_data = torch.Tensor(recon_data['data'])
 
 B = net.B
 stride = net.stride
@@ -3579,47 +3579,47 @@ axs[0,0].imshow(padded_img)
 axs[0,1].imshow(padded_img)
 axs[1,0].imshow(padded_img)
 axs[1,1].imshow(padded_img)
-axs[1,1].set_title(f&#39;{total_bbox} cells present&#39;)
+axs[1,1].set_title(f'{total_bbox} cells present')
 
 # for tile in tiles:
-#     p = tile[&#39;p&#39;]
+#     p = tile['p']
 #     r = random.random()
 #     b = random.random()
 #     g = random.random()
 #     color = (r,b,g)
-#     rec = Rectangle(p,tile_dim0,tile_dim1, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.5)
+#     rec = Rectangle(p,tile_dim0,tile_dim1, facecolor=color, edgecolor='k',alpha = 0.5)
 #     axs[1,0].add_patch(rec)
-#     # rec = Rectangle(p,tile_dim0,tile_dim1, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.5)
+#     # rec = Rectangle(p,tile_dim0,tile_dim1, facecolor=color, edgecolor='k',alpha = 0.5)
 #     # axs[0,1].add_patch(rec)
 
 bboxes, data = convert_data(out[None], B, stride)
 # bboxes, data = convert_data(recon_data[None], B, stride)
 
 scores = torch.Tensor(data[:,-1])
-predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc=&#39;none&#39;,ec=&#39;lime&#39;)#,alpha=scores)
+predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc='none',ec='lime')#,alpha=scores)
 axs[0,0].add_collection(predicted_rectangles)
-axs[0,0].set_title(f&#39;All outputs ({len(bboxes)} bboxes)&#39;)
+axs[0,0].set_title(f'All outputs ({len(bboxes)} bboxes)')
 
 start = time.time()
 bboxes, scores = get_best_bounding_box_per_cell(bboxes, scores, B)
-predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc=&#39;none&#39;,ec=&#39;lime&#39;)#,alpha=scores)
+predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc='none',ec='lime')#,alpha=scores)
 axs[0,1].add_collection(predicted_rectangles)
-axs[0,1].set_title(f&#39;Best bbox per cell ({len(bboxes)} bboxes)&#39;)
-print(f&#39;Finished Best bbox per cell in {time.time()-start:.2f}s&#39;)
+axs[0,1].set_title(f'Best bbox per cell ({len(bboxes)} bboxes)')
+print(f'Finished Best bbox per cell in {time.time()-start:.2f}s')
 
 start = time.time()
 bboxes, scores = remove_low_conf_bboxes(bboxes, scores, conf_thresh = 0.1)
-predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc=&#39;none&#39;,ec=&#39;lime&#39;)#,alpha=scores)
+predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc='none',ec='lime')#,alpha=scores)
 axs[1,0].add_collection(predicted_rectangles)
-axs[1,0].set_title(f&#39;Remove low conf bbox ({len(bboxes)} bboxes)&#39;)
-print(f&#39;Finished low conf in {time.time()-start:.2f}s&#39;)
+axs[1,0].set_title(f'Remove low conf bbox ({len(bboxes)} bboxes)')
+print(f'Finished low conf in {time.time()-start:.2f}s')
 
 # start = time.time()
 # bboxes, scores = NMS(bboxes, scores)
-# predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc=&#39;none&#39;,ec=&#39;lime&#39;,alpha=scores)
+# predicted_rectangles = bbox_to_rectangles(np.asarray(bboxes),fc='none',ec='lime',alpha=scores)
 # axs[1,1].add_collection(predicted_rectangles)
-# axs[1,1].set_title(f&#39;NMS ({len(bboxes)} bboxes)&#39;)
-# print(f&#39;Finished NMS in {time.time()-start:.2f}s&#39;)
+# axs[1,1].set_title(f'NMS ({len(bboxes)} bboxes)')
+# print(f'Finished NMS in {time.time()-start:.2f}s')
 
 fig.set_size_inches(10,10)
 # fig.set_size_inches(15,30)
@@ -3740,11 +3740,11 @@ img = np.random.rand(img_dim0, img_dim1, num_ch)
 
 # tile_n0 = int(img_dim0 / (tile_dim0-min_overlap)) # Number of tiles to extract along axis 0
 # pad_dim0 = (tile_n0*(tile_dim0 - min_overlap) + tile_dim0)
-# print(f&#39;img_dim: {img_dim0}, padded: {pad_dim0}&#39;)
+# print(f'img_dim: {img_dim0}, padded: {pad_dim0}')
 
 # tile_n1 = int(img_dim1 / (tile_dim1-min_overlap)) # Number of tiles to extract along axis 1
 # pad_dim1 = (tile_n1*(tile_dim1 - min_overlap) + tile_dim1)
-# print(f&#39;img_dim: {img_dim1}, padded: {pad_dim1}&#39;)
+# print(f'img_dim: {img_dim1}, padded: {pad_dim1}')
 
 # padded_img = np.zeros((pad_dim0, pad_dim1, num_ch))
 # padded_img[:img_dim0,:img_dim1,:] = img
@@ -3755,12 +3755,12 @@ padded_img, tiles = img_to_tiles(img, upper_threshold_bg = 210)
 
 ax.imshow(padded_img)
 for tile in tiles:
-    p = tile[&#39;p&#39;]
+    p = tile['p']
     r = random.random()
     b = random.random()
     g = random.random()
     color = (r,b,g)
-    rec = Rectangle(p[::-1],tile_dim0,tile_dim1, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.5)
+    rec = Rectangle(p[::-1],tile_dim0,tile_dim1, facecolor=color, edgecolor='k',alpha = 0.5)
     ax.add_patch(rec)
 <br/></pre></div>
 </div>
@@ -3789,7 +3789,7 @@ Finished extracting all tiles in 0.12s
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load a target image
 start_total = time.time()
-img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+img_dir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched'
 net = Net()
 B = net.B
 stride = net.stride
@@ -3803,26 +3803,26 @@ img = tifffile.imread(img_path)
 # Preprocess using gamma correction + upsampling
 start = time.time()
 img_up = preprocess(img)
-print(f&#39;Finished preprocessing in {time.time()-start:.2f}s&#39;)
+print(f'Finished preprocessing in {time.time()-start:.2f}s')
 
 # Extract tiles from the preprocessed input image
 padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04, verbose=True)
 
 # Apply model to tiles + apply bbox edge filtering
-print(&#39;Applying model to tiles . . .&#39;)
-model_path = os.path.join(&#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854&#39;)
-model_path = os.path.join(model_path,&#39;modelsave.pt&#39;)
+print('Applying model to tiles . . .')
+model_path = os.path.join('/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854')
+model_path = os.path.join(model_path,'modelsave.pt')
 out = apply_model_to_tiles(tiles, model_path, padded_img.shape[0], padded_img.shape[1], verbose=True)
 
 # Convert the raw model output into a more useful data structure
 pads = (np.array(padded_img.shape) - np.array(img_up.shape))/2
-print(&#39;Postprocessing . . .&#39;)
+print('Postprocessing . . .')
 out_ = postprocess(out, B, stride, pads, up_factor=2, verbose=True)
 # out = postprocess(out, B, stride, pads, verbose=True)
 
 # Save/load the processed output
-out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
-out_path = f&#39;/home/abenneck/Desktop/yolo_model/{out_fname}&#39;
+out_fname = (img_path.split('/')[-1]).split('.')[0] + '.npy'
+out_path = f'/home/abenneck/Desktop/yolo_model/{out_fname}'
 # np.save(out_path, out)
 out = np.load(out_fname)
 
@@ -3843,8 +3843,8 @@ print(out[:,1000,1000])
 idx = 500
 fname = sorted(os.listdir(img_dir))[idx]
 img_path = os.path.join(img_dir, fname)
-out_fname = (img_path.split(&#39;/&#39;)[-1]).split(&#39;.&#39;)[0] + &#39;.npy&#39;
-out_path = f&#39;/home/abenneck/Desktop/yolo_model/{out_fname}&#39;
+out_fname = (img_path.split('/')[-1]).split('.')[0] + '.npy'
+out_path = f'/home/abenneck/Desktop/yolo_model/{out_fname}'
 out = np.load(out_fname)
 
 best_bb = np.take_along_axis(out[:5*B], 5*np.argmax(out[4:5*B:5], axis=0)[None, ...] + np.arange(5)[:, None, None], axis=0)
@@ -3885,12 +3885,12 @@ from torch.utils.data import Dataset, DataLoader
 
 class tileDataset(Dataset):
     def __init__(self, tiles):
-        self.images = [tile[&#39;img&#39;] for tile in tiles]
-        self.all_p  = [tile[&#39;p&#39;] for tile in tiles]
-        self.all_bg = [tile[&#39;bg&#39;] for tile in tiles]
-        self.all_r  = [tile[&#39;r_idx&#39;] for tile in tiles]
+        self.images = [tile['img'] for tile in tiles]
+        self.all_p  = [tile['p'] for tile in tiles]
+        self.all_bg = [tile['bg'] for tile in tiles]
+        self.all_r  = [tile['r_idx'] for tile in tiles]
         self.n_row = np.max(self.all_r)
-        self.all_c  = [tile[&#39;c_idx&#39;] for tile in tiles]
+        self.all_c  = [tile['c_idx'] for tile in tiles]
         self.n_col = np.max(self.all_c)
         # self.transform = ToTensor()
 
@@ -3899,7 +3899,7 @@ class tileDataset(Dataset):
 
     def __getitem__(self, idx):
         img = self.images[idx]
-        prcb = {&#39;p&#39;:self.all_p[idx], &#39;r&#39;:self.all_r[idx], &#39;c&#39;:self.all_c[idx], &#39;bg&#39;:self.all_bg[idx]}
+        prcb = {'p':self.all_p[idx], 'r':self.all_r[idx], 'c':self.all_c[idx], 'bg':self.all_bg[idx]}
         if len(img.shape) == 2: # If image is grayscale, add a color dimension
             img = img[None]
         return torch.tensor(img, dtype=torch.float32), prcb
@@ -3908,7 +3908,7 @@ def rem_bb(out, B, stride, tile_dim, boundary_cond = [16,16]):
     # Get the positions of the grid cells
     x = torch.arange(out.shape[-1])*stride + (stride-1)/2
     y = torch.arange(out.shape[-2])*stride + (stride-1)/2
-    YX = torch.stack(torch.meshgrid(y,x,indexing=&#39;ij&#39;),0)
+    YX = torch.stack(torch.meshgrid(y,x,indexing='ij'),0)
 
     # Convert bbox0 data to dimensions that are relative to the original input
     outB0 = out[:,:5]
@@ -3953,7 +3953,7 @@ def rem_bb(out, B, stride, tile_dim, boundary_cond = [16,16]):
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img_idx = 500
-img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+img_dir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched'
 fname = sorted(os.listdir(img_dir))[img_idx]
 img_path = os.path.join(img_dir, fname)
 img = tifffile.imread(img_path)
@@ -3961,13 +3961,13 @@ img_up = preprocess(img)
 padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04)
 pads = (np.array(padded_img.shape) - np.array(img_up.shape))/2
 
-nrow_t = int(np.max([tile[&#39;r_idx&#39;] for tile in tiles])) + 1
-ncol_t = int(np.max([tile[&#39;c_idx&#39;] for tile in tiles])) + 1
+nrow_t = int(np.max([tile['r_idx'] for tile in tiles])) + 1
+ncol_t = int(np.max([tile['c_idx'] for tile in tiles])) + 1
 
 ds = tileDataset(tiles)
 dl = DataLoader(ds, batch_size = ncol_t, shuffle=False)
 
-print(f&#39;{nrow_t} x {ncol_t} tiles&#39;)
+print(f'{nrow_t} x {ncol_t} tiles')
 </pre></div>
 </div>
 </div>
@@ -3983,8 +3983,8 @@ print(f&#39;{nrow_t} x {ncol_t} tiles&#39;)
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model_path = os.path.join(&#39;/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854&#39;)
-model_path = os.path.join(model_path,&#39;modelsave.pt&#39;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model_path = os.path.join('/home/abenneck/Desktop/yolo_outputs/models/nepochs_9854')
+model_path = os.path.join(model_path,'modelsave.pt')
 dtype = torch.float32
 net = Net()
 net.load_state_dict(torch.load(model_path))
@@ -4004,11 +4004,11 @@ ndim = 2
 
 batch_start = time.time()
 recon = np.zeros((bbox_dim*B+num_classes, int(img_dim0/ds_factor), int(img_dim1/ds_factor)))
-print(&#39;Starting batch mode . . .&#39;)
+print('Starting batch mode . . .')
 for i_batch, batch in enumerate(dl):
     imgs, meta_data = batch
-    if np.all(np.array(meta_data[&#39;bg&#39;])):
-        print(f&#39;Skipping batch {i_batch}/{nrow_t}&#39;)
+    if np.all(np.array(meta_data['bg'])):
+        print(f'Skipping batch {i_batch}/{nrow_t}')
         continue
     else:
         start = time.time()
@@ -4016,36 +4016,36 @@ for i_batch, batch in enumerate(dl):
         for idx, elem in enumerate(out):
             out_i = remove_bbox_in_overlap(elem[None].clone().detach(), B, stride, tile_dim, boundary_cond = boundary_cond)
             # out_i = remove_bbox_in_overlap(elem[None].clone().detach(), B, stride, tile_dim, boundary_cond = boundary_cond)
-            p0 = meta_data[&#39;p&#39;][0][idx]
-            p1 = meta_data[&#39;p&#39;][1][idx]
+            p0 = meta_data['p'][0][idx]
+            p1 = meta_data['p'][1][idx]
             recon[:,int(p0/ds_factor):int((p0+tile_dim)/ds_factor), int(p1/ds_factor):int((p1+tile_dim)/ds_factor)] = out_i[0].detach().numpy()
-        print(f&#39;Finished batch {i_batch}/{nrow_t} in {time.time()-start:.2f}s&#39;)
+        print(f'Finished batch {i_batch}/{nrow_t} in {time.time()-start:.2f}s')
         start = time.time()
 
 recon = torch.tensor(recon, dtype=torch.float32)
 recon = postprocess(recon, B, stride, pads, up_factor=2, verbose=True)
 
-print(f&#39;Finished ALL batches in {time.time()-batch_start:.2f}s\n&#39;)
+print(f'Finished ALL batches in {time.time()-batch_start:.2f}s\n')
 
 last_idx = 0
 tile_start = time.time()
 start = time.time()
 recon0 = np.zeros((bbox_dim*B+num_classes, int(img_dim0/ds_factor), int(img_dim1/ds_factor)))
 recon1 = np.zeros((bbox_dim*B+num_classes, int(img_dim0/ds_factor), int(img_dim1/ds_factor)))
-print(&#39;Starting tile mode . . .&#39;)
+print('Starting tile mode . . .')
 for idx, tile in enumerate(tiles):
-    I = tile[&#39;img&#39;]
+    I = tile['img']
     if ndim == 2: # Model expects input shape of length 4, so
         I = I[None]
-    p = tile[&#39;p&#39;]
-    bg = tile[&#39;bg&#39;]
-    r_idx = tile[&#39;r_idx&#39;]
-    c_idx = tile[&#39;c_idx&#39;]
+    p = tile['p']
+    bg = tile['bg']
+    r_idx = tile['r_idx']
+    c_idx = tile['c_idx']
 
     if bg:
         continue
         if verbose and idx % 100 == 0:
-            print(f&#39;Skipping tile {idx}/{len(tiles)} (r,c):({r_idx},{c_idx})&#39;)
+            print(f'Skipping tile {idx}/{len(tiles)} (r,c):({r_idx},{c_idx})')
     else:
         # Apply trained model to the image + define some key model outputs
         out = net((torch.tensor(I[None],dtype=dtype)))
@@ -4054,17 +4054,17 @@ for idx, tile in enumerate(tiles):
         out0 = rem_bb(out_, B, stride, tile_dim, boundary_cond = boundary_cond)
         recon0[:,int(p[0]/ds_factor):int((p[0]+tile_dim)/ds_factor), int(p[1]/ds_factor):int((p[1]+tile_dim)/ds_factor)] = out0[0].detach().numpy()
         if idx % 500 == 0:
-            print(f&#39;Finished rem_bb() in {time.time()-start0:.4f}s&#39;)
+            print(f'Finished rem_bb() in {time.time()-start0:.4f}s')
 
         start1 = time.time()
         out_ = out.clone()
         out1 = remove_bbox_in_overlap(out_, B, stride, tile_dim, boundary_cond = boundary_cond)
         recon1[:,int(p[0]/ds_factor):int((p[0]+tile_dim)/ds_factor), int(p[1]/ds_factor):int((p[1]+tile_dim)/ds_factor)] = out1[0].detach().numpy()
         if idx % 500 == 0:
-            print(f&#39;Finished remove_bbbox_in_overlap() in {time.time()-start1:.4f}s&#39;)
+            print(f'Finished remove_bbbox_in_overlap() in {time.time()-start1:.4f}s')
 
         if idx % 100 == 0:
-            print(f&#39;Finished tiles {last_idx}:{idx}/{len(tiles)} in {time.time()-start:.2f}s&#39;)
+            print(f'Finished tiles {last_idx}:{idx}/{len(tiles)} in {time.time()-start:.2f}s')
             start = time.time()
             last_idx = idx
 
@@ -4075,7 +4075,7 @@ recon0_post = postprocess(recon0, B, stride, pads, up_factor=2, verbose=True)
 recon1 = torch.tensor(recon1, dtype=torch.float32)
 recon1_post = postprocess(recon1, B, stride, pads, up_factor=2, verbose=True)
 
-print(f&#39;Finished ALL tiles in {time.time()-tile_start:.2f}s&#39;)
+print(f'Finished ALL tiles in {time.time()-tile_start:.2f}s')
 </pre></div>
 </div>
 </div>
@@ -4117,7 +4117,7 @@ Finished ALL tiles in 152.63s
 # plotBbox = True
 
 img_idx = 500
-img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+img_dir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched'
 fname = sorted(os.listdir(img_dir))[img_idx]
 img_path = os.path.join(img_dir, fname)
 
@@ -4128,29 +4128,29 @@ img_path = os.path.join(img_dir, fname)
 #         padded_img, tiles = img_to_tiles(img, lower_threshold_bg = 0.04, verbose=True)
 #     else:
 #         padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04, verbose=True)
-#     tile_dim = tiles[0][&#39;img&#39;].shape[0]
+#     tile_dim = tiles[0]['img'].shape[0]
 
 img_plot = preprocess(img, upsample=False)
 
 fig, ax = plt.subplots(1,2)
 
-print(&#39;Plotting bboxes . . .&#39;)
+print('Plotting bboxes . . .')
 ax[0].imshow(img_plot)
 start = time.time()
 scores = recon0_post[:,:,-4].ravel()
-predicted_rectangles = bb_to_rec(recon0_post,fc=&#39;none&#39;,ec=&#39;lime&#39;,alpha=scores)
+predicted_rectangles = bb_to_rec(recon0_post,fc='none',ec='lime',alpha=scores)
 ax[0].add_collection(predicted_rectangles)
-ax[0].set_title(f&#39;rem_bb(): {len(scores)} predictions&#39;)
-print(f&#39;Finished plotting bboxes0 in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+ax[0].set_title(f'rem_bb(): {len(scores)} predictions')
+print(f'Finished plotting bboxes0 in {time.time()-start:.2f}s, {len(scores)} boxes present')
 
 ax[1].imshow(img_plot)
 # Filter out extra bboxes
 start = time.time()
 scores = recon1_post[:,:,-4].ravel()
-predicted_rectangles = bb_to_rec(recon1_post,fc=&#39;none&#39;,ec=&#39;lime&#39;,alpha=scores)
+predicted_rectangles = bb_to_rec(recon1_post,fc='none',ec='lime',alpha=scores)
 ax[1].add_collection(predicted_rectangles)
-ax[1].set_title(f&#39;remove_bbox_in_overlap(): {len(scores)} predictions&#39;)
-print(f&#39;Finished plotting bboxes1 in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+ax[1].set_title(f'remove_bbox_in_overlap(): {len(scores)} predictions')
+print(f'Finished plotting bboxes1 in {time.time()-start:.2f}s, {len(scores)} boxes present')
 
 for ax_i in ax:
     ax_i.set_xlim([3900,4000])
@@ -4161,11 +4161,11 @@ for ax_i in ax:
 # ax[1].set_xlim([4000,4100])
 # ax[1].set_ylim([6200,6100])
 
-# print(f&#39;Finished entire image in {time.time()-start:.2f}s&#39;)
+# print(f'Finished entire image in {time.time()-start:.2f}s')
 
 fig.set_size_inches(8,4)
 fig.canvas.draw()
-# plt.savefig(f&#39;/home/abenneck/Desktop/yolo_model/tiles_{img_idx}.png&#39;)
+# plt.savefig(f'/home/abenneck/Desktop/yolo_model/tiles_{img_idx}.png')
 </pre></div>
 </div>
 </div>
@@ -4223,7 +4223,7 @@ addTiles = True
 plotBbox = False
 
 img_idx = 500
-img_dir = &#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched&#39;
+img_dir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/Ex_488_Em_525_stitched'
 fname = sorted(os.listdir(img_dir))[img_idx]
 img_path = os.path.join(img_dir, fname)
 
@@ -4234,7 +4234,7 @@ if True:
         padded_img, tiles = img_to_tiles(img, lower_threshold_bg = 0.04, verbose=True)
     else:
         padded_img, tiles = img_to_tiles(img_up, lower_threshold_bg = 0.04, verbose=True)
-    tile_dim = tiles[0][&#39;img&#39;].shape[0]
+    tile_dim = tiles[0]['img'].shape[0]
 
 fig, ax = plt.subplots()
 
@@ -4243,40 +4243,40 @@ if plotBbox:
 else:
     ax.imshow(padded_img)
 
-out_fname = fname.split(&#39;.&#39;)[0] + &#39;.npy&#39;
-out_path = f&#39;/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}&#39;
+out_fname = fname.split('.')[0] + '.npy'
+out_path = f'/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_outputs_v03_32bit/{out_fname}'
 out_from_pipeline = torch.Tensor(np.load(out_path))
 scores = out_from_pipeline[:,:,-4]
 
 if addTiles:
-    print(&#39;Adding tiles . . .&#39;)
+    print('Adding tiles . . .')
     start = time.time()
     for tile in tiles:
-        p = tile[&#39;p&#39;]
-        bg = tile[&#39;bg&#39;]
-        color = &#39;k&#39; if bg else &#39;w&#39;
-        rec = Rectangle(p[::-1],tile_dim,tile_dim, facecolor=color, edgecolor=&#39;k&#39;,alpha = 0.2)
+        p = tile['p']
+        bg = tile['bg']
+        color = 'k' if bg else 'w'
+        rec = Rectangle(p[::-1],tile_dim,tile_dim, facecolor=color, edgecolor='k',alpha = 0.2)
         ax.add_patch(rec)
-    print(f&#39;Finished plotting tiles in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+    print(f'Finished plotting tiles in {time.time()-start:.2f}s, {len(scores)} boxes present')
 
 if plotBbox:
-    print(&#39;Plotting bboxes . . .&#39;)
+    print('Plotting bboxes . . .')
     # Filter out extra bboxes
     start = time.time()
     # scores = out[:,:,4].ravel()
     scores = out[:,:,-4].ravel()
-    predicted_rectangles = bb_to_rec(out_from_pipeline,fc=&#39;none&#39;,ec=&#39;lime&#39;,alpha=scores)
+    predicted_rectangles = bb_to_rec(out_from_pipeline,fc='none',ec='lime',alpha=scores)
     ax.add_collection(predicted_rectangles)
-    ax.set_title(f&#39;{len(scores)} predictions&#39;)
-    print(f&#39;Finished plotting bboxes in {time.time()-start:.2f}s, {len(scores)} boxes present&#39;)
+    ax.set_title(f'{len(scores)} predictions')
+    print(f'Finished plotting bboxes in {time.time()-start:.2f}s, {len(scores)} boxes present')
 
 # ax.set_xlim([4000,4100])
 # ax.set_ylim([6200,6100])
 
-print(f&#39;Finished entire image in {time.time()-start_total:.2f}s&#39;)
+print(f'Finished entire image in {time.time()-start_total:.2f}s')
 
 fig.canvas.draw()
-# plt.savefig(f&#39;/home/abenneck/Desktop/yolo_model/tiles_{img_idx}.png&#39;)
+# plt.savefig(f'/home/abenneck/Desktop/yolo_model/tiles_{img_idx}.png')
 </pre></div>
 </div>
 </div>

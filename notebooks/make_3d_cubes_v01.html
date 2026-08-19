@@ -1,0 +1,3029 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>v01 &#8212; yolo_model  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">v01</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="v01">
+<h1>v01<a class="headerlink" href="#v01" title="Link to this heading">¶</a></h1>
+<p>In v01 I work with domains more carefully</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import numpy as np
+import matplotlib.pyplot as plt
+# %matplotlib ipympl
+
+import os
+from glob import glob
+
+import h5py
+import matplotlib.collections
+import time
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def extent_from_x(xhighres):
+    dxhighres = [x[1] - x[0] for x in xhighres]
+
+    extenthighres0 = (xhighres[-1][0]-dxhighres[-1]/2, xhighres[-1][-1]+dxhighres[-1]/2, xhighres[-2][-1]+dxhighres[-2]/2, xhighres[-2][0]-dxhighres[-2]/2)
+    extenthighres1 = (xhighres[-1][0]-dxhighres[-1]/2, xhighres[-1][-1]+dxhighres[-1]/2, xhighres[-3][-1]+dxhighres[-3]/2, xhighres[-3][0]-dxhighres[-3]/2)
+    extenthighres2 = (xhighres[-2][0]-dxhighres[-2]/2, xhighres[-2][-1]+dxhighres[-2]/2, xhighres[-3][-1]+dxhighres[-3]/2, xhighres[-3][0]-dxhighres[-3]/2)
+
+    return extenthighres0,extenthighres1,extenthighres2
+</pre></div>
+</div>
+</div>
+</section>
+<section id="goals">
+<h1>goals<a class="headerlink" href="#goals" title="Link to this heading">¶</a></h1>
+<p>Load and display bounding boxes for 1 sagital, 1 coronal, and one transverse whole slice.</p>
+<p>Where they intersect I want to view a 3D volume with bounding boxes, loaded from your output data.</p>
+<p>Potentially, I would want to reconstruct the 3D volume from the 2D slices.</p>
+</section>
+<section id="First-chose-one-3D-cube-and-find-the-slices-that-go-right-though-the-middle">
+<h1>First chose one 3D cube and find the slices that go right though the middle<a class="headerlink" href="#First-chose-one-3D-cube-and-find-the-slices-that-go-right-though-the-middle" title="Link to this heading">¶</a></h1>
+<p>The directory below has npy files.</p>
+<p>Each npy file has an ijk index.</p>
+<p>2,1,3 is reasonable.</p>
+<p>Since the cube is at low resolution this starts at</p>
+<p>i: 2 * 256 to 3 * 256</p>
+<p>j: 1 * 256 to 2 * 256</p>
+<p>k: 3 * 256 to 4 * 256</p>
+<p>Because of 4x downsampling, the size is actually 1024 (at native resolution). (recall we start with 2x updsampling, and the network does 8x downsampling)</p>
+</section>
+<section id="note">
+<h1>note<a class="headerlink" href="#note" title="Link to this heading">¶</a></h1>
+<p>Initialized from</p>
+<p>view_data_and_try_to_fix_shift_v01</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># output file naming convention like this
+# i0000_j0000_k0000_d256_Ex_488_Em_525.npy
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>threeDcubedir_for_outputs = '/home/dtward/mounts/bmaproot/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v02_'
+d = 256
+out_suffix = f'd{d}_Ex_488_Em_525.npy'
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># starting location for this cube
+i = 2
+j = 3
+k = 5
+</pre></div>
+</div>
+</div>
+</section>
+<section id="walk-through-the-features">
+<h1>walk through the features<a class="headerlink" href="#walk-through-the-features" title="Link to this heading">¶</a></h1>
+<p>The first 3 axes are slice row col</p>
+<p>The fourth axis has 10 numbers.</p>
+<p>slicemin, slicemax</p>
+<p>rowmin, rowmax,</p>
+<p>colmin, colmax</p>
+<p>Then confidence (normalized)</p>
+<p>Followed by 3 class probabilities (unnormalized)</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># if i = 0, j = 0, k = 0, the first coordinate of the cube is not 0, it is 1.5
+(0+1+2+3)/4
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+1.5
+</pre></div></div>
+</div>
+</section>
+<section id="(0)-Compute-several-parameters-before-processing-+-Generate-some-validation-figures">
+<h1>(0) Compute several parameters before processing + Generate some validation figures<a class="headerlink" href="#(0)-Compute-several-parameters-before-processing-+-Generate-some-validation-figures" title="Link to this heading">¶</a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># I need the spatial coordinates of the datacube
+# n is the size (256)
+i,j,k = 0,0,0
+ndatacube = np.array((d,d,d))
+
+# x0 is the location of the first pixel (within the high res volume)
+x0datacube = np.array([0,0,0]) # initialize
+x0datacube = np.array([1.5,1.5,1.5]) + np.array([i,j,k])*d*4 # (up by 2 down by 8)
+
+# get the coordinates of each voxel
+xdatacube = [np.arange(n)*4+o for n,o in zip(ndatacube,x0datacube)]
+
+# get the voxel size
+ddatacube = np.array([4,4,4])
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># for drawing we need extents
+# extent for viewing with constant slice (this is transverse)
+extentdatacube0 = (xdatacube[-1][0]-ddatacube[-1]/2, xdatacube[-1][-1]+ddatacube[-1]/2, xdatacube[-2][-1]+ddatacube[-2]/2, xdatacube[-2][0]-ddatacube[-2]/2)
+
+# extent for viewing with constant row (this is coronal)
+extentdatacube1 = (xdatacube[-1][0]-ddatacube[-1]/2, xdatacube[-1][-1]+ddatacube[-1]/2, xdatacube[-3][-1]+ddatacube[-3]/2, xdatacube[-3][0]-ddatacube[-3]/2)
+
+# extent for viewing with constant col (this is sagittal)
+extentdatacube2 = (xdatacube[-2][0]-ddatacube[-2]/2, xdatacube[-2][-1]+ddatacube[-2]/2, xdatacube[-3][-1]+ddatacube[-3]/2, xdatacube[-3][0]-ddatacube[-3]/2)
+</pre></div>
+</div>
+</div>
+<section id="(0.1)-Compute-middle-indeces-along-the-slice,-row,-col-dimensions">
+<h2>(0.1) Compute middle indeces along the slice, row, col dimensions<a class="headerlink" href="#(0.1)-Compute-middle-indeces-along-the-slice,-row,-col-dimensions" title="Link to this heading">¶</a></h2>
+<p>For visualization only</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[26]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># it doesn't have a middle, so the middle coordinate is not a round number, so we convert to an int
+# I will want to load these slices for display
+m0 = int( np.round( xdatacube[0][len(xdatacube[0])//2]) )
+m1 = int( np.round( xdatacube[1][len(xdatacube[1])//2]) )
+m2 = int( np.round( xdatacube[2][len(xdatacube[2])//2]) )
+print(m0,m1,m2)
+
+# we can enumerate the first and last pixel in the region covered by the datacube
+# this is for cutting out parts for faster processing
+start0 = xdatacube[0][0]
+start1 = xdatacube[1][0]
+start2 = xdatacube[2][0]
+
+end0 = xdatacube[0][-1]
+end1 = xdatacube[1][-1]
+end2 = xdatacube[2][-1]
+print(f'[{start0},{end0}],[{start1},{end1}],[{start2},{end2}]')
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+514 514 514
+[1.5,1021.5],[1.5,1021.5],[1.5,1021.5]
+</pre></div></div>
+</div>
+</section>
+<section id="(0.2)-Extract-these-middle-slices-from-the-full-res-data,-for-visualizatoin">
+<h2>(0.2) Extract these middle slices from the full res data, for visualizatoin<a class="headerlink" href="#(0.2)-Extract-these-middle-slices-from-the-full-res-data,-for-visualizatoin" title="Link to this heading">¶</a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[29]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>raw_image_file_first_two_views = '/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5'
+vol01 = h5py.File(raw_image_file_first_two_views)
+nhighres = vol01['stack'].shape
+xhighres = [np.arange(n) for n in nhighres]
+
+raw_image_file_third_view = '/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_full_sag.h5'
+vol2 = h5py.File(raw_image_file_third_view)
+nhighres = vol2['stack'].shape
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># get an extent for drawing
+extenthighres0,extenthighres1,extenthighres2 = extent_from_x(xhighres)
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[27]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># chose the middle slice
+Islice = vol01['stack'][m0]
+Irow   = vol01['stack'][:,m1]
+Icol = vol2['stack'][:,:,m2]
+
+fig,ax = plt.subplots(1,3)
+ax[0].imshow(Islice,extent=extenthighres0)
+ax[1].imshow(Irow,extent=extenthighres1)
+ax[2].imshow(Icol,extent=extenthighres2)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[27]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;matplotlib.image.AxesImage at 0x7ffb8fa4bad0&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "7a02dfb247c44d858a54525fcda48e15", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[30]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>vol01.close()
+vol2.close()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="(0.3)-Draw-the-rectangle-that-corresponds-to-the-3D-cube">
+<h2>(0.3) Draw the rectangle that corresponds to the 3D cube<a class="headerlink" href="#(0.3)-Draw-the-rectangle-that-corresponds-to-the-3D-cube" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[38]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>downshow = 8
+
+extenthighres0d,extenthighres1d,extenthighres2d = extent_from_x([x[::downshow] for x in xhighres])
+
+fig,ax = plt.subplots(2,3)
+ax[0,0].imshow(Islice[::downshow,::downshow],extent=extenthighres0d)
+rect0 = plt.Rectangle((start2,start1), (end2-start2),(end1-start1), edgecolor='r', facecolor='none')
+ax[0,0].add_patch(rect0)
+
+ax[0,1].imshow(Irow[::downshow,::downshow],extent=extenthighres1d)
+rect1 = plt.Rectangle((start2,start0), (end2-start2),(end0-start0), edgecolor='r', facecolor='none')
+ax[0,1].add_patch(rect1)
+
+ax[0,2].imshow(Icol[::downshow,::downshow],extent=extenthighres2d)
+rect2 = plt.Rectangle((start1,start0), (end1-start1),(end0-start0), edgecolor='r', facecolor='none')
+ax[0,2].add_patch(rect2)
+
+#ax[1,0].imshow(datacube[datacube.shape[0]//2,...,6],vmin=0,vmax=1)
+#ax[1,1].imshow(datacube[:,datacube.shape[1]//2,...,6],vmin=0,vmax=1)
+#ax[1,2].imshow(datacube[:,:,datacube.shape[2]//2,...,6],vmin=0,vmax=1)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[38]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;matplotlib.patches.Rectangle at 0x7ffb84196750&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e3a673866d1d457fb53c17607d28be83", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+</section>
+<section id="(0.4)-Load-the-2D-detections-for-these-slices">
+<h2>(0.4) Load the 2D detections for these slices<a class="headerlink" href="#(0.4)-Load-the-2D-detections-for-these-slices" title="Link to this heading">¶</a></h2>
+<p>These are 2D ones, before any stitching. For display we load the middle slice. Later we’ll load all the slices.</p>
+<p>For display, we’ll compare the 3D cubes to these single slice images. They should be roughly the same.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[27]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># in this directory there are lots of slices
+# note the order here, it is xmin,ymin, xmax,ymax
+ax0outputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0'
+ax1outputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax1'
+ax2outputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax2'
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[30]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load the middle slice along each dimension (Each slice contains bbox info at every pixel)
+ax0files = glob(join(ax0outputdir,'*.npy'))
+ax0files.sort()
+ax0detects = np.load(ax0files[m0]) # this is the middle slice
+
+ax1files = glob(join(ax1outputdir,'*.npy'))
+ax1files.sort()
+ax1detects = np.load(ax1files[m1])
+
+ax2files = glob(join(ax2outputdir,'*.npy'))
+ax2files.sort()
+ax2detects = np.load(ax2files[m2])
+
+print(ax0detects.shape,nhighres) # note downsampling by 4
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+(2148, 1832, 8) (3600, 8587, 7321)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[55]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># TODO: potentially come back later and deal with this minor issue
+# note the outputs were created by first upsampling by 2
+# then downsampling by 8
+# for a net downsampling of 4
+# the outputs were created by taking the displacements
+# and adding the pixel position of the output times the stride
+# that was to give coordinates in the upsampled space
+# then they were divided by 2
+#
+# okay, but after upsampling
+# the pixel with coordinate 0, that spans from -0.5 to 0.5
+# becomes two pixels
+# the first spans -0.5 to 0, the second spans 0 to 0.5
+# so the coordinates of the first two pixels are -0.25, and 0.25
+#
+# now when we downsample by 8
+# the average coordinate is 1.5, okay that's what I was using in this notebook
+print( np.mean( np.arange(8)*0.5 - 0.25 ) )
+# during post processing we added x = torch.arange(out.shape[-1])*stride + (stride-1)/2
+# but stride was 8, not 4
+# we divided by 2 later
+print((8-1)/2)
+print((8-1)/2/2)
+# so the location of the first pixel SHOULD HAVE BEEN 1.5
+# but instead it is 1.75.  This is a pretty minor mistake
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+1.5
+3.5
+1.75
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[56]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># get the pixel locations, and extents for display, in each of the three views
+ax0x1 = np.arange(ax0detects.shape[0])*4 + np.mean( np.array([0,1,2,3]) )
+ax0x2 = np.arange(ax0detects.shape[1])*4 + np.mean( np.array([0,1,2,3]) )
+ax0x = [ax0x1,ax0x2]
+extentax00,extentax01,extentax02 = extent_from_x([[0,1],ax0x1,ax0x2])
+
+ax1x0 = np.arange(ax1detects.shape[0])*4 + np.mean( np.array([0,1,2,3]) )
+ax1x2 = np.arange(ax1detects.shape[1])*4 + np.mean( np.array([0,1,2,3]) )
+ax1x = [ax1x0,ax1x2]
+extentax10,extentax11,extentax12 = extent_from_x([ax1x0,[0,1],ax1x2])
+
+ax2x0 = np.arange(ax2detects.shape[0])*4 + np.mean( np.array([0,1,2,3]) )
+ax2x1 = np.arange(ax2detects.shape[1])*4 + np.mean( np.array([0,1,2,3]) )
+ax2x = [ax2x0,ax2x1]
+extentax20,extentax21,extentax22 = extent_from_x([ax2x0,ax2x1,[0,1],])
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[61]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Draw the confidence of every bbox in the slice
+fig,ax_ = plt.subplots(1,2)
+ax = ax_[0]
+ax0p =  ax0detects[...,4]
+ax.imshow(ax0p,vmin=0,vmax=1,extent=extentax00)
+rect0 = plt.Rectangle((start2,start1), (end2-start2),(end1-start1), edgecolor='r', facecolor='none')
+ax.add_patch(rect0)
+
+ax = ax_[1]
+ax.imshow(ax0p,vmin=0,vmax=1,extent=extentax00)
+rect0 = plt.Rectangle((start2,start1), (end2-start2),(end1-start1), edgecolor='r', facecolor='none')
+ax.add_patch(rect0)
+ax.set_xlim(start2,end2)
+ax.set_ylim(start1,end1)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[61]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+(3073.5, 4093.5)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "36addbcad43042358724555afd2d4b3c", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[62]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># now show the image and bounding boxes
+inds = ax0p&gt;0.75
+# note the order here, it is xmin,ymin, xmax,ymax
+rectdata = np.stack(
+        (
+            np.stack((ax0detects[inds,0].ravel(), ax0detects[inds,1].ravel()),-1),
+            np.stack((ax0detects[inds,0].ravel(), ax0detects[inds,3].ravel()),-1),
+            np.stack((ax0detects[inds,2].ravel(), ax0detects[inds,3].ravel()),-1),
+            np.stack((ax0detects[inds,2].ravel(), ax0detects[inds,1].ravel()),-1),
+        ),
+        1)
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+edgecolor[:,-1] = ax0detects[inds,4]*0.5
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=ax0detects[inds,4].ravel(),
+)
+
+
+# draw it
+fig,ax_ = plt.subplots(1,2)
+ax = ax_[0]
+ax.imshow(ax0p,vmin=0,vmax=1,extent=extentax00)
+ax.imshow(Islice,vmin=0,vmax=65535,extent=extenthighres0)
+rect0 = plt.Rectangle((start2,start1), (end2-start2),(end1-start1), edgecolor='r', facecolor='none')
+ax.add_patch(rect0)
+ax.add_collection(rects)
+
+
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=ax0detects[inds,4].ravel(),
+)
+ax = ax_[1]
+ax.imshow(ax0p,vmin=0,vmax=1,extent=extentax00,cmap='gray')
+ax.imshow(Islice,vmin=0,vmax=65535/2,extent=extenthighres0,alpha=1,cmap='hot')
+rect0 = plt.Rectangle((start2,start1), (end2-start2),(end1-start1), edgecolor='r', facecolor='none')
+ax.add_patch(rect0)
+ax.set_xlim(start2,end2)
+ax.set_ylim(end1,start1)
+ax.add_collection(rects)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[62]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;matplotlib.collections.PolyCollection at 0x7ffb841f2ae0&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "de6bc6cff4bc47068bb64c3a210c97c9", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+</section>
+</section>
+<section id="(1)-The-Big-Loop">
+<h1>(1) The Big Loop<a class="headerlink" href="#(1)-The-Big-Loop" title="Link to this heading">¶</a></h1>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>d = 256 # The desired output shape for each cube
+down_factor = 4 # The factor by which the size of the whole dataset shrunk during processing (2x upsampling AND 8x 'downsampling' =&gt; 4x downsampling)
+outdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v03'
+
+# Transverse / Axial / Horizontal slices - [DV, AP, LR]
+indir0 = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0'
+data0 = np.load(os.path.join(indir0,os.listdir(indir0)[0]))
+shape0 = data0.shape
+
+# Coronal slices - [AP, DV, LR]
+indir1 = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax1'
+data1 = np.load(os.path.join(indir1,os.listdir(indir1)[0]))
+shape1 = data1.shape
+
+# Sagittal slices - [LR, DV, AP]
+indir2 = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax2'
+data2 = np.load(os.path.join(indir2,os.listdir(indir2)[0]))
+shape2 = data2.shape
+
+final_shape = np.array([shape1[0], shape0[0], shape0[1]]) # [DV, AP, LR]
+
+n_cube_i = int(np.ceil(final_shape[0] / d)) # Num complete cubes along AP axis (Transverse)
+n_cube_j = int(np.ceil(final_shape[1] / d)) # Num complete cubes along DV axis (Coronal)
+n_cube_k = int(np.ceil(final_shape[2] / d)) # Num complete cubes along LR axis (Sagittal)
+print(f'Total Cubes Shape: ({n_cube_i}, {n_cube_j}, {n_cube_k})')
+
+next_i, next_j, next_k = 3,2,1
+
+for i in np.arange(n_cube_i): # NOTE: Originally, included a (+1) to each np.arange(...) to include edge case cubes
+
+    if i &lt; next_i:
+        continue
+
+    for j in np.arange(n_cube_j):
+
+        if j &lt; next_j and i &lt;= next_i:
+            continue
+
+        for k in np.arange(n_cube_k):
+
+            if k &lt; next_k and i &lt;= next_i and j &lt;= next_j:
+                continue
+
+            print(f'Starting cube ({i},{j},{k}) . . .')
+            start_time = time.time()
+
+            # Determine if cube is an edge case
+            isEdge_i = True if i == n_cube_i - 1 else False
+            isEdge_j = True if j == n_cube_j - 1 else False
+            isEdge_k = True if k == n_cube_k - 1 else False
+            print(f'Edge? - {isEdge_i} {isEdge_j} {isEdge_k}')
+
+            # The spatial coordinates of the datacube
+            ndatacube = np.array((d,d,d))
+
+            # x0 is the location of the first pixel (within the high res volume)
+            x0datacube = np.array([0,0,0]) # initialize
+            x0datacube = np.array([1.5,1.5,1.5]) + np.array([i,j,k])*d*down_factor # ([]*256*4 - up by 2 down by 8)
+
+            # get the coordinates of each voxel
+            xdatacube = [np.arange(n)*down_factor+o for n,o in zip(ndatacube,x0datacube)]
+
+            # get the voxel size
+            ddatacube = np.array([down_factor,down_factor,down_factor])
+
+            # Get start and end indeces for coordinate systems
+            start0 = xdatacube[0][0]
+            start1 = xdatacube[1][0]
+            start2 = xdatacube[2][0]
+            end0 = xdatacube[0][-1] if isEdge_i else xdatacube[0][-1]
+            end1 = xdatacube[1][-1] if isEdge_j else xdatacube[1][-1]
+            end2 = xdatacube[2][-1] if isEdge_k else xdatacube[2][-1]
+
+            # Load the detections from each directory
+            # NOTE: Order is xmin,ymin,xmax,ymax
+
+            # Generate a list of fnames for all the slices in each dir (Each slice contains bbox info at every pixel)
+            ax0files = glob(os.path.join(indir0,'*.npy'))
+            ax0files.sort()
+            ax0detects = np.load(ax0files[0]) # Load the first slice for shape info
+
+            ax1files = glob(os.path.join(indir1,'*.npy'))
+            ax1files.sort()
+            ax1detects = np.load(ax1files[0]) # Load the first slice for shape info
+
+            ax2files = glob(os.path.join(indir2,'*.npy'))
+            ax2files.sort()
+            ax2detects = np.load(ax2files[0]) # Load the first slice for shape info
+
+            # (07/16/26) Added if/else logic to address edge case
+            start0i = np.floor(start0).astype(int)-1
+            start1i = np.floor(start1).astype(int)-1
+            start2i = np.floor(start2).astype(int)-1
+            end0i = len(ax0files)-1 if isEdge_i else np.ceil(end0).astype(int)
+            end1i = len(ax1files)-1 if isEdge_j else np.ceil(end1).astype(int)
+            end2i = len(ax2files)-1 if isEdge_k else np.ceil(end2).astype(int)
+
+            print(f'Extent: [{start0},{end0}],[{start1},{end1}],[{start2},{end2}]')
+            print(f'Extent_i:  [{start0i},{end0i}],[{start1i},{end1i}],[{start2i},{end2i}]')
+
+            # get the pixel locations, and extents for display, in each of the three views
+            ax0x1 = np.arange(ax0detects.shape[0])*down_factor + np.mean( np.array([0,1,2,3]) )
+            ax0x2 = np.arange(ax0detects.shape[1])*down_factor + np.mean( np.array([0,1,2,3]) )
+            ax0x = [ax0x1,ax0x2]
+            extentax00,extentax01,extentax02 = extent_from_x([[0,1],ax0x1,ax0x2])
+
+            ax1x0 = np.arange(ax1detects.shape[0])*down_factor + np.mean( np.array([0,1,2,3]) )
+            ax1x2 = np.arange(ax1detects.shape[1])*down_factor + np.mean( np.array([0,1,2,3]) )
+            ax1x = [ax1x0,ax1x2]
+            extentax10,extentax11,extentax12 = extent_from_x([ax1x0,[0,1],ax1x2])
+
+            ax2x0 = np.arange(ax2detects.shape[0])*down_factor + np.mean( np.array([0,1,2,3]) )
+            ax2x1 = np.arange(ax2detects.shape[1])*down_factor + np.mean( np.array([0,1,2,3]) )
+            ax2x = [ax2x0,ax2x1]
+            extentax20,extentax21,extentax22 = extent_from_x([ax2x0,ax2x1,[0,1],])
+
+            print('Finished initializing global variables and data structures . . .')
+
+            # Start by loading the transverse slices + Compress data via downsampling
+            detects = []
+            detects_ = []
+            for i_ in range(start0i,end0i+1):   # loop over all the slices we identified
+                ax0detects_ = np.load(ax0files[i_],mmap_mode='r') # use memory mapping for speed
+                # get a range, figure out which pixel to start and end at
+                # recall ax0x1,ax0x2 are the coordinates of each pixel in my slice output (detection)
+                rowstart = np.argmin((ax0x1 - start1)**2)
+                colstart = np.argmin((ax0x2 - start2)**2)
+                rowend = np.argmin((ax0x1 - end1)**2) - 1 if isEdge_j else np.argmin((ax0x1 - end1)**2)
+                colend = np.argmin((ax0x2 - end2)**2) - 1 if isEdge_k else np.argmin((ax0x2 - end2)**2)
+                ax0detects_ = np.array( ax0detects_[rowstart:rowend+1,colstart:colend+1]     )
+                detects_.append(ax0detects_)
+                if len(detects_) == 4 or i_ == end0i :
+                    detects_ = np.stack(detects_)
+                    inds = np.argmax(detects_[...,4],axis=0)
+                    detects__ = np.take_along_axis(detects_,inds[None,...,None],axis=0)
+                    # we now expect detects__ to have a singleton dimension at the beginning
+                    if detects__.shape[0] == 1:
+                        detects__ = detects__[0]
+                    else:
+                        raise Exception()
+                    detects.append(detects__)
+                    detects_ = []
+            ax0combinedetects = np.stack(detects,axis=0)
+            print('Finished combining detections along transverse view . . .')
+
+            # next load the coronal slices
+            detects = []
+            detects_ = []
+            for i_ in range(start1i,end1i+1):
+                ax1detects_ = np.load(ax1files[i_],mmap_mode='r')
+                # get a range
+                rowstart = np.argmin((ax1x0 - start0)**2)
+                colstart = np.argmin((ax1x2 - start2)**2)
+                rowend = np.argmin((ax1x0 - end0)**2) if isEdge_i else np.argmin((ax1x0 - end0)**2)
+                colend = np.argmin((ax1x2 - end2)**2) - 1 if isEdge_k else np.argmin((ax1x2 - end2)**2)
+                ax1detects_ = np.array( ax1detects_[rowstart:rowend+1,colstart:colend+1]     )
+                detects_.append(ax1detects_)
+                if len(detects_) == 4 or i_ == end1i :
+                    detects_ = np.stack(detects_)
+                    inds = np.argmax(detects_[...,4],axis=0)
+                    detects__ = np.take_along_axis(detects_,inds[None,...,None],axis=0)
+                    # we now expect detects__ to have a singleton dimension at the beginning
+                    if detects__.shape[0] == 1:
+                        detects__ = detects__[0]
+                    else:
+                        raise Exception()
+                    detects.append(detects__)
+                    detects_ = []
+            ax1combinedetects = np.stack(detects,axis=1)
+            print('Finished combining detections along coronal view . . .')
+
+            # now do the sagittal slices
+            detects = []
+            detects_ = []
+            for i_ in range(start2i,end2i+1):
+                ax2detects_ = np.load(ax2files[i_],mmap_mode='r')
+                # get a range
+                rowstart = np.argmin((ax2x0 - start0)**2)
+                colstart = np.argmin((ax2x1 - start1)**2)
+                rowend = np.argmin((ax2x0 - end0)**2) if isEdge_i else np.argmin((ax2x0 - end0)**2)
+                colend = np.argmin((ax2x1 - end1)**2) - 1 if isEdge_j else np.argmin((ax2x1 - end1)**2)
+                ax2detects_ = np.array( ax2detects_[rowstart:rowend+1,colstart:colend+1]     )
+                detects_.append(ax2detects_)
+                if len(detects_) == 4 or i_ == end2i :
+                    detects_ = np.stack(detects_)
+                    inds = np.argmax(detects_[...,4],axis=0)
+                    detects__ = np.take_along_axis(detects_,inds[None,...,None],axis=0)
+                    # we now expect detects__ to have a singleton dimension at the beginning
+                    if detects__.shape[0] == 1:
+                        detects__ = detects__[0]
+                    else:
+                        raise Exception()
+                    detects.append(detects__)
+                    detects_ = []
+            ax2combinedetects = np.stack(detects,axis=2)
+            print('Finished combining detections along sagittal view . . .')
+
+            # Initialize the data cube
+            datacubenew = np.zeros(ax1combinedetects.shape[:3]+(10,)) # 6 for xyzminmax, 1 prob, 3 features
+
+            # Update confidence values at every voxel using the minimum probability
+            datacubenew[...,6] = np.min(np.stack((ax0combinedetects[...,4],ax1combinedetects[...,4],ax2combinedetects[...,4])),0)
+
+            # Update the feature labels at every voxel using the avg value
+            for i_ in range(3):
+                datacubenew[...,7+i_] = (ax0combinedetects[...,5+i_] + ax1combinedetects[...,5+i_] + ax2combinedetects[...,5+i_])/3
+
+            # Update the bbox features using min for xmin/ymin/zmin, and max for xmax/ymax/zmax
+            datacubenew[...,0] = np.minimum( ax1combinedetects[...,1], ax2combinedetects[...,1] )
+            datacubenew[...,3] = np.maximum( ax1combinedetects[...,3], ax2combinedetects[...,3] )
+
+            # the 1 coordinate (row)
+            # this is ax0 the 1th coordinate
+            # and ax2 the 0th coordinate
+            datacubenew[...,1] = np.minimum( ax0combinedetects[...,1], ax2combinedetects[...,0] )
+            datacubenew[...,4] = np.maximum( ax0combinedetects[...,3], ax2combinedetects[...,2] )
+
+            # the 2 coordinate (col)
+            # this is ax0 the 0th coordinate
+            # and ax1 the 0th coordinate
+            datacubenew[...,2] = np.minimum( ax0combinedetects[...,0], ax1combinedetects[...,0] )
+            datacubenew[...,5] = np.maximum( ax0combinedetects[...,2], ax1combinedetects[...,2] )
+
+            # Save output cube
+            outname = os.path.join(outdir,f'i{i:04d}_j{j:04d}_k{k:04d}_d{d}_Ex_488_Em_525.npy')
+            datacubeoutput = datacubenew.copy()
+
+            # change from 012012 to 001122 (xmin, ymin, zmin, xmax, ymax, zmax) to (xmin, xmax, ymin, ymax, zmin, zmax)
+            permutation = [0,3,1,4,2,5]
+            datacubeoutput[...,:6] = datacubenew[...,permutation]
+
+            np.save(outname, datacubeoutput)
+
+            print(f'Finished cube ({i},{j},{k}) in {time.time()-start_time:.2f}s\n')
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Total Cubes Shape: (4, 9, 8)
+Starting cube (3,2,1) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[2049.5,3069.5],[1025.5,2045.5]
+Extent_i:  [3072,3599],[2048,3070],[1024,2046]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,2,1) in 290.74s
+
+Starting cube (3,2,2) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[2049.5,3069.5],[2049.5,3069.5]
+Extent_i:  [3072,3599],[2048,3070],[2048,3070]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,2,2) in 238.20s
+
+Starting cube (3,2,3) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[2049.5,3069.5],[3073.5,4093.5]
+Extent_i:  [3072,3599],[2048,3070],[3072,4094]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,2,3) in 267.33s
+
+Starting cube (3,2,4) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[2049.5,3069.5],[4097.5,5117.5]
+Extent_i:  [3072,3599],[2048,3070],[4096,5118]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,2,4) in 394.43s
+
+Starting cube (3,2,5) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[2049.5,3069.5],[5121.5,6141.5]
+Extent_i:  [3072,3599],[2048,3070],[5120,6142]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,2,5) in 437.92s
+
+Starting cube (3,2,6) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[2049.5,3069.5],[6145.5,7165.5]
+Extent_i:  [3072,3599],[2048,3070],[6144,7166]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,2,6) in 424.42s
+
+Starting cube (3,2,7) . . .
+Edge? - True False True
+Extent: [3073.5,4093.5],[2049.5,3069.5],[7169.5,8189.5]
+Extent_i:  [3072,3599],[2048,3070],[7168,7320]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,2,7) in 188.56s
+
+Starting cube (3,3,0) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[3073.5,4093.5],[1.5,1021.5]
+Extent_i:  [3072,3599],[3072,4094],[0,1022]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,3,0) in 378.96s
+
+Starting cube (3,3,1) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[3073.5,4093.5],[1025.5,2045.5]
+Extent_i:  [3072,3599],[3072,4094],[1024,2046]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,3,1) in 397.31s
+
+Starting cube (3,3,2) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[3073.5,4093.5],[2049.5,3069.5]
+Extent_i:  [3072,3599],[3072,4094],[2048,3070]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,3,2) in 369.16s
+
+Starting cube (3,3,3) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[3073.5,4093.5],[3073.5,4093.5]
+Extent_i:  [3072,3599],[3072,4094],[3072,4094]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,3,3) in 365.98s
+
+Starting cube (3,3,4) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[3073.5,4093.5],[4097.5,5117.5]
+Extent_i:  [3072,3599],[3072,4094],[4096,5118]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,3,4) in 494.04s
+
+Starting cube (3,3,5) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[3073.5,4093.5],[5121.5,6141.5]
+Extent_i:  [3072,3599],[3072,4094],[5120,6142]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,3,5) in 543.28s
+
+Starting cube (3,3,6) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[3073.5,4093.5],[6145.5,7165.5]
+Extent_i:  [3072,3599],[3072,4094],[6144,7166]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,3,6) in 541.05s
+
+Starting cube (3,3,7) . . .
+Edge? - True False True
+Extent: [3073.5,4093.5],[3073.5,4093.5],[7169.5,8189.5]
+Extent_i:  [3072,3599],[3072,4094],[7168,7320]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,3,7) in 294.10s
+
+Starting cube (3,4,0) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[4097.5,5117.5],[1.5,1021.5]
+Extent_i:  [3072,3599],[4096,5118],[0,1022]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,4,0) in 368.82s
+
+Starting cube (3,4,1) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[4097.5,5117.5],[1025.5,2045.5]
+Extent_i:  [3072,3599],[4096,5118],[1024,2046]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,4,1) in 377.31s
+
+Starting cube (3,4,2) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[4097.5,5117.5],[2049.5,3069.5]
+Extent_i:  [3072,3599],[4096,5118],[2048,3070]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,4,2) in 368.73s
+
+Starting cube (3,4,3) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[4097.5,5117.5],[3073.5,4093.5]
+Extent_i:  [3072,3599],[4096,5118],[3072,4094]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,4,3) in 356.86s
+
+Starting cube (3,4,4) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[4097.5,5117.5],[4097.5,5117.5]
+Extent_i:  [3072,3599],[4096,5118],[4096,5118]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,4,4) in 509.68s
+
+Starting cube (3,4,5) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[4097.5,5117.5],[5121.5,6141.5]
+Extent_i:  [3072,3599],[4096,5118],[5120,6142]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,4,5) in 542.20s
+
+Starting cube (3,4,6) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[4097.5,5117.5],[6145.5,7165.5]
+Extent_i:  [3072,3599],[4096,5118],[6144,7166]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,4,6) in 550.29s
+
+Starting cube (3,4,7) . . .
+Edge? - True False True
+Extent: [3073.5,4093.5],[4097.5,5117.5],[7169.5,8189.5]
+Extent_i:  [3072,3599],[4096,5118],[7168,7320]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,4,7) in 295.80s
+
+Starting cube (3,5,0) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[5121.5,6141.5],[1.5,1021.5]
+Extent_i:  [3072,3599],[5120,6142],[0,1022]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,5,0) in 373.31s
+
+Starting cube (3,5,1) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[5121.5,6141.5],[1025.5,2045.5]
+Extent_i:  [3072,3599],[5120,6142],[1024,2046]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,5,1) in 356.56s
+
+Starting cube (3,5,2) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[5121.5,6141.5],[2049.5,3069.5]
+Extent_i:  [3072,3599],[5120,6142],[2048,3070]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,5,2) in 373.57s
+
+Starting cube (3,5,3) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[5121.5,6141.5],[3073.5,4093.5]
+Extent_i:  [3072,3599],[5120,6142],[3072,4094]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,5,3) in 351.53s
+
+Starting cube (3,5,4) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[5121.5,6141.5],[4097.5,5117.5]
+Extent_i:  [3072,3599],[5120,6142],[4096,5118]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,5,4) in 486.71s
+
+Starting cube (3,5,5) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[5121.5,6141.5],[5121.5,6141.5]
+Extent_i:  [3072,3599],[5120,6142],[5120,6142]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,5,5) in 517.54s
+
+Starting cube (3,5,6) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[5121.5,6141.5],[6145.5,7165.5]
+Extent_i:  [3072,3599],[5120,6142],[6144,7166]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,5,6) in 529.69s
+
+Starting cube (3,5,7) . . .
+Edge? - True False True
+Extent: [3073.5,4093.5],[5121.5,6141.5],[7169.5,8189.5]
+Extent_i:  [3072,3599],[5120,6142],[7168,7320]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,5,7) in 292.86s
+
+Starting cube (3,6,0) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[6145.5,7165.5],[1.5,1021.5]
+Extent_i:  [3072,3599],[6144,7166],[0,1022]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,6,0) in 408.32s
+
+Starting cube (3,6,1) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[6145.5,7165.5],[1025.5,2045.5]
+Extent_i:  [3072,3599],[6144,7166],[1024,2046]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,6,1) in 376.65s
+
+Starting cube (3,6,2) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[6145.5,7165.5],[2049.5,3069.5]
+Extent_i:  [3072,3599],[6144,7166],[2048,3070]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,6,2) in 395.34s
+
+Starting cube (3,6,3) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[6145.5,7165.5],[3073.5,4093.5]
+Extent_i:  [3072,3599],[6144,7166],[3072,4094]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,6,3) in 387.73s
+
+Starting cube (3,6,4) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[6145.5,7165.5],[4097.5,5117.5]
+Extent_i:  [3072,3599],[6144,7166],[4096,5118]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,6,4) in 538.48s
+
+Starting cube (3,6,5) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[6145.5,7165.5],[5121.5,6141.5]
+Extent_i:  [3072,3599],[6144,7166],[5120,6142]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,6,5) in 538.37s
+
+Starting cube (3,6,6) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[6145.5,7165.5],[6145.5,7165.5]
+Extent_i:  [3072,3599],[6144,7166],[6144,7166]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,6,6) in 577.84s
+
+Starting cube (3,6,7) . . .
+Edge? - True False True
+Extent: [3073.5,4093.5],[6145.5,7165.5],[7169.5,8189.5]
+Extent_i:  [3072,3599],[6144,7166],[7168,7320]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,6,7) in 323.60s
+
+Starting cube (3,7,0) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[7169.5,8189.5],[1.5,1021.5]
+Extent_i:  [3072,3599],[7168,8190],[0,1022]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,7,0) in 572.30s
+
+Starting cube (3,7,1) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[7169.5,8189.5],[1025.5,2045.5]
+Extent_i:  [3072,3599],[7168,8190],[1024,2046]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,7,1) in 542.96s
+
+Starting cube (3,7,2) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[7169.5,8189.5],[2049.5,3069.5]
+Extent_i:  [3072,3599],[7168,8190],[2048,3070]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,7,2) in 473.91s
+
+Starting cube (3,7,3) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[7169.5,8189.5],[3073.5,4093.5]
+Extent_i:  [3072,3599],[7168,8190],[3072,4094]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,7,3) in 542.11s
+
+Starting cube (3,7,4) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[7169.5,8189.5],[4097.5,5117.5]
+Extent_i:  [3072,3599],[7168,8190],[4096,5118]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,7,4) in 666.39s
+
+Starting cube (3,7,5) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[7169.5,8189.5],[5121.5,6141.5]
+Extent_i:  [3072,3599],[7168,8190],[5120,6142]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,7,5) in 703.84s
+
+Starting cube (3,7,6) . . .
+Edge? - True False False
+Extent: [3073.5,4093.5],[7169.5,8189.5],[6145.5,7165.5]
+Extent_i:  [3072,3599],[7168,8190],[6144,7166]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,7,6) in 700.84s
+
+Starting cube (3,7,7) . . .
+Edge? - True False True
+Extent: [3073.5,4093.5],[7169.5,8189.5],[7169.5,8189.5]
+Extent_i:  [3072,3599],[7168,8190],[7168,7320]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,7,7) in 456.70s
+
+Starting cube (3,8,0) . . .
+Edge? - True True False
+Extent: [3073.5,4093.5],[8193.5,9213.5],[1.5,1021.5]
+Extent_i:  [3072,3599],[8192,8586],[0,1022]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,8,0) in 311.95s
+
+Starting cube (3,8,1) . . .
+Edge? - True True False
+Extent: [3073.5,4093.5],[8193.5,9213.5],[1025.5,2045.5]
+Extent_i:  [3072,3599],[8192,8586],[1024,2046]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,8,1) in 131.56s
+
+Starting cube (3,8,2) . . .
+Edge? - True True False
+Extent: [3073.5,4093.5],[8193.5,9213.5],[2049.5,3069.5]
+Extent_i:  [3072,3599],[8192,8586],[2048,3070]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,8,2) in 277.74s
+
+Starting cube (3,8,3) . . .
+Edge? - True True False
+Extent: [3073.5,4093.5],[8193.5,9213.5],[3073.5,4093.5]
+Extent_i:  [3072,3599],[8192,8586],[3072,4094]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,8,3) in 295.56s
+
+Starting cube (3,8,4) . . .
+Edge? - True True False
+Extent: [3073.5,4093.5],[8193.5,9213.5],[4097.5,5117.5]
+Extent_i:  [3072,3599],[8192,8586],[4096,5118]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,8,4) in 276.65s
+
+Starting cube (3,8,5) . . .
+Edge? - True True False
+Extent: [3073.5,4093.5],[8193.5,9213.5],[5121.5,6141.5]
+Extent_i:  [3072,3599],[8192,8586],[5120,6142]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,8,5) in 463.14s
+
+Starting cube (3,8,6) . . .
+Edge? - True True False
+Extent: [3073.5,4093.5],[8193.5,9213.5],[6145.5,7165.5]
+Extent_i:  [3072,3599],[8192,8586],[6144,7166]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,8,6) in 320.47s
+
+Starting cube (3,8,7) . . .
+Edge? - True True True
+Extent: [3073.5,4093.5],[8193.5,9213.5],[7169.5,8189.5]
+Extent_i:  [3072,3599],[8192,8586],[7168,7320]
+Finished initializing global variables and data structures . . .
+Finished combining detections along transverse view . . .
+Finished combining detections along coronal view . . .
+Finished combining detections along sagittal view . . .
+Finished cube (3,8,7) in 186.59s
+
+</pre></div></div>
+</div>
+Hi David and Daniel,
+
+Using the convention [x0, x1, y0, y1, z0, z1, conf, ...] for the data stored at each voxel:
+- x is along the slice dimension from the original dataset of 3600 coronal slice images. These coordinates are along the Anterior/Posterior axis
+- y is the row from those images. These coordinates are along the Inferior/Superior axis
+- z is the col from those images. These coordinates are along the L/R axis
+
+Additionally, the images in that screenshot were not rotated for display and are in their original orientation.</section>
+<section id="(2)-Create-a-datacube-from-our-2D-data">
+<h1>(2) Create a datacube from our 2D data<a class="headerlink" href="#(2)-Create-a-datacube-from-our-2D-data" title="Link to this heading">¶</a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[69]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># now I will redo the datacube
+# which slices do we want, so that we can extract a datacube with the coordinates that we specified
+# the idea is, for a given i,j,k, what were all the original slices that correspond to this cube
+
+# note about these numbers
+# start0 is the spatial location of the first point in my datacube (if i = j = k = 0, this is 1.5)
+# actually to do this
+# I want to find the four slices such that when I average them I get start0
+# similarly for end0
+# this is floor-1 and ceil+1
+# ANDREW: please think about this carefully, I think it's the most critical part
+# CHECK: if we increment i by 1, do we get nonoverlapping indices (we should)
+
+start0i = np.floor(start0).astype(int)-1
+start1i = np.floor(start1).astype(int)-1
+start2i = np.floor(start2).astype(int)-1
+end0i = np.ceil(end0).astype(int)+1
+end1i = np.ceil(end1).astype(int)+1
+end2i = np.ceil(end2).astype(int)+1
+
+# note: we still need to determine which pixels within a given slice output correspond to our box
+</pre></div>
+</div>
+</div>
+<section id="(1.1)-Load-all-slices-and-combine-detections-(via-downsampling/compression)-into-a-cube-for-each-view-(transverse,-coronal,-sagittal)">
+<h2>(1.1) Load all slices and combine detections (via downsampling/compression) into a cube for each view (transverse, coronal, sagittal)<a class="headerlink" href="#(1.1)-Load-all-slices-and-combine-detections-(via-downsampling/compression)-into-a-cube-for-each-view-(transverse,-coronal,-sagittal)" title="Link to this heading">¶</a></h2>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[31]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># start by loading the transverse slices
+detects = []
+detects_ = []
+for i in range(start0i,end0i+1):   # loop over all the slices we identified
+    print('.',end='')
+    ax0detects_ = np.load(ax0files[i],mmap_mode='r') # use memory mapping for speed
+    # get a range, figure out which pixel to start and end at
+    # recall ax0x1,ax0x2 are the coordinates of each pixel in my slice output (detection)
+    rowstart = np.argmin((ax0x1 - start1)**2) #
+    colstart = np.argmin((ax0x2 - start2)**2)
+    rowend = np.argmin((ax0x1 - end1)**2)
+    colend = np.argmin((ax0x2 - end2)**2)
+    ax0detects_ = np.array( ax0detects_[rowstart:rowend+1,colstart:colend+1]     )
+    detects_.append(ax0detects_)
+    if len(detects_) == 4 or i == end0i :
+        detects_ = np.stack(detects_)
+        inds = np.argmax(detects_[...,4],axis=0)
+        detects__ = np.take_along_axis(detects_,inds[None,...,None],axis=0)
+        # we now expect detects__ to have a singleton dimension at the beginning
+        if detects__.shape[0] == 1:
+            detects__ = detects__[0]
+        else:
+            raise Exception()
+        detects.append(detects__)
+        detects_ = []
+ax0combinedetects = np.stack(detects,axis=0)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">KeyboardInterrupt</span>                         Traceback (most recent call last)
+Cell <span class="ansi-green-fg">In[31], line 13</span>
+<span class="ansi-green-intense-fg ansi-bold">     11</span> rowend <span style="color: rgb(98,98,98)">=</span> np<span style="color: rgb(98,98,98)">.</span>argmin((ax0x1 <span style="color: rgb(98,98,98)">-</span> end1)<span style="color: rgb(98,98,98)">*</span><span style="color: rgb(98,98,98)">*</span><span style="color: rgb(98,98,98)">2</span>)
+<span class="ansi-green-intense-fg ansi-bold">     12</span> colend <span style="color: rgb(98,98,98)">=</span> np<span style="color: rgb(98,98,98)">.</span>argmin((ax0x2 <span style="color: rgb(98,98,98)">-</span> end2)<span style="color: rgb(98,98,98)">*</span><span style="color: rgb(98,98,98)">*</span><span style="color: rgb(98,98,98)">2</span>)
+<span class="ansi-green-fg">---&gt; 13</span> ax0detects_ <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">np</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">array</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">ax0detects_</span><span class="ansi-yellow-bg">[</span><span class="ansi-yellow-bg">rowstart</span><span class="ansi-yellow-bg">:</span><span class="ansi-yellow-bg">rowend</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">+</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">1</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg">colstart</span><span class="ansi-yellow-bg">:</span><span class="ansi-yellow-bg">colend</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">+</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">1</span><span class="ansi-yellow-bg">]</span><span class="ansi-yellow-bg">     </span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">     14</span> detects_<span style="color: rgb(98,98,98)">.</span>append(ax0detects_)
+<span class="ansi-green-intense-fg ansi-bold">     15</span> <span class="ansi-bold" style="color: rgb(0,135,0)">if</span> <span style="color: rgb(0,135,0)">len</span>(detects_) <span style="color: rgb(98,98,98)">==</span> <span style="color: rgb(98,98,98)">4</span> <span class="ansi-bold" style="color: rgb(175,0,255)">or</span> i <span style="color: rgb(98,98,98)">==</span> end0i :
+
+<span class="ansi-red-fg">KeyboardInterrupt</span>:
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[72]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># next load the coronal slices
+detects = []
+detects_ = []
+for i in range(start1i,end1i+1):
+    print('.',end='')
+    ax1detects_ = np.load(ax1files[i],mmap_mode='r')
+    # get a range
+    rowstart = np.argmin((ax1x0 - start0)**2)
+    colstart = np.argmin((ax1x2 - start2)**2)
+    rowend = np.argmin((ax1x0 - end0)**2)
+    colend = np.argmin((ax1x2 - end2)**2)
+    ax1detects_ = np.array( ax1detects_[rowstart:rowend+1,colstart:colend+1]     )
+    detects_.append(ax1detects_)
+    if len(detects_) == 4 or i == end1i :
+        detects_ = np.stack(detects_)
+        inds = np.argmax(detects_[...,4],axis=0)
+        detects__ = np.take_along_axis(detects_,inds[None,...,None],axis=0)
+        # we now expect detects__ to have a singleton dimension at the beginning
+        if detects__.shape[0] == 1:
+            detects__ = detects__[0]
+        else:
+            raise Exception()
+        detects.append(detects__)
+        detects_ = []
+ax1combinedetects = np.stack(detects,axis=1)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[73]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># now do the sagittal slices
+detects = []
+detects_ = []
+for i in range(start2i,end2i+1):
+    print('.',end='')
+    ax2detects_ = np.load(ax2files[i],mmap_mode='r')
+    # get a range
+    rowstart = np.argmin((ax2x0 - start0)**2)
+    colstart = np.argmin((ax2x1 - start1)**2)
+    rowend = np.argmin((ax2x0 - end0)**2)
+    colend = np.argmin((ax2x1 - end1)**2)
+    ax2detects_ = np.array( ax2detects_[rowstart:rowend+1,colstart:colend+1]     )
+    detects_.append(ax2detects_)
+    if len(detects_) == 4 or i == end2i :
+        detects_ = np.stack(detects_)
+        inds = np.argmax(detects_[...,4],axis=0)
+        detects__ = np.take_along_axis(detects_,inds[None,...,None],axis=0)
+        # we now expect detects__ to have a singleton dimension at the beginning
+        if detects__.shape[0] == 1:
+            detects__ = detects__[0]
+        else:
+            raise Exception()
+        detects.append(detects__)
+        detects_ = []
+ax2combinedetects = np.stack(detects,axis=2)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[78]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># CHECK: they should all be the same size
+print(ax0combinedetects.shape,ax1combinedetects.shape,ax2combinedetects.shape)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[78]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+((256, 256, 256, 8), (256, 256, 256, 8), (256, 256, 256, 8))
+</pre></div></div>
+</div>
+<section id="Generate-Validation-Figure">
+<h3>Generate Validation Figure<a class="headerlink" href="#Generate-Validation-Figure" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># These three files should look relatively similar
+fig,ax = plt.subplots(1,3)
+ax[0].imshow(ax0combinedetects[ax0combinedetects.shape[0]//2,...,4],vmin=0,vmax=1)
+ax[0].set_title('transverse')
+ax[1].imshow(ax1combinedetects[ax0combinedetects.shape[0]//2,...,4],vmin=0,vmax=1)
+ax[1].set_title('coronal')
+ax[2].imshow(ax2combinedetects[ax0combinedetects.shape[0]//2,...,4],vmin=0,vmax=1)
+ax[2].set_title('sagittal')
+fig.suptitle('3 different detections, viewed on the same slice')
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[79]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fig,ax = plt.subplots(1,3,figsize=(9.5,5))
+ax[0].imshow(np.stack((
+    ax0combinedetects[ax0combinedetects.shape[0]//2,...,4],
+    ax1combinedetects[ax0combinedetects.shape[0]//2,...,4],
+    ax2combinedetects[ax0combinedetects.shape[0]//2,...,4],
+),-1),vmin=0,vmax=1)
+ax[0].set_title('Transverse')
+
+ax[1].imshow(np.stack((
+    ax0combinedetects[:,ax0combinedetects.shape[1]//2,...,4],
+    ax1combinedetects[:,ax0combinedetects.shape[1]//2,...,4],
+    ax2combinedetects[:,ax0combinedetects.shape[1]//2,...,4],
+),-1),vmin=0,vmax=1)
+ax[1].set_title('Coronal')
+
+ax[2].imshow(np.stack((
+    ax0combinedetects[:,:,ax0combinedetects.shape[2]//2,...,4],
+    ax1combinedetects[:,:,ax0combinedetects.shape[2]//2,...,4],
+    ax2combinedetects[:,:,ax0combinedetects.shape[2]//2,...,4],
+),-1),vmin=0,vmax=1)
+ax[2].set_title('Sagittal')
+
+
+fig.suptitle('RGB (transverse, coronal, sagittal) Merged')
+fig.subplots_adjust(left=0,right=1,wspace=0.05)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "2703714c1a61492ca256afc07dfd715b", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+</section>
+</section>
+<section id="(1.2)-Combine-the-three-views-using-minimum-(for-bbox-probability),-average-(for-feature-maps),-and-min/max-(for-bbox-features)">
+<h2>(1.2) Combine the three views using minimum (for bbox probability), average (for feature maps), and min/max (for bbox features)<a class="headerlink" href="#(1.2)-Combine-the-three-views-using-minimum-(for-bbox-probability),-average-(for-feature-maps),-and-min/max-(for-bbox-features)" title="Link to this heading">¶</a></h2>
+<p>The minimum means the probability must exceed some threshold in all three views</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[93]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Initialize the data cube
+datacubenew = np.zeros(ax1combinedetects.shape[:3]+(10,)) # 6 for xyzminmax, 1 prob, 3 features
+
+# Update confidence values at every voxel using the minimum probability
+datacubenew[...,6] = np.min(np.stack((ax0combinedetects[...,4],ax1combinedetects[...,4],ax2combinedetects[...,4])),0)
+
+# Update the feature labels at every voxel using the avg value
+for i in range(3):
+    datacubenew[...,7+i] = (ax0combinedetects[...,5+i] + ax1combinedetects[...,5+i] + ax2combinedetects[...,5+i])/3
+
+# Update the bbox features using min for xmin/ymin/zmin, and max for xmax/ymax/zmax
+datacubenew[...,0] = np.minimum( ax1combinedetects[...,1], ax2combinedetects[...,1] )
+datacubenew[...,3] = np.maximum( ax1combinedetects[...,3], ax2combinedetects[...,3] )
+
+# the 1 coordinate (row)
+# this is ax0 the 1th coordinate
+# and ax2 the 0th coordinate
+datacubenew[...,1] = np.minimum( ax0combinedetects[...,1], ax2combinedetects[...,0] )
+datacubenew[...,4] = np.maximum( ax0combinedetects[...,3], ax2combinedetects[...,2] )
+
+# the 2 coordinate (col)
+# this is ax0 the 0th coordinate
+# and ax1 the 0th coordinate
+datacubenew[...,2] = np.minimum( ax0combinedetects[...,0], ax1combinedetects[...,0] )
+datacubenew[...,5] = np.maximum( ax0combinedetects[...,2], ax1combinedetects[...,2] )
+</pre></div>
+</div>
+</div>
+<section id="Generate-+-save-the-output">
+<h3>Generate + save the output<a class="headerlink" href="#Generate-+-save-the-output" title="Link to this heading">¶</a></h3>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>outname = join(threeDcubedir_for_outputs,f'i{i:04d}_j{j:04d}_k{k:04d}_d{d}_Ex_488_Em_525.npy')
+datacubeoutput = datacubenew.copy()
+
+# change from 012012 to 001122 (xmin, ymin, zmin, xmax, ymax, zmax) to (xmin, xmax, ymin, ymax, zmin, zmax)
+permutation = [0,3,1,4,2,5]
+datacubeoutput[...,:6] = datacubenew[...,permutation]
+
+np.save(outname, datacubeoutput)
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Generate-Validation-Figures">
+<h3>Generate Validation Figures<a class="headerlink" href="#Generate-Validation-Figures" title="Link to this heading">¶</a></h3>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Plot the confidence values from each view as RGB values (White = bbox w high probability in all 3 views)
+fig,ax = plt.subplots(1,3,figsize=(9.5,5))
+ax[0].imshow( datacubenew[ax0combinedetects.shape[0]//2,...,6],cmap='gray')
+ax[1].imshow( datacubenew[:,ax0combinedetects.shape[1]//2,...,6],cmap='gray')
+ax[2].imshow( datacubenew[:,:,ax0combinedetects.shape[2]//2,...,6],cmap='gray')
+
+fig.suptitle('RGB (transverse, coronal, sagittal) Minimum Merged')
+fig.subplots_adjust(left=0,right=1,wspace=0.05)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_make_3d_cubes_v01_50_0.png" src="../_images/notebooks_make_3d_cubes_v01_50_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[94]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># from these I can now build some rectangles
+# use the same code as above
+
+gamma = 0.5
+
+
+extenthighres0z,extenthighres1z,extenthighres2z = extent_from_x([xhighres[0][int(start0):int(end0)],xhighres[1][int(start1):int(end1)],xhighres[2][int(start2):int(end2)]])
+fig,ax_ = plt.subplots(2,3,figsize=(9.5,6))
+
+################################################################################
+# now I want to show the 3d one and all the others
+# the cube, transverse slice
+ax = ax_[0,0]
+sl = datacubenew.shape[0]//2
+ax.imshow(datacubenew[sl,...,6], vmin=0,vmax=1,extent=extent_datacube_0)
+ax.imshow(Islice[int(start1):int(end1),int(start2):int(end2)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres0z,cmap='gray')
+ax.set_title('datacube new')
+ax.set_xlim(start2_,end2_)
+ax.set_ylim(end1_,start1_)
+sliceclose = 4
+#sliceclose = 16
+#sliceclose = 1
+offset = 0
+inds = datacubenew[...,6]&gt;0
+inds = inds * (np.abs(xdatacube[0] - xdatacube[0][sl+offset]) &lt;= sliceclose )[...,None,None] # everything close to this slice
+
+# TODO
+# check if boxes intersect this plane.  Not sliceclose
+thresh = 0.25
+inds = datacubenew[...,6]&gt;thresh
+inds = inds * (datacubenew[...,0]-0.5 &lt;=  xdatacube[0][sl+offset] ) * (datacubenew[...,3]+0.5 &gt;=  xdatacube[0][sl+offset] )
+
+
+# new data cube is in 012,012 order
+# I want to fix 0, and plot in order (2,1)
+rectdata = np.stack(
+        (
+            np.stack((datacubenew[inds,2].ravel(), datacubenew[inds,1].ravel()),-1),
+            np.stack((datacubenew[inds,2].ravel(), datacubenew[inds,4].ravel()),-1),
+            np.stack((datacubenew[inds,5].ravel(), datacubenew[inds,4].ravel()),-1),
+            np.stack((datacubenew[inds,5].ravel(), datacubenew[inds,1].ravel()),-1),
+        ),
+        1)
+
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+
+edgecolor[:,-1] = datacubenew[inds,6]*0.5
+#edgecolor[:,-1] = 1.0
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=datacubenew[inds,6].ravel(),
+    linewidth=1,
+)
+ax.add_collection(rects)
+
+
+
+
+################################################################################
+# the slice
+# the transverse slice
+ax = ax_[1,0]
+ax.imshow(ax0detects[...,4],vmin=0,vmax=1,extent=extentax00)
+
+# rects for the slice
+inds = ax0detects[...,4]&gt;0.25 #
+# but I also want to restrict the field of view. this will make it much faster
+inds = inds * (ax0x1[...,None] &gt;= start1)
+inds = inds * (ax0x1[...,None] &lt;= end1)
+inds = inds * (ax0x2 &gt;= start2)
+inds = inds * (ax0x2 &lt;= end2)
+rectdata = np.stack(
+        (
+            np.stack((ax0detects[inds,0].ravel(), ax0detects[inds,1].ravel()),-1),
+            np.stack((ax0detects[inds,0].ravel(), ax0detects[inds,3].ravel()),-1),
+            np.stack((ax0detects[inds,2].ravel(), ax0detects[inds,3].ravel()),-1),
+            np.stack((ax0detects[inds,2].ravel(), ax0detects[inds,1].ravel()),-1),
+        ),
+        1)
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+edgecolor[:,-1] = ax0detects[inds,4]*0.5
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=ax0detects[inds,4].ravel(),
+    linewidth=1,
+)
+
+
+ax.imshow(Islice[int(start1):int(end1),int(start2):int(end2)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres0z,cmap='gray')
+ax.add_collection(rects)
+ax.set_xlim(start2_,end2_)
+ax.set_ylim(end1_,start1_)
+ax.set_title('single slice (transverse)')
+
+
+
+
+################################################################################
+# the cube
+# the coronal slice
+ax = ax_[0,1]
+sl = datacubenew.shape[1]//2
+ax.imshow(datacubenew[:,sl,...,6], vmin=0,vmax=1,extent=extent_datacube_0)
+ax.imshow(Irow[int(start0):int(end0),int(start2):int(end2)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres1z,cmap='gray')
+ax.set_title('datacube new')
+ax.set_xlim(start2_,end2_)
+ax.set_ylim(end0_,start0_)
+sliceclose = 4
+#sliceclose = 16
+#sliceclose = 1
+offset = 0
+inds = datacubenew[...,6]&gt;0
+inds = inds * (np.abs(xdatacube[1] - xdatacube[1][sl+offset]) &lt;= sliceclose )[...,None,None] # everything close to this slice
+
+# TODO
+# check if boxes intersect this plane.  Not sliceclose
+thresh = 0.25
+inds = datacubenew[...,6]&gt;thresh
+inds = inds * (datacubenew[...,1]-0.5 &lt;=  xdatacube[1][sl+offset] ) * (datacubenew[...,4]+0.5 &gt;=  xdatacube[1][sl+offset] )
+
+
+# new data cube is in 012,012 order
+# I want to fix 0, and plot in order (2,1)
+rectdata = np.stack(
+        (
+            np.stack((datacubenew[inds,2].ravel(), datacubenew[inds,0].ravel()),-1),
+            np.stack((datacubenew[inds,2].ravel(), datacubenew[inds,3].ravel()),-1),
+            np.stack((datacubenew[inds,5].ravel(), datacubenew[inds,3].ravel()),-1),
+            np.stack((datacubenew[inds,5].ravel(), datacubenew[inds,0].ravel()),-1),
+        ),
+        1)
+
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+
+edgecolor[:,-1] = datacubenew[inds,6]*0.5
+#edgecolor[:,-1] = 1.0
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=datacubenew[inds,6].ravel(),
+    linewidth=1,
+)
+ax.add_collection(rects)
+
+
+
+
+
+
+################################################################################
+# the slice
+# coronal
+ax = ax_[1,1]
+ax.imshow(ax1detects[...,4],vmin=0,vmax=1,extent=extentax11)
+
+# rects for the slice
+inds = ax1detects[...,4]&gt;0.25 #
+# but I also want to restrict the field of view. this will make it much faster
+inds = inds * (ax1x0[...,None] &gt;= start0)
+inds = inds * (ax1x0[...,None] &lt;= end0)
+inds = inds * (ax1x2 &gt;= start2)
+inds = inds * (ax1x2 &lt;= end2)
+rectdata = np.stack(
+        (
+            np.stack((ax1detects[inds,0].ravel(), ax1detects[inds,1].ravel()),-1),
+            np.stack((ax1detects[inds,0].ravel(), ax1detects[inds,3].ravel()),-1),
+            np.stack((ax1detects[inds,2].ravel(), ax1detects[inds,3].ravel()),-1),
+            np.stack((ax1detects[inds,2].ravel(), ax1detects[inds,1].ravel()),-1),
+        ),
+        1)
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+edgecolor[:,-1] = ax1detects[inds,4]*0.5
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=ax0detects[inds,4].ravel(),
+    linewidth=1,
+)
+
+
+ax.imshow(Irow[int(start0):int(end0),int(start2):int(end2)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres1z,cmap='gray')
+ax.add_collection(rects)
+ax.set_xlim(start2_,end2_)
+ax.set_ylim(end0_,start0_)
+ax.set_title('single slice (coronal)')
+
+
+
+
+
+
+
+
+
+################################################################################
+# the cube
+# the sagittal slice
+ax = ax_[0,2]
+sl = datacubenew.shape[2]//2
+ax.imshow(datacubenew[:,:,sl,...,6], vmin=0,vmax=1,extent=extent_datacube_0)
+ax.imshow(Icol[int(start0):int(end0),int(start1):int(end1)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres2z,cmap='gray')
+ax.set_title('datacube new')
+ax.set_xlim(start1_,end1_)
+ax.set_ylim(end0_,start0_)
+sliceclose = 4
+#sliceclose = 16
+#sliceclose = 1
+offset = 0
+inds = datacubenew[...,6]&gt;0
+inds = inds * (np.abs(xdatacube[2] - xdatacube[2][sl+offset]) &lt;= sliceclose )[...,None,None] # everything close to this slice
+
+# TODO
+# check if boxes intersect this plane.  Not sliceclose
+thresh = 0.25
+inds = datacubenew[...,6]&gt;thresh
+inds = inds * (datacubenew[...,2]-0.5 &lt;=  xdatacube[2][sl+offset] ) * (datacubenew[...,5]+0.5 &gt;=  xdatacube[2][sl+offset] )
+
+
+# new data cube is in 012,012 order
+# I want to fix 0, and plot in order (2,1)
+rectdata = np.stack(
+        (
+            np.stack((datacubenew[inds,1].ravel(), datacubenew[inds,0].ravel()),-1),
+            np.stack((datacubenew[inds,1].ravel(), datacubenew[inds,3].ravel()),-1),
+            np.stack((datacubenew[inds,4].ravel(), datacubenew[inds,3].ravel()),-1),
+            np.stack((datacubenew[inds,4].ravel(), datacubenew[inds,0].ravel()),-1),
+        ),
+        1)
+
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+
+edgecolor[:,-1] = datacubenew[inds,6]*0.5
+#edgecolor[:,-1] = 1.0
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=datacubenew[inds,6].ravel(),
+    linewidth=1,
+)
+ax.add_collection(rects)
+
+
+
+
+
+
+################################################################################
+# the slice
+# coronal
+ax = ax_[1,2]
+ax.imshow(ax2detects[...,4],vmin=0,vmax=1,extent=extentax22)
+
+# rects for the slice
+inds = ax2detects[...,4]&gt;0.25 #
+# but I also want to restrict the field of view. this will make it much faster
+inds = inds * (ax2x0[...,None] &gt;= start0)
+inds = inds * (ax2x0[...,None] &lt;= end0)
+inds = inds * (ax2x1 &gt;= start1)
+inds = inds * (ax2x1 &lt;= end1)
+rectdata = np.stack(
+        (
+            np.stack((ax2detects[inds,0].ravel(), ax2detects[inds,1].ravel()),-1),
+            np.stack((ax2detects[inds,0].ravel(), ax2detects[inds,3].ravel()),-1),
+            np.stack((ax2detects[inds,2].ravel(), ax2detects[inds,3].ravel()),-1),
+            np.stack((ax2detects[inds,2].ravel(), ax2detects[inds,1].ravel()),-1),
+        ),
+        1)
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+edgecolor[:,-1] = ax2detects[inds,4]*0.5
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=ax0detects[inds,4].ravel(),
+    linewidth=1,
+)
+
+
+ax.imshow(Icol[int(start0):int(end0),int(start1):int(end1)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres2z,cmap='gray')
+ax.add_collection(rects)
+ax.set_xlim(start1_,end1_)
+ax.set_ylim(end0_,start0_)
+ax.set_title('single slice (sagittal)')
+<br/><br/><br/></pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[94]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Text(0.5, 1.0, &#39;single slice (sagittal)&#39;)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "723b3afe9c024695b8aced14be18e4b8", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[102]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>'''
+Hi David and Daniel,
+
+Using the convention [x0, x1, y0, y1, z0, z1, conf, ...] for the data stored at each voxel:
+- x is along the slice dimension from the original dataset of 3600 coronal slice images. These coordinates are along the Anterior/Posterior axis
+- y is the row from those images. These coordinates are along the Inferior/Superior axis
+- z is the col from those images. These coordinates are along the L/R axis
+
+Additionally, the images in that screenshot were not rotated for display and are in their original orientation.
+'''
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[102]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&#39;\nHi David and Daniel,\n\nUsing the convention [x0, x1, y0, y1, z0, z1, conf, ...] for the data stored at each voxel:\n- x is along the slice dimension from the original dataset of 3600 coronal slice images. These coordinates are along the Anterior/Posterior axis\n- y is the row from those images. These coordinates are along the Inferior/Superior axis\n- z is the col from those images. These coordinates are along the L/R axis\n\nAdditionally, the images in that screenshot were not rotated for display and are in their original orientation.\n&#39;
+</pre></div></div>
+</div>
+</section>
+</section>
+</section>
+<section id="(3)-NMS">
+<h1>(3) NMS<a class="headerlink" href="#(3)-NMS" title="Link to this heading">¶</a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def compute_iou(data0,data1=None):
+    '''
+    compute iou, uses xyzxyz convention on last axis.
+    All leading dimensions keep as is
+
+    Assume we have 2 datasets (the output cubes), data0 and data1
+    '''
+    if data1 is None:
+        data1 = data0
+
+    # get volume of first
+    vol0 = ((data0[...,3] - data0[...,0]) * (data0[...,4] - data0[...,1]) * (data0[...,5] - data0[...,2]))[...,:,None]
+    vol1 = ((data1[...,3] - data1[...,0]) * (data1[...,4] - data1[...,1]) * (data1[...,5] - data1[...,2]))[...,None,:]
+    # Note the fancy indexing - If data0 is size M and data1 is size N, these volumes will be size MxN
+    #print(vol0.shape,vol1.shape)
+
+    # get volume of intersection
+    slice0 = np.maximum( data0[...,0][...,:,None], data1[...,0][...,None,:])
+    slice1 = np.minimum( data0[...,3][...,:,None], data1[...,3][...,None,:])
+    row0 = np.maximum( data0[...,1][...,:,None], data1[...,1][...,None,:])
+    row1 = np.minimum( data0[...,4][...,:,None], data1[...,4][...,None,:])
+    col0 = np.maximum( data0[...,2][...,:,None], data1[...,2][...,None,:])
+    col1 = np.minimum( data0[...,5][...,:,None], data1[...,5][...,None,:])
+    l0 = (slice1-slice0).clip(min=0)
+    l1 = (row1-row0).clip(min=0)
+    l2 = (col1-col0).clip(min=0)
+    intersection = l0*l1*l2
+
+    return intersection / (vol0 + vol1 - intersection)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># NOTE: bb coords are stored in 001122 order in this file, but to run the below code, we expect 012012
+fpath = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v03/i0002_j0005_k0003_d256_Ex_488_Em_525.npy'
+datacubenew = np.load(fpath)
+
+permutation = [0,2,4,1,3,5,6,7,8,9]
+datacubenew = datacubenew[...,permutation]
+data = datacubenew.copy() # make a copy of our data, so the new one will get edited, without modifying the original
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>datacubenew[100,100,100]
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+array([ 2.44684644e+03,  5.51649609e+03,  3.46659399e+03,  2.45345190e+03,
+        5.52344287e+03,  3.47565649e+03,  2.22724088e-06,  7.41677523e-01,
+       -9.86046016e-01, -1.34215057e+00])
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># linear complexity nms
+conf_thresh = 0.25 # only consider pixels whose confidence is bigger than this
+nms_thresh = 0.25
+removed = np.zeros_like(data[...,0],dtype=bool)
+r = 5 # chose a radius (+/- to consider neighbors)
+for i in range(data.shape[0]): # loop through slice i
+    print('.',end='')
+
+    imin = np.clip(i-r,0,data.shape[0]-1)
+    imax = np.clip(i+r,0,data.shape[0]-1)
+    for j in range(data.shape[1]):  # loop through rows j
+        jmin = np.clip(j-r,0,data.shape[1]-1)
+        jmax = np.clip(j+r,0,data.shape[1]-1)
+        for k  in range(data.shape[2]): # loop through columns k
+            thisdata = data[i,j,k]
+            # if the confidence at this pixel is less than a threshold, just set it to zero and continu
+            if thisdata[6] &lt; conf_thresh:
+                removed[i,j,k] = True
+                continue
+            kmin = np.clip(k-r,0,data.shape[2]-1)
+            kmax = np.clip(k+r,0,data.shape[2]-1)
+
+            # cut out a rectangular prism around pixel i,j,k
+            cutout = data[imin:imax,jmin:jmax,kmin:kmax]
+
+            # compute pairwise IOU: TODO threshold the cutout so we're only looking at neighbors with higher confidence (not equal or less) so there are less of them, and this step is faster
+            iou = compute_iou(thisdata[None],cutout.reshape(-1,cutout.shape[-1])).reshape(cutout.shape[:3]).reshape(cutout.shape[:3])
+
+            # under what situation do we keep this?
+            # we keep it if, out of all the ones with iou greater than thresh, this one has the highest prob
+            # the candidates to compare with should not be this pixel (i,j,k). if we implement the todo above, the iou &lt; 1 will not be necessary
+            candidates = (iou &gt;= nms_thresh)*(iou &lt; 1) # exactly 1 means it is the same one, there should be a better way to exclude
+            if not np.any(candidates):
+                continue
+
+            # evaluate the confidence on the neighbors
+            probs = cutout[candidates][...,6]
+            # if none of them are a higher confidence than ijk, we keep ijk
+            if thisdata[6] &gt; np.max(probs):
+                continue
+
+            # otherwise it's not the biggest among those that overlap, so we remove ijk
+            removed[i,j,k] = True
+
+# When writing this out, reverse the permutation from 012012 back to 001122
+permutation = [0,3,1,4,2,5,6,7,8,9]
+data = data[...,permutation]
+
+print(f'{np.mean(removed)*100:.2f}% of bboxes removed')
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Update the conf of bboxes marked for removal to 0
+data[...,6] = np.where(removed,0,data[...,6])
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[28]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fig, ax = plt.subplots(10,1)
+
+_ = ax[0].hist(datacubenew[...,0].ravel(), 100)
+_ = ax[1].hist(datacubenew[...,1].ravel(), 100)
+_ = ax[2].hist(datacubenew[...,2].ravel(), 100)
+_ = ax[3].hist(datacubenew[...,3].ravel(), 100)
+_ = ax[4].hist(datacubenew[...,4].ravel(), 100)
+_ = ax[5].hist(datacubenew[...,5].ravel(), 100)
+_ = ax[6].hist(datacubenew[...,6].ravel(), 100)
+_ = ax[7].hist(datacubenew[...,7].ravel(), 100)
+_ = ax[8].hist(datacubenew[...,8].ravel(), 100)
+_ = ax[9].hist(datacubenew[...,9].ravel(), 100)
+
+
+fig.set_size_inches(3,10)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">ValueError</span>                                Traceback (most recent call last)
+Cell <span class="ansi-green-fg">In[28], line 10</span>
+<span class="ansi-green-intense-fg ansi-bold">      8</span> _ <span style="color: rgb(98,98,98)">=</span> ax[<span style="color: rgb(98,98,98)">5</span>]<span style="color: rgb(98,98,98)">.</span>hist(datacubenew[<span style="color: rgb(98,98,98)">.</span><span style="color: rgb(98,98,98)">.</span><span style="color: rgb(98,98,98)">.</span>,<span style="color: rgb(98,98,98)">5</span>]<span style="color: rgb(98,98,98)">.</span>ravel(), <span style="color: rgb(98,98,98)">100</span>)
+<span class="ansi-green-intense-fg ansi-bold">      9</span> _ <span style="color: rgb(98,98,98)">=</span> ax[<span style="color: rgb(98,98,98)">6</span>]<span style="color: rgb(98,98,98)">.</span>hist(datacubenew[<span style="color: rgb(98,98,98)">.</span><span style="color: rgb(98,98,98)">.</span><span style="color: rgb(98,98,98)">.</span>,<span style="color: rgb(98,98,98)">6</span>]<span style="color: rgb(98,98,98)">.</span>ravel(), <span style="color: rgb(98,98,98)">100</span>)
+<span class="ansi-green-fg">---&gt; 10</span> _ <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">ax</span><span class="ansi-yellow-bg">[</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">7</span><span class="ansi-yellow-bg">]</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">hist</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">datacubenew</span><span class="ansi-yellow-bg">[</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">7</span><span class="ansi-yellow-bg">]</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">ravel</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">100</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">     11</span> _ <span style="color: rgb(98,98,98)">=</span> ax[<span style="color: rgb(98,98,98)">8</span>]<span style="color: rgb(98,98,98)">.</span>hist(datacubenew[<span style="color: rgb(98,98,98)">.</span><span style="color: rgb(98,98,98)">.</span><span style="color: rgb(98,98,98)">.</span>,<span style="color: rgb(98,98,98)">8</span>]<span style="color: rgb(98,98,98)">.</span>ravel(), <span style="color: rgb(98,98,98)">100</span>)
+<span class="ansi-green-intense-fg ansi-bold">     12</span> _ <span style="color: rgb(98,98,98)">=</span> ax[<span style="color: rgb(98,98,98)">9</span>]<span style="color: rgb(98,98,98)">.</span>hist(datacubenew[<span style="color: rgb(98,98,98)">.</span><span style="color: rgb(98,98,98)">.</span><span style="color: rgb(98,98,98)">.</span>,<span style="color: rgb(98,98,98)">9</span>]<span style="color: rgb(98,98,98)">.</span>ravel(), <span style="color: rgb(98,98,98)">100</span>)
+
+File <span class="ansi-green-fg">~/.local/lib/python3.9/site-packages/matplotlib/__init__.py:1476</span>, in <span class="ansi-cyan-fg">_preprocess_data.&lt;locals&gt;.inner</span><span class="ansi-blue-fg">(ax, data, *args, **kwargs)</span>
+<span class="ansi-green-intense-fg ansi-bold">   1473</span> <span style="color: rgb(175,0,255)">@functools</span><span style="color: rgb(98,98,98)">.</span>wraps(func)
+<span class="ansi-green-intense-fg ansi-bold">   1474</span> <span class="ansi-bold" style="color: rgb(0,135,0)">def</span><span style="color: rgb(188,188,188)"> </span><span style="color: rgb(0,0,255)">inner</span>(ax, <span style="color: rgb(98,98,98)">*</span>args, data<span style="color: rgb(98,98,98)">=</span><span class="ansi-bold" style="color: rgb(0,135,0)">None</span>, <span style="color: rgb(98,98,98)">*</span><span style="color: rgb(98,98,98)">*</span>kwargs):
+<span class="ansi-green-intense-fg ansi-bold">   1475</span>     <span class="ansi-bold" style="color: rgb(0,135,0)">if</span> data <span class="ansi-bold" style="color: rgb(175,0,255)">is</span> <span class="ansi-bold" style="color: rgb(0,135,0)">None</span>:
+<span class="ansi-green-fg">-&gt; 1476</span>         <span class="ansi-bold" style="color: rgb(0,135,0)">return</span> <span class="ansi-yellow-bg">func</span><span class="ansi-yellow-bg">(</span>
+<span class="ansi-green-intense-fg ansi-bold">   1477</span> <span class="ansi-yellow-bg">            </span><span class="ansi-yellow-bg">ax</span><span class="ansi-yellow-bg">,</span>
+<span class="ansi-green-intense-fg ansi-bold">   1478</span> <span class="ansi-yellow-bg">            </span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">*</span><span class="ansi-yellow-bg" style="color: rgb(0,135,0)">map</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">sanitize_sequence</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">args</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg">,</span>
+<span class="ansi-green-intense-fg ansi-bold">   1479</span> <span class="ansi-yellow-bg">            </span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">*</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">*</span><span class="ansi-yellow-bg">{</span><span class="ansi-yellow-bg">k</span><span class="ansi-yellow-bg">:</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">sanitize_sequence</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">v</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg ansi-bold" style="color: rgb(0,135,0)">for</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">k</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">v</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg ansi-bold" style="color: rgb(175,0,255)">in</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">kwargs</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">items</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">)</span><span class="ansi-yellow-bg">}</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   1481</span>     bound <span style="color: rgb(98,98,98)">=</span> new_sig<span style="color: rgb(98,98,98)">.</span>bind(ax, <span style="color: rgb(98,98,98)">*</span>args, <span style="color: rgb(98,98,98)">*</span><span style="color: rgb(98,98,98)">*</span>kwargs)
+<span class="ansi-green-intense-fg ansi-bold">   1482</span>     auto_label <span style="color: rgb(98,98,98)">=</span> (bound<span style="color: rgb(98,98,98)">.</span>arguments<span style="color: rgb(98,98,98)">.</span>get(label_namer)
+<span class="ansi-green-intense-fg ansi-bold">   1483</span>                   <span class="ansi-bold" style="color: rgb(175,0,255)">or</span> bound<span style="color: rgb(98,98,98)">.</span>kwargs<span style="color: rgb(98,98,98)">.</span>get(label_namer))
+
+File <span class="ansi-green-fg">~/.local/lib/python3.9/site-packages/matplotlib/axes/_axes.py:7001</span>, in <span class="ansi-cyan-fg">Axes.hist</span><span class="ansi-blue-fg">(self, x, bins, range, density, weights, cumulative, bottom, histtype, align, orientation, rwidth, log, color, label, stacked, **kwargs)</span>
+<span class="ansi-green-intense-fg ansi-bold">   6997</span> <span style="color: rgb(95,135,135)"># Loop through datasets</span>
+<span class="ansi-green-intense-fg ansi-bold">   6998</span> <span class="ansi-bold" style="color: rgb(0,135,0)">for</span> i <span class="ansi-bold" style="color: rgb(175,0,255)">in</span> <span style="color: rgb(0,135,0)">range</span>(nx):
+<span class="ansi-green-intense-fg ansi-bold">   6999</span>     <span style="color: rgb(95,135,135)"># this will automatically overwrite bins,</span>
+<span class="ansi-green-intense-fg ansi-bold">   7000</span>     <span style="color: rgb(95,135,135)"># so that each histogram uses the same bins</span>
+<span class="ansi-green-fg">-&gt; 7001</span>     m, bins <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">np</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">histogram</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">x</span><span class="ansi-yellow-bg">[</span><span class="ansi-yellow-bg">i</span><span class="ansi-yellow-bg">]</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">bins</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">weights</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">=</span><span class="ansi-yellow-bg">w</span><span class="ansi-yellow-bg">[</span><span class="ansi-yellow-bg">i</span><span class="ansi-yellow-bg">]</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">*</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">*</span><span class="ansi-yellow-bg">hist_kwargs</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   7002</span>     tops<span style="color: rgb(98,98,98)">.</span>append(m)
+<span class="ansi-green-intense-fg ansi-bold">   7003</span> tops <span style="color: rgb(98,98,98)">=</span> np<span style="color: rgb(98,98,98)">.</span>array(tops, <span style="color: rgb(0,135,0)">float</span>)  <span style="color: rgb(95,135,135)"># causes problems later if it&#39;s an int</span>
+
+File <span class="ansi-green-fg">~/.local/lib/python3.9/site-packages/numpy/lib/_histograms_impl.py:790</span>, in <span class="ansi-cyan-fg">histogram</span><span class="ansi-blue-fg">(a, bins, range, density, weights)</span>
+<span class="ansi-green-intense-fg ansi-bold">    682</span> <span style="color: rgb(175,0,0)">r</span><span style="color: rgb(175,0,0)">&#34;&#34;&#34;</span>
+<span class="ansi-green-intense-fg ansi-bold">    683</span> <span style="color: rgb(175,0,0)">Compute the histogram of a dataset.</span>
+<span class="ansi-green-intense-fg ansi-bold">    684</span>
+<span class="ansi-green-fg">   (...)</span>
+<span class="ansi-green-intense-fg ansi-bold">    786</span>
+<span class="ansi-green-intense-fg ansi-bold">    787</span> <span style="color: rgb(175,0,0)">&#34;&#34;&#34;</span>
+<span class="ansi-green-intense-fg ansi-bold">    788</span> a, weights <span style="color: rgb(98,98,98)">=</span> _ravel_and_check_weights(a, weights)
+<span class="ansi-green-fg">--&gt; 790</span> bin_edges, uniform_bins <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">_get_bin_edges</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">a</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">bins</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(0,135,0)">range</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg">weights</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">    792</span> <span style="color: rgb(95,135,135)"># Histogram is an integer or a float array depending on the weights.</span>
+<span class="ansi-green-intense-fg ansi-bold">    793</span> <span class="ansi-bold" style="color: rgb(0,135,0)">if</span> weights <span class="ansi-bold" style="color: rgb(175,0,255)">is</span> <span class="ansi-bold" style="color: rgb(0,135,0)">None</span>:
+
+File <span class="ansi-green-fg">~/.local/lib/python3.9/site-packages/numpy/lib/_histograms_impl.py:428</span>, in <span class="ansi-cyan-fg">_get_bin_edges</span><span class="ansi-blue-fg">(a, bins, range, weights)</span>
+<span class="ansi-green-intense-fg ansi-bold">    425</span>     <span class="ansi-bold" style="color: rgb(0,135,0)">if</span> n_equal_bins <span style="color: rgb(98,98,98)">&lt;</span> <span style="color: rgb(98,98,98)">1</span>:
+<span class="ansi-green-intense-fg ansi-bold">    426</span>         <span class="ansi-bold" style="color: rgb(0,135,0)">raise</span> <span class="ansi-bold" style="color: rgb(215,95,95)">ValueError</span>(<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">`bins` must be positive, when an integer</span><span style="color: rgb(175,0,0)">&#39;</span>)
+<span class="ansi-green-fg">--&gt; 428</span>     first_edge, last_edge <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">_get_outer_edges</span><span class="ansi-yellow-bg">(</span><span class="ansi-yellow-bg">a</span><span class="ansi-yellow-bg">,</span><span class="ansi-yellow-bg"> </span><span class="ansi-yellow-bg" style="color: rgb(0,135,0)">range</span><span class="ansi-yellow-bg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">    430</span> <span class="ansi-bold" style="color: rgb(0,135,0)">elif</span> np<span style="color: rgb(98,98,98)">.</span>ndim(bins) <span style="color: rgb(98,98,98)">==</span> <span style="color: rgb(98,98,98)">1</span>:
+<span class="ansi-green-intense-fg ansi-bold">    431</span>     bin_edges <span style="color: rgb(98,98,98)">=</span> np<span style="color: rgb(98,98,98)">.</span>asarray(bins)
+
+File <span class="ansi-green-fg">~/.local/lib/python3.9/site-packages/numpy/lib/_histograms_impl.py:315</span>, in <span class="ansi-cyan-fg">_get_outer_edges</span><span class="ansi-blue-fg">(a, range)</span>
+<span class="ansi-green-intense-fg ansi-bold">    312</span>         <span class="ansi-bold" style="color: rgb(0,135,0)">raise</span> <span class="ansi-bold" style="color: rgb(215,95,95)">ValueError</span>(
+<span class="ansi-green-intense-fg ansi-bold">    313</span>             <span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">max must be larger than min in range parameter.</span><span style="color: rgb(175,0,0)">&#39;</span>)
+<span class="ansi-green-intense-fg ansi-bold">    314</span>     <span class="ansi-bold" style="color: rgb(0,135,0)">if</span> <span class="ansi-bold" style="color: rgb(175,0,255)">not</span> (np<span style="color: rgb(98,98,98)">.</span>isfinite(first_edge) <span class="ansi-bold" style="color: rgb(175,0,255)">and</span> np<span style="color: rgb(98,98,98)">.</span>isfinite(last_edge)):
+<span class="ansi-green-fg">--&gt; 315</span>         <span class="ansi-bold" style="color: rgb(0,135,0)">raise</span> <span class="ansi-bold" style="color: rgb(215,95,95)">ValueError</span>(
+<span class="ansi-green-intense-fg ansi-bold">    316</span>             <span style="color: rgb(175,0,0)">&#34;</span><span style="color: rgb(175,0,0)">supplied range of [</span><span class="ansi-bold" style="color: rgb(175,95,135)">{}</span><span style="color: rgb(175,0,0)">, </span><span class="ansi-bold" style="color: rgb(175,95,135)">{}</span><span style="color: rgb(175,0,0)">] is not finite</span><span style="color: rgb(175,0,0)">&#34;</span><span style="color: rgb(98,98,98)">.</span>format(first_edge, last_edge))
+<span class="ansi-green-intense-fg ansi-bold">    317</span> <span class="ansi-bold" style="color: rgb(0,135,0)">elif</span> a<span style="color: rgb(98,98,98)">.</span>size <span style="color: rgb(98,98,98)">==</span> <span style="color: rgb(98,98,98)">0</span>:
+<span class="ansi-green-intense-fg ansi-bold">    318</span>     <span style="color: rgb(95,135,135)"># handle empty arrays. Can&#39;t determine range, so use 0-1.</span>
+<span class="ansi-green-intense-fg ansi-bold">    319</span>     first_edge, last_edge <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(98,98,98)">0</span>, <span style="color: rgb(98,98,98)">1</span>
+
+<span class="ansi-red-fg">ValueError</span>: supplied range of [-inf, 5.98724365234375] is not finite
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_make_3d_cubes_v01_61_1.png" src="../_images/notebooks_make_3d_cubes_v01_61_1.png" />
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load the original image files to initialize the coordinate space AND
+raw_image_file_first_two_views = '/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_chunk32.h5'
+vol01 = h5py.File(raw_image_file_first_two_views)
+nhighres = vol01['stack'].shape
+xhighres = [np.arange(n) for n in nhighres]
+
+raw_image_file_third_view = '/nafs/shattuck/RodentToolsData/Stacked/Ex_488_Em_525_stitched_full_sag.h5'
+vol2 = h5py.File(raw_image_file_third_view)
+nhighres = vol2['stack'].shape
+
+# Define which cube we are looking at
+i,j,k,d = 2,5,3,256
+ndatacube = np.array((d,d,d)) # The shape of the output cube
+
+# Compute the coordinate offset that results from the 4x downsampling
+x0datacube = np.array([0,0,0]) # initialize
+x0datacube = np.array([1.5,1.5,1.5]) + np.array([i,j,k])*d*4 # (up by 2 down by 8)
+
+# Initialize the coordinate space for this specific cube + Extract extents for visualization
+xdatacube = [np.arange(n)*4+o for n,o in zip(ndatacube,x0datacube)]
+extent_datacube_0, extent_datacube_1 ,extent_datacube_2 = extent_from_x(xdatacube)
+
+# Define the relative voxel size
+ddatacube = np.array([4,4,4])
+
+# Initialize the middle idx along each ax
+m0 = int( np.round( xdatacube[0][len(xdatacube[0])//2]) )
+m1 = int( np.round( xdatacube[1][len(xdatacube[1])//2]) )
+m2 = int( np.round( xdatacube[2][len(xdatacube[2])//2]) )
+
+# Extract the image data along the middle of each volume
+Islice = vol01['stack'][m0]
+Irow   = vol01['stack'][:,m1]
+Icol = vol2['stack'][:,:,m2]
+
+# Load the OUTPUT DATA in the middle slice along each dimension (Each slice contains bbox info at every pixel)
+ax0outputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0'
+ax0files = glob(os.path.join(ax0outputdir,'*.npy'))
+ax0files.sort()
+ax0detects = np.load(ax0files[m0]) # this is the middle slice
+
+ax1outputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax1'
+ax1files = glob(os.path.join(ax1outputdir,'*.npy'))
+ax1files.sort()
+ax1detects = np.load(ax1files[m1])
+
+ax2outputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax2'
+ax2files = glob(os.path.join(ax2outputdir,'*.npy'))
+ax2files.sort()
+ax2detects = np.load(ax2files[m2])
+
+# Extract the start and end coordiantes along each axis
+start0 = xdatacube[0][0]
+start1 = xdatacube[1][0]
+start2 = xdatacube[2][0]
+
+end0 = xdatacube[0][-1]
+end1 = xdatacube[1][-1]
+end2 = xdatacube[2][-1]
+
+# Define the start + end indeces for a ZOOMED window
+zoom = 1/10
+start0_,end0_ = (start0+end0)/2 - (end0-start0)/2*zoom, (start0+end0)/2 + (end0-start0)/2*zoom
+start1_,end1_ = (start1+end1)/2 - (end1-start1)/2*zoom, (start1+end1)/2 + (end1-start1)/2*zoom
+start2_,end2_ = (start2+end2)/2 - (end2-start2)/2*zoom, (start2+end2)/2 + (end2-start2)/2*zoom
+
+# Initialize more extents?
+ax0x1 = np.arange(ax0detects.shape[0])*4 + np.mean( np.array([0,1,2,3]) )
+ax0x2 = np.arange(ax0detects.shape[1])*4 + np.mean( np.array([0,1,2,3]) )
+ax0x = [ax0x1,ax0x2]
+extentax00,extentax01,extentax02 = extent_from_x([[0,1],ax0x1,ax0x2])
+
+ax1x0 = np.arange(ax1detects.shape[0])*4 + np.mean( np.array([0,1,2,3]) )
+ax1x2 = np.arange(ax1detects.shape[1])*4 + np.mean( np.array([0,1,2,3]) )
+ax1x = [ax1x0,ax1x2]
+extentax10,extentax11,extentax12 = extent_from_x([ax1x0,[0,1],ax1x2])
+
+ax2x0 = np.arange(ax2detects.shape[0])*4 + np.mean( np.array([0,1,2,3]) )
+ax2x1 = np.arange(ax2detects.shape[1])*4 + np.mean( np.array([0,1,2,3]) )
+ax2x = [ax2x0,ax2x1]
+extentax20,extentax21,extentax22 = extent_from_x([ax2x0,ax2x1,[0,1],])
+</pre></div>
+</div>
+</div>
+Updated Figure Plan:
+
+            Transverse Coronal Sagittal
+Slice           |X|      |X|      |X|
+Cube            |X|      |X|      |X|
+Cube (NMS)      |X|      |X|      |X|<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[29]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># from these I can now build some rectangles
+# use the same code as above
+gamma = 0.5
+
+data = datacubenew.copy() # make a copy of our data, so the new one will get edited, without modifying the original
+
+extenthighres0z,extenthighres1z,extenthighres2z = extent_from_x([xhighres[0][int(start0):int(end0)],xhighres[1][int(start1):int(end1)],xhighres[2][int(start2):int(end2)]])
+fig,ax_ = plt.subplots(2,3,figsize=(9.5,6))
+
+# =================================
+# ===== THE CUBE - Transverse =====
+# =================================
+ax = ax_[0,0]
+sl = data.shape[0]//2
+ax.imshow(data[sl,...,6], vmin=0,vmax=1,extent=extent_datacube_0)
+ax.imshow(Islice[int(start1):int(end1),int(start2):int(end2)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres0z,cmap='gray')
+ax.set_title('datacube new (transverse)')
+ax.set_xlim(start2_,end2_)
+ax.set_ylim(end1_,start1_)
+sliceclose = 4
+offset = 0
+inds = data[...,6]&gt;0
+inds = inds * (np.abs(xdatacube[0] - xdatacube[0][sl+offset]) &lt;= sliceclose )[...,None,None] # everything close to this slice
+
+# TODO
+# check if boxes intersect this plane.  Not sliceclose
+thresh = 0.25
+inds = data[...,6]&gt;thresh
+inds = inds * (data[...,0]-0.5 &lt;=  xdatacube[0][sl+offset] ) * (data[...,3]+0.5 &gt;=  xdatacube[0][sl+offset] )
+
+
+# new data cube is in 012,012 order
+# I want to fix 0, and plot in order (2,1)
+rectdata = np.stack(
+        (
+            np.stack((data[inds,2].ravel(), data[inds,1].ravel()),-1),
+            np.stack((data[inds,2].ravel(), data[inds,4].ravel()),-1),
+            np.stack((data[inds,5].ravel(), data[inds,4].ravel()),-1),
+            np.stack((data[inds,5].ravel(), data[inds,1].ravel()),-1),
+        ),
+        1)
+
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+
+edgecolor[:,-1] = data[inds,6]*0.5
+#edgecolor[:,-1] = 1.0
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=data[inds,6].ravel(),
+    linewidth=1,
+)
+ax.add_collection(rects)
+
+# ==================================
+# ===== THE SLICE - Transverse =====
+# ==================================
+ax = ax_[1,0]
+ax.imshow(ax0detects[...,4],vmin=0,vmax=1,extent=extentax00)
+
+# rects for the slice
+inds = ax0detects[...,4]&gt;0.25 #
+# but I also want to restrict the field of view. this will make it much faster
+inds = inds * (ax0x1[...,None] &gt;= start1)
+inds = inds * (ax0x1[...,None] &lt;= end1)
+inds = inds * (ax0x2 &gt;= start2)
+inds = inds * (ax0x2 &lt;= end2)
+rectdata = np.stack(
+        (
+            np.stack((ax0detects[inds,0].ravel(), ax0detects[inds,1].ravel()),-1),
+            np.stack((ax0detects[inds,0].ravel(), ax0detects[inds,3].ravel()),-1),
+            np.stack((ax0detects[inds,2].ravel(), ax0detects[inds,3].ravel()),-1),
+            np.stack((ax0detects[inds,2].ravel(), ax0detects[inds,1].ravel()),-1),
+        ),
+        1)
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+edgecolor[:,-1] = ax0detects[inds,4]*0.5
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=ax0detects[inds,4].ravel(),
+    linewidth=1,
+)
+
+
+ax.imshow(Islice[int(start1):int(end1),int(start2):int(end2)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres0z,cmap='gray')
+ax.add_collection(rects)
+ax.set_xlim(start2_,end2_)
+ax.set_ylim(end1_,start1_)
+ax.set_title('single slice (transverse)')
+
+
+raise Exception
+
+# ==============================
+# ===== THE CUBE - Coronal =====
+# ==============================
+ax = ax_[0,1]
+sl = data.shape[1]//2
+ax.imshow(data[:,sl,...,6], vmin=0,vmax=1,extent=extent_datacube_0)
+ax.imshow(Irow[int(start0):int(end0),int(start2):int(end2)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres1z,cmap='gray')
+ax.set_title('datacube new (Coronal)')
+ax.set_xlim(start2_,end2_)
+ax.set_ylim(end0_,start0_)
+sliceclose = 4
+#sliceclose = 16
+#sliceclose = 1
+offset = 0
+inds = data[...,6]&gt;0
+inds = inds * (np.abs(xdatacube[1] - xdatacube[1][sl+offset]) &lt;= sliceclose )[...,None,None] # everything close to this slice
+
+# TODO
+# check if boxes intersect this plane.  Not sliceclose
+thresh = 0.25
+inds = data[...,6]&gt;thresh
+inds = inds * (data[...,1]-0.5 &lt;=  xdatacube[1][sl+offset] ) * (data[...,4]+0.5 &gt;=  xdatacube[1][sl+offset] )
+
+
+# new data cube is in 012,012 order
+# I want to fix 0, and plot in order (2,1)
+rectdata = np.stack(
+        (
+            np.stack((data[inds,2].ravel(), data[inds,0].ravel()),-1),
+            np.stack((data[inds,2].ravel(), data[inds,3].ravel()),-1),
+            np.stack((data[inds,5].ravel(), data[inds,3].ravel()),-1),
+            np.stack((data[inds,5].ravel(), data[inds,0].ravel()),-1),
+        ),
+        1)
+
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+
+edgecolor[:,-1] = data[inds,6]*0.5
+#edgecolor[:,-1] = 1.0
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=data[inds,6].ravel(),
+    linewidth=1,
+)
+ax.add_collection(rects)
+
+
+# ==============================
+# ===== THE SLICE - Coronal =====
+# ==============================
+ax = ax_[1,1]
+ax.imshow(ax1detects[...,4],vmin=0,vmax=1,extent=extentax11)
+
+# rects for the slice
+inds = ax1detects[...,4]&gt;0.25 #
+# but I also want to restrict the field of view. this will make it much faster
+inds = inds * (ax1x0[...,None] &gt;= start0)
+inds = inds * (ax1x0[...,None] &lt;= end0)
+inds = inds * (ax1x2 &gt;= start2)
+inds = inds * (ax1x2 &lt;= end2)
+rectdata = np.stack(
+        (
+            np.stack((ax1detects[inds,0].ravel(), ax1detects[inds,1].ravel()),-1),
+            np.stack((ax1detects[inds,0].ravel(), ax1detects[inds,3].ravel()),-1),
+            np.stack((ax1detects[inds,2].ravel(), ax1detects[inds,3].ravel()),-1),
+            np.stack((ax1detects[inds,2].ravel(), ax1detects[inds,1].ravel()),-1),
+        ),
+        1)
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+edgecolor[:,-1] = ax1detects[inds,4]*0.5
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=ax0detects[inds,4].ravel(),
+    linewidth=1,
+)
+
+
+ax.imshow(Irow[int(start0):int(end0),int(start2):int(end2)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres1z,cmap='gray')
+ax.add_collection(rects)
+ax.set_xlim(start2_,end2_)
+ax.set_ylim(end0_,start0_)
+ax.set_title('single slice (coronal)')
+
+# ===============================
+# ===== THE CUBE - Sagittal =====
+# ===============================
+ax = ax_[0,2]
+sl = data.shape[2]//2
+ax.imshow(data[:,:,sl,...,6], vmin=0,vmax=1,extent=extent_datacube_0)
+ax.imshow(Icol[int(start0):int(end0),int(start1):int(end1)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres2z,cmap='gray')
+ax.set_title('datacube new (Sagittal)')
+ax.set_xlim(start1_,end1_)
+ax.set_ylim(end0_,start0_)
+sliceclose = 4
+#sliceclose = 16
+#sliceclose = 1
+offset = 0
+inds = data[...,6]&gt;0
+inds = inds * (np.abs(xdatacube[2] - xdatacube[2][sl+offset]) &lt;= sliceclose )[...,None,None] # everything close to this slice
+
+# TODO
+# check if boxes intersect this plane.  Not sliceclose
+thresh = 0.25
+inds = data[...,6]&gt;thresh
+inds = inds * (data[...,2]-0.5 &lt;=  xdatacube[2][sl+offset] ) * (data[...,5]+0.5 &gt;=  xdatacube[2][sl+offset] )
+
+
+# new data cube is in 012,012 order
+# I want to fix 0, and plot in order (2,1)
+rectdata = np.stack(
+        (
+            np.stack((data[inds,1].ravel(), data[inds,0].ravel()),-1),
+            np.stack((data[inds,1].ravel(), data[inds,3].ravel()),-1),
+            np.stack((data[inds,4].ravel(), data[inds,3].ravel()),-1),
+            np.stack((data[inds,4].ravel(), data[inds,0].ravel()),-1),
+        ),
+        1)
+
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+
+edgecolor[:,-1] = data[inds,6]*0.5
+#edgecolor[:,-1] = 1.0
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=data[inds,6].ravel(),
+    linewidth=1,
+)
+ax.add_collection(rects)
+
+# ================================
+# ===== THE SLICE - Sagittal =====
+# ================================
+ax = ax_[1,2]
+ax.imshow(ax2detects[...,4],vmin=0,vmax=1,extent=extentax22)
+
+# rects for the slice
+inds = ax2detects[...,4]&gt;0.25 #
+# but I also want to restrict the field of view. this will make it much faster
+inds = inds * (ax2x0[...,None] &gt;= start0)
+inds = inds * (ax2x0[...,None] &lt;= end0)
+inds = inds * (ax2x1 &gt;= start1)
+inds = inds * (ax2x1 &lt;= end1)
+rectdata = np.stack(
+        (
+            np.stack((ax2detects[inds,0].ravel(), ax2detects[inds,1].ravel()),-1),
+            np.stack((ax2detects[inds,0].ravel(), ax2detects[inds,3].ravel()),-1),
+            np.stack((ax2detects[inds,2].ravel(), ax2detects[inds,3].ravel()),-1),
+            np.stack((ax2detects[inds,2].ravel(), ax2detects[inds,1].ravel()),-1),
+        ),
+        1)
+edgecolor = np.zeros((len(rectdata),4))
+edgecolor[:,0] = 1.0
+edgecolor[:,-1] = ax2detects[inds,4]*0.5
+rects = matplotlib.collections.PolyCollection(
+    rectdata, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolor,
+    #alpha=ax0detects[inds,4].ravel(),
+    linewidth=1,
+)
+
+
+ax.imshow(Icol[int(start0):int(end0),int(start1):int(end1)]**gamma,vmin=0,vmax=(65535/4)**gamma,extent=extenthighres2z,cmap='gray')
+ax.add_collection(rects)
+ax.set_xlim(start1_,end1_)
+ax.set_ylim(end0_,start0_)
+ax.set_title('single slice (sagittal)')
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">Exception</span>                                 Traceback (most recent call last)
+Cell <span class="ansi-green-fg">In[29], line 97</span>
+<span class="ansi-green-intense-fg ansi-bold">     93</span> ax<span style="color: rgb(98,98,98)">.</span>set_ylim(end1_,start1_)
+<span class="ansi-green-intense-fg ansi-bold">     94</span> ax<span style="color: rgb(98,98,98)">.</span>set_title(<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">single slice (transverse)</span><span style="color: rgb(175,0,0)">&#39;</span>)
+<span class="ansi-green-fg">---&gt; 97</span> <span class="ansi-bold" style="color: rgb(0,135,0)">raise</span> <span class="ansi-bold" style="color: rgb(215,95,95)">Exception</span>
+<span class="ansi-green-intense-fg ansi-bold">     99</span> <span style="color: rgb(95,135,135)"># ==============================</span>
+<span class="ansi-green-intense-fg ansi-bold">    100</span> <span style="color: rgb(95,135,135)"># ===== THE CUBE - Coronal =====</span>
+<span class="ansi-green-intense-fg ansi-bold">    101</span> <span style="color: rgb(95,135,135)"># ==============================</span>
+<span class="ansi-green-intense-fg ansi-bold">    102</span> ax <span style="color: rgb(98,98,98)">=</span> ax_[<span style="color: rgb(98,98,98)">0</span>,<span style="color: rgb(98,98,98)">1</span>]
+
+<span class="ansi-red-fg">Exception</span>:
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_make_3d_cubes_v01_66_1.png" src="../_images/notebooks_make_3d_cubes_v01_66_1.png" />
+</div>
+</div>
+</section>
+<section id="next-write-it-out">
+<h1>next write it out<a class="headerlink" href="#next-write-it-out" title="Link to this heading">¶</a></h1>
+<p>Alsoo, when we do nms we have to make sure we do it properly at boundaries. This will likely mean reloading the data.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># let's check some stuff
+fig,ax = plt.subplots(2,3)
+ax[0,0].hist(datacubenew[...,0].ravel())
+# 0 goes from about 2000 to about 3000
+# this is the 0th index
+ax[0,1].hist(datacubenew[...,1].ravel())
+# 1 is the same, 0th index
+ax[0,2].hist(datacubenew[...,2].ravel())
+# the 2 index goes from 3000 to 4000
+# this is the 1th coordinate
+ax[1,0].hist(datacubenew[...,3].ravel())
+# last ones
+ax[1,1].hist(datacubenew[...,4].ravel())
+ax[1,2].hist(datacubenew[...,5].ravel())
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># so what should my nms be?
+# input a list with 7 numbers (last one is prob)
+# output a list of probs, with overlapping ones set to zero
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>raise Exception('no more')
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># d the same with the datacube
+fig,ax = plt.subplots()
+ax.imshow(np.stack((
+    datacube[ax0combinedetects.shape[0]//2,...,6],
+    datacube[ax0combinedetects.shape[0]//2,...,6],
+    datacube[ax0combinedetects.shape[0]//2,...,4],
+),-1),vmin=0,vmax=1)
+ax.set_title('RGB (transverse, coronal, sagittal) Merged')
+<br/></pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># note these three are in the order xyxy
+#
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>raise Exception('no more')
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># these ones are maxpooled by a factor of 4, along their respective slice dimensions
+# extents are averaged, but ideally they will be minmaxed
+ax0downoutputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0_down'
+ax1downoutputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax1_down'
+ax2downoutputdir = '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax2_down'
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>m0
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>glob(join(ax0outputdir,'*'))
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ax0detectsdown = np.load( '/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo3D_outputs_v01/ax0_down/Ex_488_Em_525_stitched_chunk32_ax0_02560:02563.npy',)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ax0detectsdownp =  ax0detectsdown[...,4]
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># now I want to show the 3d one
+#
+fig,ax_ = plt.subplots(1,3)
+ax = ax_[0]
+ax.imshow(datacube[datacube.shape[0]//2,...,6], vmin=0,vmax=1,extent=extent_datacube_0)
+#ax.imshow(Islice,vmin=0,vmax=65535,extent=extenthighres0)
+ax.set_title('datacube')
+ax.set_xlim(start2,end2)
+ax.set_ylim(end1,start1)
+
+
+
+
+ax = ax_[1]
+ax.imshow(ax0p,vmin=0,vmax=1,extent=extentax00)
+#ax.imshow(Islice,vmin=0,vmax=65535,extent=extenthighres0)
+#ax.add_collection(rects)
+ax.set_xlim(start2,end2)
+ax.set_ylim(end1,start1)
+ax.set_title('single slice')
+
+ax = ax_[2]
+ax.imshow(ax0detectsdownp,vmin=0,vmax=1,extent=extentax00)
+#ax.imshow(Islice,vmin=0,vmax=65535,extent=extenthighres0)
+#ax.add_collection(rects)
+ax.set_xlim(start2,end2)
+ax.set_ylim(end1,start1)
+ax.set_title('4x merged slice')
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>plt.close('all')
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># repeat by drawing the rects
+#
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>rectdatacube = np.stack(
+        (
+            np.stack((datacube[datacube.shape[0]//2,...,0].ravel(), datacube[datacube.shape[0]//2,...,1].ravel()),-1),
+            np.stack((datacube[datacube.shape[0]//2,...,0].ravel(), datacube[datacube.shape[0]//2,...,4].ravel()),-1),
+            np.stack((datacube[datacube.shape[0]//2,...,3].ravel(), datacube[datacube.shape[0]//2,...,4].ravel()),-1),
+            np.stack((datacube[datacube.shape[0]//2,...,3].ravel(), datacube[datacube.shape[0]//2,...,1].ravel()),-1),
+        ),
+        1)
+edgecolordatacube = np.zeros((len(rectdatacube),4))
+edgecolordatacube[:,0] = 1.0
+edgecolordatacube[:,-1] = datacube[datacube.shape[0]//2,...,6].ravel()*0.5
+rectsdatacube = matplotlib.collections.PolyCollection(
+    rectdatacube, # divide by 4 to account for scale change
+    facecolor='none',
+    edgecolor=edgecolordatacube,
+    #alpha=ax0detects[inds,4].ravel(),
+)
+
+fig,ax_ = plt.subplots(1,3)
+ax = ax_[0]
+ax.imshow(datacube[datacube.shape[0]//2,...,6], vmin=0,vmax=1,extent=extent_datacube_0)
+#ax.imshow(Islice,vmin=0,vmax=65535,extent=extenthighres0)
+ax.set_title('datacube')
+ax.set_xlim(start2,end2)
+ax.set_ylim(end1,start1)
+ax.add_collection(rectsdatacube)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>rectdatacube
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># okay so what's my plan?
+# let's extract the cube
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>np.arange(start1,end1,4)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>datacube.shape
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># so what if I wanted to stitch this myself
+#
+</pre></div>
+</div>
+</div>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">v01</a></li>
+<li><a class="reference internal" href="#goals">goals</a></li>
+<li><a class="reference internal" href="#First-chose-one-3D-cube-and-find-the-slices-that-go-right-though-the-middle">First chose one 3D cube and find the slices that go right though the middle</a></li>
+<li><a class="reference internal" href="#note">note</a></li>
+<li><a class="reference internal" href="#walk-through-the-features">walk through the features</a></li>
+<li><a class="reference internal" href="#(0)-Compute-several-parameters-before-processing-+-Generate-some-validation-figures">(0) Compute several parameters before processing + Generate some validation figures</a><ul>
+<li><a class="reference internal" href="#(0.1)-Compute-middle-indeces-along-the-slice,-row,-col-dimensions">(0.1) Compute middle indeces along the slice, row, col dimensions</a></li>
+<li><a class="reference internal" href="#(0.2)-Extract-these-middle-slices-from-the-full-res-data,-for-visualizatoin">(0.2) Extract these middle slices from the full res data, for visualizatoin</a></li>
+<li><a class="reference internal" href="#(0.3)-Draw-the-rectangle-that-corresponds-to-the-3D-cube">(0.3) Draw the rectangle that corresponds to the 3D cube</a></li>
+<li><a class="reference internal" href="#(0.4)-Load-the-2D-detections-for-these-slices">(0.4) Load the 2D detections for these slices</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(1)-The-Big-Loop">(1) The Big Loop</a></li>
+<li><a class="reference internal" href="#(2)-Create-a-datacube-from-our-2D-data">(2) Create a datacube from our 2D data</a><ul>
+<li><a class="reference internal" href="#(1.1)-Load-all-slices-and-combine-detections-(via-downsampling/compression)-into-a-cube-for-each-view-(transverse,-coronal,-sagittal)">(1.1) Load all slices and combine detections (via downsampling/compression) into a cube for each view (transverse, coronal, sagittal)</a><ul>
+<li><a class="reference internal" href="#Generate-Validation-Figure">Generate Validation Figure</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(1.2)-Combine-the-three-views-using-minimum-(for-bbox-probability),-average-(for-feature-maps),-and-min/max-(for-bbox-features)">(1.2) Combine the three views using minimum (for bbox probability), average (for feature maps), and min/max (for bbox features)</a><ul>
+<li><a class="reference internal" href="#Generate-+-save-the-output">Generate + save the output</a></li>
+<li><a class="reference internal" href="#Generate-Validation-Figures">Generate Validation Figures</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#(3)-NMS">(3) NMS</a></li>
+<li><a class="reference internal" href="#next-write-it-out">next write it out</a></li>
+</ul>
+
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/notebooks/make_3d_cubes_v01.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">v01</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Andrew Bennecke, Daniel Tward.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>
