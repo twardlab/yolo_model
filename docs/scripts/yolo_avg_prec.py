@@ -1,28 +1,37 @@
 import numpy as np
 from sklearn.metrics import auc
+import time
 
 def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = False):
+    """
+    Note: In the yolo_3d notebook, gt_bboxes and pred_bboxes are in their native format, so they must first be converted to lists prior to the AP calculation.
+    Note: In the gt_ap notebook, gt_bboxes and pred_bboxes are already in list format
+    """
 
-    # Convert inputs to lists
-    gt_bboxes = yolo_output_to_list(gt_bboxes)
-    gt_bboxes = gt_bbox_to_pred_bbox_format(gt_bboxes) # (cz, cy, cx, l, w, d) => (xmin, xmax, ymin, ymax, zmin, zmax)
-    pred_bboxes = yolo_output_to_list(pred_bboxes)
+    # # Convert inputs to lists
+    # gt_bboxes = yolo_output_to_list(gt_bboxes)
+    # gt_bboxes = gt_bbox_to_pred_bbox_format(gt_bboxes) # (cz, cy, cx, l, w, d) => (xmin, xmax, ymin, ymax, zmin, zmax)
+    # pred_bboxes = yolo_output_to_list(pred_bboxes)
     
     # Sort all detections by confidence
     inds = np.argsort(pred_bboxes[..., conf_idx], axis = 0) # The sorted indeces from pred_bboxes
     pred_sorted = np.flip(pred_bboxes[inds], axis=0) # Note that inds sorts from lowest to highest, so flip is necessary to sort from highest to lowest
     
     # Compute pairwise IOU between all gt_bboxes and pred_bboxes
-    pw_IOU = np.zeros((pred_sorted.shape[0], gt_bboxes.shape[0]))
+    pw_IOU = np.zeros((len(pred_sorted), len(gt_bboxes)))
+    start = time.time()
     for i, gt_bb in enumerate(pred_sorted):
         for j, p_bb in enumerate(gt_bboxes):
             pw_IOU[i, j] = IOU_3D(gt_bb, p_bb)
+        if verbose and i % 10000 == 0 and i > 0:
+            print(f'Finished rows {i-9999}:{i} / {len(pred_sorted)} computation of pairwise IOU in {time.time()-start:.2f}s')
+            start = time.time()
 
     # Assign each detection to a GT bbox + remove the GT bbox after pairing
     tpfp_out = []
     total_TP = 0
     total_FP = 0
-    num_gt_remaining = gt_bboxes.shape[0]
+    num_gt_remaining = len(gt_bboxes)
     for i, pred_i in enumerate(pred_sorted):
         best_gt_iou_idx = np.argmax(pw_IOU[i, :])
         best_gt_iou = pw_IOU[i, best_gt_iou_idx]
@@ -40,12 +49,12 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = Fa
             FP = 1
 
         precision = total_TP / (i+1) # Precision = num TP / all detections considered so far
-        recall = total_TP / gt_bboxes.shape[0] # Recall = num TP / all ground truths
+        recall = total_TP / len(gt_bboxes) # Recall = num TP / all ground truths
 
-        if verbose:
+        if verbose and i % 25000 == 0 and i > 0:
             print(f'i: {i:<5}, conf: {pred_conf:.3f}, iou: {best_gt_iou:.3f}, TP: {TP}, FP: {FP}')
        
-        tpfp_out.append([i, pred_conf, best_gt_iou, TP, FP, total_TP, total_FP, precision, recall])
+        tpfp_out.append([i, best_gt_iou_idx, pred_conf, best_gt_iou, TP, FP, total_TP, total_FP, precision, recall])
 
         if num_gt_remaining == 0:
             break
@@ -62,19 +71,26 @@ def gt_bbox_to_pred_bbox_format(gt_bbox, idx = [2,1,0,5,4,3]):
 
     bb_out = []
     for bb in gt_bbox:
-        cx = bb[idx[0]]
-        cy = bb[idx[1]]
-        cz = bb[idx[2]]
-        l = bb[idx[3]]
-        w = bb[idx[4]]
-        d = bb[idx[5]]
+        # cx = bb[idx[0]]
+        # cy = bb[idx[1]]
+        # cz = bb[idx[2]]
+        # l = bb[idx[3]]
+        # w = bb[idx[4]]
+        # d = bb[idx[5]]
 
-        xmin = cx
-        xmax = cx + l
-        ymin = cy
-        ymax = cy + w
-        zmin = cz
-        zmax = cz + d
+        # xmin = cx
+        # xmax = cx + l
+        # ymin = cy
+        # ymax = cy + w
+        # zmin = cz
+        # zmax = cz + d
+
+        xmin = bb[idx[0]]
+        ymin = bb[idx[1]]
+        zmin = bb[idx[2]]
+        xmax = xmin + bb[idx[3]]
+        ymax = ymin + bb[idx[4]]
+        zmax = zmin + bb[idx[5]]
 
         bb_out.append([xmin, xmax, ymin, ymax, zmin, zmax])
 
@@ -83,8 +99,8 @@ def gt_bbox_to_pred_bbox_format(gt_bbox, idx = [2,1,0,5,4,3]):
 def IOU_3D(bb0, bb1):
 
     # Compute volume of each cube
-    vol0 = abs((bb0[1] - bb0[0]) * (bb0[3] - bb0[2]) * (bb0[4] - bb0[5]))
-    vol1 = abs((bb1[1] - bb1[0]) * (bb1[3] - bb1[2]) * (bb1[4] - bb1[5]))
+    vol0 = abs((bb0[1] - bb0[0]) * (bb0[3] - bb0[2]) * (bb0[5] - bb0[4]))
+    vol1 = abs((bb1[1] - bb1[0]) * (bb1[3] - bb1[2]) * (bb1[5] - bb1[4]))
 
     # Compute intersection volume between both cubes
     inter_xmin = max(bb0[0], bb1[0])

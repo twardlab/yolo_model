@@ -53,15 +53,17 @@ def preprocess(img, gamma = True, upsample = True):
     gamma : bool
         Default - True; If True, apply a gamma correction where the gamma value is 1/2
     upsample : bool
-        Default - True; If True, upsampled the image by a factor of 2
+        Default - True; If True, upsampled the image by a factor of 2. It is recommended to do this if the target objects are smaller than 10 pixels in diameter.
 
     Returns:
     --------
     img_up : array of shape [N*2, M*2]
         A normalized, gamma corrected, upsampled version of the input image 
     """
-    # Normalize input image
-    img = img[None] / np.max(img,axis=(-1,-2),keepdims=True)
+
+    # Normalize input image (Assumes min of 0)
+    img = img[None]
+    img /=  np.max(img,axis=(-1,-2),keepdims=True)
 
     # Gamma correction on input image
     if gamma:
@@ -187,6 +189,10 @@ def img_to_tiles(img, outdir='', min_overlap = 32, tile_dim = 256, upper_thresho
     right_idx = left_idx+img_dim0
     upper_idx = int((pad_dim1-img_dim1)/2)
     lower_idx = upper_idx+img_dim1
+    if verbose:
+        print(f'Original dimensions: ({img_dim0},{img_dim1})')
+        print(f'Padded dimensions  : ({pad_dim0},{pad_dim1})')
+        print(f'Original extent" ([{left_idx}:{right_idx}],[{upper_idx}:{lower_idx}])')
     
     if ndim == 3:
         padded_img = np.ones((pad_dim0, pad_dim1, num_ch), dtype=int)*pad

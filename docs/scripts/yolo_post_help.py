@@ -147,261 +147,362 @@ def remove_low_conf_bboxes(bboxes, scores, conf_thresh = 0.1):
     return torch.stack(bboxes_out,dim=0), torch.stack(scores_out,dim=0)
 
 
-
-def NMS(bboxes, scores, nms_threshold = 0.8):
+def NMS(data, bb_order = "001122", verbose=True):
     """
-    Perform non-maximum suppression (NMS) on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.
-
-    Parameters:
-    -----------
-    bboxes : torch.Tensor of size [N, 4]
-        N corresponds to the number of bounding boxes
-    scores : torch.Tensor of size [N, 1]
-        N corresponds to the number of bboxes; scores[i] corresponds to the confidence that bboxes[i] encompasses a target object
-    nms_threshold : float
-        The iou threshold used to remove candidate bounding boxes when comparing their spatial position with respect to the bounding box with the highest confidence during the current iteration
-
-    Returns:
-    --------
-    bboxes_out : torch.Tensor of size [M, 4]
-        M corresponds to the number of bounding boxes remaining after NMS
-    scores_out : torch.Tensor of size [M, 1]
-        The M scores corresponding to the bounding boxes defined in bboxes_out
+    Perform 'NMS' on a data cube output from the YOLO pipeline. Note that after postprocessing, the bbox values are stored in 001122 format, but in this function, they must be permuted to 012012.
     """
-    # Sort the bboxes and scores in descending order based on score
-    def bb_sort(bbox):
-        return bbox[0]
+
+    # Permute the bbox scalars if necessary
+    if bb_order == "001122":
+        permutation = [0,2,4,1,3,5,6,7,8,9]
+        data = data[...,permutation]
+
+    # Make a copy of our data, so the new one will get edited, without modifying the original
+    data_out = data.copy() 
     
-    bboxes_nms = [b for _ , b in sorted(list(zip(scores, bboxes)), key=bb_sort, reverse = True)]
-    scores_nms = sorted(scores, reverse = True)
-
-    bboxes_out = []
-    scores_out = []
-
-    # Until every bbox has been checked
-    while len(bboxes_nms) > 0:
-
-        for b_max, s_max in zip(bboxes_nms, scores_nms):
-            # Append bbox w highest scores to output list + remove from input list
-            bboxes_out.append(b_max)
-            scores_out.append(s_max)
-
-            # Remove bbox if iou w b_max > nms_threshold
-            for b,s in zip(bboxes_nms, scores_nms):
-                if iou(b_max, b) > nms_threshold:
-                    scores_nms.remove(s)
-                    del b
-        break
-
-    bboxes_out = torch.stack(bboxes_out, dim=0)
-    scores_out = torch.stack(scores_out, dim=0)
+    # linear complexity nms
+    conf_thresh = 0.25 # only consider pixels whose confidence is bigger than this
+    nms_thresh = 0.25
+    removed = np.zeros_like(data_out[...,0],dtype=bool)
+    r = 5 # chose a radius (+/- to consider neighbors)
+    for i in range(data_out.shape[0]): # loop through slice i
+        print('.',end='')
     
-    return bboxes_out, scores_out
-
-
-
-def compute_pr_curves(all_gt_bboxes, all_pred_bboxes, all_pred_scores, outdir, verbose = False):
-    """
-    Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints. This function will automatically resume the computations at the last (iou, conf) tuple if
-
-    Parameters:
-    -----------
-    gt_bboxes : torch.Tensor of shape [X,N,4]
-        The ground truth bounding boxes which correspond to the target objects in the original image. X is the number of images in the original gt dataset and N is the number of gt bounding boxes for each image. Note that N may vary from image to image.
-    pred_bboxes : torch.Tensor of shape [X,M,4]
-        The filtered bounding boxes which were output from the model. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image 'x' in the gt dataset.
-    pred_scores : torch.Tensor of shape [X,M,1]
-        The confidence scores corresponding to the bounding boxes in the parameter 'pred_boxes'. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image 'x' in the gt dataset.
-    verbose : bool
-        Default - False; If True, print out the (tp, fp, fn) 3-tuple for every (iou, conf) threshold
-        
-    Returns:
-    --------
-    all_pr_curves : list of shape [10,101,3]
-        Each element of this list is defined by 101 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh).
-    """
-
-    iou_threshold  = [round(x,2) for x in list(np.arange(0.5,1.0,0.05))]
-    conf_threshold = [round(x,2) for x in list(np.arange(0.01,1.0,0.01))]
-
-    # Resume computation if the file exists
-    fname = 'all_pr_curves.npz'
-    if os.path.exists(os.path.join(outdir, fname)):
-        pr_data = np.load(os.path.join(outdir, fname))
-        last_iou = pr_data['last_iou'].item()
-        all_pr_curves = list(pr_data['data'])
-        resume = True
-        
-        if verbose:
-            print(f'Loaded data stored at {os.path.join(outdir, fname)}. Last iou was {last_iou}')
-        
-        # If all computations have already been completed, return the pr curve data stored at os.path.join(outdir, fname)
-        if last_iou == iou_threshold[-1]:
-            return all_pr_curves
+        imin = np.clip(i-r,0,data_out.shape[0]-1)
+        imax = np.clip(i+r,0,data_out.shape[0]-1)
+        for j in range(data_out.shape[1]):  # loop through rows j
+            jmin = np.clip(j-r,0,data_out.shape[1]-1)
+            jmax = np.clip(j+r,0,data_out.shape[1]-1)
+            for k  in range(data_out.shape[2]): # loop through columns k
+                thisdata = data_out[i,j,k]
+                # if the confidence at this pixel is less than a threshold, just set it to zero and continu
+                if thisdata[6] < conf_thresh:
+                    removed[i,j,k] = True
+                    continue
+                kmin = np.clip(k-r,0,data_out.shape[2]-1)
+                kmax = np.clip(k+r,0,data_out.shape[2]-1)
     
-    else:
-        all_pr_curves = []
-        resume = False
-
-    start_iou = time.time()
-    for iou_thresh in iou_threshold:
-
-        # Either 'continue' current loop if data has already been generated, or define the current pr_curve
-        if (not resume) or (resume and (iou_thresh > last_iou)):
-            curr_pr_curve = [[0.0, 1.0, -1]]
-        else: # resume AND iou_thresh <= last_iou
-            print(f'Skipping iou {iou_thresh}')
-            continue
-        
-        if verbose:
-            print(f'===== Starting iou {iou_thresh} =====')
-            
-        for conf_thresh in conf_threshold:
-
-            if verbose:
-                print(f'Starting conf {conf_thresh}')
-                start = time.time()
+                # cut out a rectangular prism around pixel i,j,k
+                cutout = data_out[imin:imax,jmin:jmax,kmin:kmax]
                 
-            tp = 0
-            fp = 0
-            fn = 0
-            start0 = time.time()
-            for idx, pred_bboxes in enumerate(all_pred_bboxes):
-                pred_scores = all_pred_scores[idx]
-                gt_bboxes = all_gt_bboxes[idx].copy().tolist()
-                n_boxes_remaining = len(pred_bboxes)
-                for bb0, s in zip(pred_bboxes, pred_scores):
-                    if s < conf_thresh:
-                        fp += 1
-                        n_boxes_remaining -= 1
-                        continue
+                # TODO: Add in data from neighboring cubes for the edge cases
+    
+                # compute pairwise IOU: TODO threshold the cutout so we're only looking at neighbors with higher confidence (not equal or less) so there are less of them, and this step is faster
+                iou = compute_iou(thisdata[None],cutout.reshape(-1,cutout.shape[-1])).reshape(cutout.shape[:3]).reshape(cutout.shape[:3])
+    
+                # under what situation do we keep this?
+                # we keep it if, out of all the ones with iou greater than thresh, this one has the highest prob
+                # the candidates to compare with should not be this pixel (i,j,k). if we implement the todo above, the iou < 1 will not be necessary
+                candidates = (iou >= nms_thresh)*(iou < 1) # exactly 1 means it is the same one, there should be a better way to exclude
+                if not np.any(candidates):
+                    continue
+    
+                # evaluate the confidence on the neighbors
+                probs = cutout[candidates][...,6]
+                # if none of them are a higher confidence than ijk, we keep ijk
+                if thisdata[6] > np.max(probs):
+                    continue
+    
+                # otherwise it's not the biggest among those that overlap, so we remove ijk
+                removed[i,j,k] = True
+    
+    # When writing this out, reverse the permutation from 012012 back to 001122
+    if bb_order == "001122":
+        permutation = [0,3,1,4,2,5,6,7,8,9]
+        data_out = data_out[...,permutation]
+
+    # Update the conf of bboxes marked for removal to 0
+    data_out[...,6] = np.where(removed,0,data_out[...,6])
+
+    if verbose:
+        print(f'{np.mean(removed)*100:.2f}% of bboxes removed')
+
+    return data_out
+
+def compute_iou(data0,data1=None):
+    ''' 
+    compute iou, uses xyzxyz convention on last axis.
+    All leading dimensions keep as is
+
+    Assume we have 2 datasets (the output cubes), data0 and data1
+    '''
+    if data1 is None:
+        data1 = data0
+
+    # get volume of first
+    vol0 = ((data0[...,3] - data0[...,0]) * (data0[...,4] - data0[...,1]) * (data0[...,5] - data0[...,2]))[...,:,None]
+    vol1 = ((data1[...,3] - data1[...,0]) * (data1[...,4] - data1[...,1]) * (data1[...,5] - data1[...,2]))[...,None,:]
+    # Note the fancy indexing - If data0 is size M and data1 is size N, these volumes will be size MxN
+    #print(vol0.shape,vol1.shape)
+    
+    # get volume of intersection
+    slice0 = np.maximum( data0[...,0][...,:,None], data1[...,0][...,None,:])
+    slice1 = np.minimum( data0[...,3][...,:,None], data1[...,3][...,None,:])
+    row0 = np.maximum( data0[...,1][...,:,None], data1[...,1][...,None,:])
+    row1 = np.minimum( data0[...,4][...,:,None], data1[...,4][...,None,:])
+    col0 = np.maximum( data0[...,2][...,:,None], data1[...,2][...,None,:])
+    col1 = np.minimum( data0[...,5][...,:,None], data1[...,5][...,None,:])
+    l0 = (slice1-slice0).clip(min=0)
+    l1 = (row1-row0).clip(min=0)
+    l2 = (col1-col0).clip(min=0)
+    intersection = l0*l1*l2
+    
+    return intersection / (vol0 + vol1 - intersection)
+
+# def NMS(bboxes, scores, nms_threshold = 0.8):
+#     """
+#     Perform non-maximum suppression (NMS) on the outputs from the yolo model framework in order to reduce the number of candidate bounding boxes.
+
+#     Parameters:
+#     -----------
+#     bboxes : torch.Tensor of size [N, 4]
+#         N corresponds to the number of bounding boxes
+#     scores : torch.Tensor of size [N, 1]
+#         N corresponds to the number of bboxes; scores[i] corresponds to the confidence that bboxes[i] encompasses a target object
+#     nms_threshold : float
+#         The iou threshold used to remove candidate bounding boxes when comparing their spatial position with respect to the bounding box with the highest confidence during the current iteration
+
+#     Returns:
+#     --------
+#     bboxes_out : torch.Tensor of size [M, 4]
+#         M corresponds to the number of bounding boxes remaining after NMS
+#     scores_out : torch.Tensor of size [M, 1]
+#         The M scores corresponding to the bounding boxes defined in bboxes_out
+#     """
+#     # Sort the bboxes and scores in descending order based on score
+#     def bb_sort(bbox):
+#         return bbox[0]
+    
+#     bboxes_nms = [b for _ , b in sorted(list(zip(scores, bboxes)), key=bb_sort, reverse = True)]
+#     scores_nms = sorted(scores, reverse = True)
+
+#     bboxes_out = []
+#     scores_out = []
+
+#     # Until every bbox has been checked
+#     while len(bboxes_nms) > 0:
+
+#         for b_max, s_max in zip(bboxes_nms, scores_nms):
+#             # Append bbox w highest scores to output list + remove from input list
+#             bboxes_out.append(b_max)
+#             scores_out.append(s_max)
+
+#             # Remove bbox if iou w b_max > nms_threshold
+#             for b,s in zip(bboxes_nms, scores_nms):
+#                 if iou(b_max, b) > nms_threshold:
+#                     scores_nms.remove(s)
+#                     del b
+#         break
+
+#     bboxes_out = torch.stack(bboxes_out, dim=0)
+#     scores_out = torch.stack(scores_out, dim=0)
+    
+#     return bboxes_out, scores_out
+
+
+
+# def compute_pr_curves(all_gt_bboxes, all_pred_bboxes, all_pred_scores, outdir, verbose = False):
+#     """
+#     Given a set of ground truth bounding boxes, a set of predicted bounding boxes, and the corresponding confidence scores for each predicted bounding box, generate a set of pr curves quantifying the performance of the model. One PR curve will be generated at each IOU threshold from 0.5 : 0.05 : 1.0 and contain 101 points corresponding to each confidence threshold from 0.01 : 0.01 : 1.0 and 2 predefined endpoints. This function will automatically resume the computations at the last (iou, conf) tuple if
+
+#     Parameters:
+#     -----------
+#     gt_bboxes : torch.Tensor of shape [X,N,4]
+#         The ground truth bounding boxes which correspond to the target objects in the original image. X is the number of images in the original gt dataset and N is the number of gt bounding boxes for each image. Note that N may vary from image to image.
+#     pred_bboxes : torch.Tensor of shape [X,M,4]
+#         The filtered bounding boxes which were output from the model. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image 'x' in the gt dataset.
+#     pred_scores : torch.Tensor of shape [X,M,1]
+#         The confidence scores corresponding to the bounding boxes in the parameter 'pred_boxes'. X is the number of images in the original gt dataset and M is the number of predicted bounding boxes for image 'x' in the gt dataset.
+#     verbose : bool
+#         Default - False; If True, print out the (tp, fp, fn) 3-tuple for every (iou, conf) threshold
+        
+#     Returns:
+#     --------
+#     all_pr_curves : list of shape [10,101,3]
+#         Each element of this list is defined by 101 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh).
+#     """
+
+#     iou_threshold  = [round(x,2) for x in list(np.arange(0.5,1.0,0.05))]
+#     conf_threshold = [round(x,2) for x in list(np.arange(0.01,1.0,0.01))]
+
+#     # Resume computation if the file exists
+#     fname = 'all_pr_curves.npz'
+#     if os.path.exists(os.path.join(outdir, fname)):
+#         pr_data = np.load(os.path.join(outdir, fname))
+#         last_iou = pr_data['last_iou'].item()
+#         all_pr_curves = list(pr_data['data'])
+#         resume = True
+        
+#         if verbose:
+#             print(f'Loaded data stored at {os.path.join(outdir, fname)}. Last iou was {last_iou}')
+        
+#         # If all computations have already been completed, return the pr curve data stored at os.path.join(outdir, fname)
+#         if last_iou == iou_threshold[-1]:
+#             return all_pr_curves
+    
+#     else:
+#         all_pr_curves = []
+#         resume = False
+
+#     start_iou = time.time()
+#     for iou_thresh in iou_threshold:
+
+#         # Either 'continue' current loop if data has already been generated, or define the current pr_curve
+#         if (not resume) or (resume and (iou_thresh > last_iou)):
+#             curr_pr_curve = [[0.0, 1.0, -1]]
+#         else: # resume AND iou_thresh <= last_iou
+#             print(f'Skipping iou {iou_thresh}')
+#             continue
+        
+#         if verbose:
+#             print(f'===== Starting iou {iou_thresh} =====')
+            
+#         for conf_thresh in conf_threshold:
+
+#             if verbose:
+#                 print(f'Starting conf {conf_thresh}')
+#                 start = time.time()
+                
+#             tp = 0
+#             fp = 0
+#             fn = 0
+#             start0 = time.time()
+#             for idx, pred_bboxes in enumerate(all_pred_bboxes):
+#                 pred_scores = all_pred_scores[idx]
+#                 gt_bboxes = all_gt_bboxes[idx].copy().tolist()
+#                 n_boxes_remaining = len(pred_bboxes)
+#                 for bb0, s in zip(pred_bboxes, pred_scores):
+#                     if s < conf_thresh:
+#                         fp += 1
+#                         n_boxes_remaining -= 1
+#                         continue
                     
-                    for bb1 in gt_bboxes:
-                        if iou(bb0,torch.FloatTensor(bb1)) > iou_thresh:
-                            tp += 1
-                            gt_bboxes.remove(bb1)
-                            n_boxes_remaining -= 1
-                            break
-                        else:
-                            continue       
-                fn += len(gt_bboxes) # All gt_bboxes that have no corresponding pred_bbox
-                fp += n_boxes_remaining # All pred_bboxes that are above conf_thresh, but have no corresponding gt bbox
-                if idx % 2 == 0 and idx != 0:
-                    print(f'Finished images {idx-1}:{idx} / {len(all_pred_bboxes)} in {time.time() - start0:.2f}s')
-                    start0 = time.time()
+#                     for bb1 in gt_bboxes:
+#                         if iou(bb0,torch.FloatTensor(bb1)) > iou_thresh:
+#                             tp += 1
+#                             gt_bboxes.remove(bb1)
+#                             n_boxes_remaining -= 1
+#                             break
+#                         else:
+#                             continue       
+#                 fn += len(gt_bboxes) # All gt_bboxes that have no corresponding pred_bbox
+#                 fp += n_boxes_remaining # All pred_bboxes that are above conf_thresh, but have no corresponding gt bbox
+#                 if idx % 2 == 0 and idx != 0:
+#                     print(f'Finished images {idx-1}:{idx} / {len(all_pred_bboxes)} in {time.time() - start0:.2f}s')
+#                     start0 = time.time()
 
-            precision = 0 if (tp+fp) == 0 else tp / (tp + fp)
-            recall = 0 if (tp+fn) == 0 else tp / (tp + fn)
-            curr_pr_curve.append([precision, recall, conf_thresh])
-            print(f'{tp} + {fn} = {tp+fn} ?= 2125')
+#             precision = 0 if (tp+fp) == 0 else tp / (tp + fp)
+#             recall = 0 if (tp+fn) == 0 else tp / (tp + fn)
+#             curr_pr_curve.append([precision, recall, conf_thresh])
+#             print(f'{tp} + {fn} = {tp+fn} ?= 2125')
                 
 
-            if verbose:
-                print(f'(tp, fp, fn) = ({tp}, {fp}, {fn}) across {len(all_pred_scores)} images')
-                print(f'Finished iter in {time.time() - start:.2f}s\n')
-                start = time.time()
+#             if verbose:
+#                 print(f'(tp, fp, fn) = ({tp}, {fp}, {fn}) across {len(all_pred_scores)} images')
+#                 print(f'Finished iter in {time.time() - start:.2f}s\n')
+#                 start = time.time()
     
-        curr_pr_curve.append([1.0, 0.0, -1])
-        all_pr_curves.append(curr_pr_curve)
-        np.savez(os.path.join(outdir, fname), data = all_pr_curves, last_iou = iou_thresh)
+#         curr_pr_curve.append([1.0, 0.0, -1])
+#         all_pr_curves.append(curr_pr_curve)
+#         np.savez(os.path.join(outdir, fname), data = all_pr_curves, last_iou = iou_thresh)
 
-        if verbose:
-            print(f'Finished iou {iou_thresh} in {time.time() - start_iou:.2f}s')
-            start_iou = time.time()
+#         if verbose:
+#             print(f'Finished iou {iou_thresh} in {time.time() - start_iou:.2f}s')
+#             start_iou = time.time()
 
-    return all_pr_curves
+#     return all_pr_curves
 
 
 
-def plot_pr_curves(all_pr_curves, save_path = '', condense = True):
-    """
-    Given one or more sets of (precision, recall, confidence) 3-tuples, generate either 1 (condense=True) or 10 (condense=False) PR curves visualizing the provided data, parameterized by confidence.
+# def plot_pr_curves(all_pr_curves, save_path = '', condense = True):
+#     """
+#     Given one or more sets of (precision, recall, confidence) 3-tuples, generate either 1 (condense=True) or 10 (condense=False) PR curves visualizing the provided data, parameterized by confidence.
 
-    Parameters:
-    -----------
-    all_pr_curves : list of shape [10,101,3]
-        Each element of this list is defined by 100 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh). This parameter is intended to be the output from the compute_pr_curves() function in this same package.
-    save_path : string
-        Default - ''; If provided, the figure generated by this function will be saved at the corresponding location
-    condense : bool
-        Default - True; If True, will plot every PR curve on the same figure and generate a legend which relates the plots with their corresponding iou_threshold value. If False, will generate a separate plot for each PR curve within the figure.
+#     Parameters:
+#     -----------
+#     all_pr_curves : list of shape [10,101,3]
+#         Each element of this list is defined by 100 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh). This parameter is intended to be the output from the compute_pr_curves() function in this same package.
+#     save_path : string
+#         Default - ''; If provided, the figure generated by this function will be saved at the corresponding location
+#     condense : bool
+#         Default - True; If True, will plot every PR curve on the same figure and generate a legend which relates the plots with their corresponding iou_threshold value. If False, will generate a separate plot for each PR curve within the figure.
 
-    Returns:
-    --------
-    fig : matplotlib.figure
-        A figure containing all of the PR curves stored in the parameter 'all_pr_curves'
-    ax : matplotlib.axes
-        A single axis containing the plotted data of all 10 PR curves or a set of 10 axes containing the plotted data of each corresponding PR curve        
-    """
-    iou_threshold  = [round(x,2) for x in list(np.arange(0.5,1.0,0.05))]
+#     Returns:
+#     --------
+#     fig : matplotlib.figure
+#         A figure containing all of the PR curves stored in the parameter 'all_pr_curves'
+#     ax : matplotlib.axes
+#         A single axis containing the plotted data of all 10 PR curves or a set of 10 axes containing the plotted data of each corresponding PR curve        
+#     """
+#     iou_threshold  = [round(x,2) for x in list(np.arange(0.5,1.0,0.05))]
 
-    if condense:
-        fig, ax = plt.subplots()
-        cmap = mpl.colormaps['magma']
-        colors = cmap(np.linspace(0,1,10))
+#     if condense:
+#         fig, ax = plt.subplots()
+#         cmap = mpl.colormaps['magma']
+#         colors = cmap(np.linspace(0,1,10))
         
-        for idx, pr_curve in enumerate(all_pr_curves):
-            p = [elem[0] for elem in pr_curve]
-            r = [elem[1] for elem in pr_curve]
-            ax.plot(r,p,color = colors[idx], label = f'{iou_threshold[idx]:.2f}')
+#         for idx, pr_curve in enumerate(all_pr_curves):
+#             p = [elem[0] for elem in pr_curve]
+#             r = [elem[1] for elem in pr_curve]
+#             ax.plot(r,p,color = colors[idx], label = f'{iou_threshold[idx]:.2f}')
 
-        ax.scatter(r[0],p[0],color='green')
-        ax.scatter(r[-1],p[-1],color='red')
-        ax.legend(title="IOU")
-        ax.set_title("PR Curves of YOLO model at Various IOU Thresholds")
+#         ax.scatter(r[0],p[0],color='green')
+#         ax.scatter(r[-1],p[-1],color='red')
+#         ax.legend(title="IOU")
+#         ax.set_title("PR Curves of YOLO model at Various IOU Thresholds")
     
-    else:
-        nrows, ncols = 2, 5
-        fig, ax = plt.subplots(nrows, ncols, layout = 'tight')
-        fig.set_size_inches(ncols*2, nrows*2)
+#     else:
+#         nrows, ncols = 2, 5
+#         fig, ax = plt.subplots(nrows, ncols, layout = 'tight')
+#         fig.set_size_inches(ncols*2, nrows*2)
     
-        i, j = 0, 0
-        for idx, pr_curve in enumerate(all_pr_curves):
+#         i, j = 0, 0
+#         for idx, pr_curve in enumerate(all_pr_curves):
         
-            p = [elem[0] for elem in pr_curve]
-            r = [elem[1] for elem in pr_curve]
+#             p = [elem[0] for elem in pr_curve]
+#             r = [elem[1] for elem in pr_curve]
             
-            ax[i][j].scatter(r,p)
-            ax[i][j].plot(r,p)
-            ax[i][j].scatter(r[0],p[0],color='green')
-            ax[i][j].scatter(r[-1],p[-1],color='red')
-            ax[i][j].set_title(f'IOU: {iou_threshold[idx]:.2f}')
+#             ax[i][j].scatter(r,p)
+#             ax[i][j].plot(r,p)
+#             ax[i][j].scatter(r[0],p[0],color='green')
+#             ax[i][j].scatter(r[-1],p[-1],color='red')
+#             ax[i][j].set_title(f'IOU: {iou_threshold[idx]:.2f}')
         
-            j += 1
-            if j >= ncols:
-                i += 1
-                j = 0
+#             j += 1
+#             if j >= ncols:
+#                 i += 1
+#                 j = 0
 
-    plt.show()
-    if save_path != '':
-        plt.savefig(save_path)
+#     plt.show()
+#     if save_path != '':
+#         plt.savefig(save_path)
     
-    return fig, ax
+#     return fig, ax
 
 
 
-def get_mAP(all_pr_curves):
-    """
-    Given a set of PR curves at various IOU thresholds, compute the mean average precision across all the provided PR curves. This is done by taking the mean of the average precision of each PR curves, which is computed using the trapezoid method from the scipy.integrate package.
+# def get_mAP(all_pr_curves):
+#     """
+#     Given a set of PR curves at various IOU thresholds, compute the mean average precision across all the provided PR curves. This is done by taking the mean of the average precision of each PR curves, which is computed using the trapezoid method from the scipy.integrate package.
 
-    Parameters:
-    -----------
-    all_pr_curves : list of shape [10,101,3]
-        Each element of this list is defined by 100 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh). This parameter is intended to be the output from the compute_pr_curves() function in this same package.
+#     Parameters:
+#     -----------
+#     all_pr_curves : list of shape [10,101,3]
+#         Each element of this list is defined by 100 3-tuples which correspond to the (precision, recall, confidence) values at the given thresholds (iou_thresh, conf_thresh). This parameter is intended to be the output from the compute_pr_curves() function in this same package.
 
-    Returns:
-    --------
-    mAP : float
-        The mean average precision metric which quantifies the performance of a model specialized in the object segmentation task and ranges from [0,1]
-    """
+#     Returns:
+#     --------
+#     mAP : float
+#         The mean average precision metric which quantifies the performance of a model specialized in the object segmentation task and ranges from [0,1]
+#     """
 
-    all_ap = []
-    for idx, pr_curve in enumerate(all_pr_curves):
-        p = [elem[0] for elem in pr_curve]
-        r = [elem[1] for elem in pr_curve]
-        ap = trapezoid(r,p)
-        all_ap.append(ap)
+#     all_ap = []
+#     for idx, pr_curve in enumerate(all_pr_curves):
+#         p = [elem[0] for elem in pr_curve]
+#         r = [elem[1] for elem in pr_curve]
+#         ap = trapezoid(r,p)
+#         all_ap.append(ap)
     
-    mAP = np.mean(all_ap)
+#     mAP = np.mean(all_ap)
 
-    return mAP
+#     return mAP

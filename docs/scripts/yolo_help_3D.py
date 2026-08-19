@@ -667,12 +667,20 @@ def orthogonal_to_3D(down_xy, down_xz, down_yz, tile_dim = 256):
             for k in np.arange(down_dim):
             
                 # From meeting 02/26/26
-                xmin = (down_xy[i,j,k,1] + down_xz[i,j,k,1]) / 2
-                xmax = (down_xy[i,j,k,3] + down_xz[i,j,k,3]) / 2
-                ymin = (down_xy[i,j,k,0] + down_yz[i,j,k,1]) / 2
-                ymax = (down_xy[i,j,k,2] + down_yz[i,j,k,3]) / 2
-                zmin = (down_xz[i,j,k,0] + down_yz[i,j,k,0]) / 2
-                zmax = (down_xz[i,j,k,2] + down_yz[i,j,k,2]) / 2
+                # xmin = (down_xy[i,j,k,1] + down_xz[i,j,k,1]) / 2
+                # xmax = (down_xy[i,j,k,3] + down_xz[i,j,k,3]) / 2
+                # ymin = (down_xy[i,j,k,0] + down_yz[i,j,k,1]) / 2
+                # ymax = (down_xy[i,j,k,2] + down_yz[i,j,k,3]) / 2
+                # zmin = (down_xz[i,j,k,0] + down_yz[i,j,k,0]) / 2
+                # zmax = (down_xz[i,j,k,2] + down_yz[i,j,k,2]) / 2
+
+                # (06/10/26) Revised
+                xmin = min(down_xy[i,j,k,1], down_xz[i,j,k,1])
+                xmax = max(down_xy[i,j,k,3], down_xz[i,j,k,3])
+                ymin = min(down_xy[i,j,k,0], down_yz[i,j,k,1])
+                ymax = max(down_xy[i,j,k,2], down_yz[i,j,k,3])
+                zmin = min(down_xz[i,j,k,0], down_yz[i,j,k,0])
+                zmax = max(down_xz[i,j,k,2], down_yz[i,j,k,2])
                 
                 # conf = np.max([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
                 conf = np.min([down_xy[i,j,k,4], down_xz[i,j,k,4], down_yz[i,j,k,4]])
