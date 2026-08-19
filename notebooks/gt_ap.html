@@ -38,7 +38,7 @@
           <div class="body" role="main">
             
   <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -98,12 +98,12 @@ from cellpose import models
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-2026-08-19 11:56:32.627420: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+2026-08-19 13:18:52.528356: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
 To enable the following instructions: AVX2 AVX512F FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
 </pre></div></div>
 </div>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def bb_slice_filter(all_bb, ax_idx, slice_val):
@@ -291,13 +291,14 @@ cell_model = models.CellposeModel(gpu=False, pretrained_model="cpsam_v2")
 print('Successfully loaded CellPose model . . .')
 
 # Load the target volume
-img_path = '/ifshome/abenneck/docs_public/misc_outputs/gt_data/cube_i0002_j0005_k0003.nii.gz'
+indir = os.path.join(os.path.split(os.getcwd())[0], 'inputs')
+img_path = os.path.join(indir, 'cube_i0002_j0005_k0003.nii.gz')
 img = nib.load(img_path)
 img = img.get_fdata()
 print('Successfully loaded target volume . . .')
 
 # Load the GT annotation + convert to list(bbox)
-mask_path = '/ifshome/abenneck/docs_public/yolo_model/docs/inputs/mask64_i0002_j0005_k0003_annotated.nii.gz'
+mask_path = os.path.join(indir, 'mask64_i0002_j0005_k0003_annotated.nii.gz')
 mask = nib.load(mask_path)
 mask = mask.get_fdata()
 gt_bb = gt_mask_to_bb_list(mask_path) # Convert integer-valued img into a list of bboxes
