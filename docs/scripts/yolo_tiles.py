@@ -63,7 +63,7 @@ def preprocess(img, gamma = True, upsample = True):
 
     # Normalize input image (Assumes min of 0)
     img = img[None]
-    img /=  np.max(img,axis=(-1,-2),keepdims=True)
+    img = img / np.max(img,axis=(-1,-2),keepdims=True)
 
     # Gamma correction on input image
     if gamma:
