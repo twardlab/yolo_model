@@ -147,7 +147,7 @@ def remove_low_conf_bboxes(bboxes, scores, conf_thresh = 0.1):
     return torch.stack(bboxes_out,dim=0), torch.stack(scores_out,dim=0)
 
 
-def NMS(data, bb_order = "001122", verbose=True):
+def NMS(data, bb_order = "001122", verbose=True, conf_thresh=0.25, nms_thresh=0.25):
     """
     Perform 'NMS' on a data cube output from the YOLO pipeline. Note that after postprocessing, the bbox values are stored in 001122 format, but in this function, they must be permuted to 012012.
     """
@@ -161,8 +161,6 @@ def NMS(data, bb_order = "001122", verbose=True):
     data_out = data.copy() 
     
     # linear complexity nms
-    conf_thresh = 0.25 # only consider pixels whose confidence is bigger than this
-    nms_thresh = 0.25
     removed = np.zeros_like(data_out[...,0],dtype=bool)
     r = 5 # chose a radius (+/- to consider neighbors)
     for i in range(data_out.shape[0]): # loop through slice i

@@ -37,7 +37,7 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = Fa
         best_gt_iou = pw_IOU[i, best_gt_iou_idx]
         pred_conf = pred_i[conf_idx]
 
-        if best_gt_iou > iou_thresh:
+        if best_gt_iou >= iou_thresh:
             total_TP += 1
             TP = 1
             FP = 0
@@ -56,7 +56,15 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = Fa
        
         tpfp_out.append([i, best_gt_iou_idx, pred_conf, best_gt_iou, TP, FP, total_TP, total_FP, precision, recall])
 
+        # All GT bboxes have been found, so all remaining bboxes are FP. Update the counts and terminate the loop.
         if num_gt_remaining == 0:
+            # Note: Only the num of FP changes, so total_TP and recall remain unchanged
+            total_FP_final = total_FP + (len(pred_sorted) - i - 1)
+            precision_final = total_TP / len(pred_sorted)
+
+            # Append one more row summarizing all remaining FPs
+            interp = [i+1, -1, 0, 0, 0, 1, total_TP, total_FP_final, precision_final, recall]
+            tpfp_out.append(interp)
             break
             
     tpfp_out = np.array(tpfp_out)

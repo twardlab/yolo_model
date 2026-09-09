@@ -9,7 +9,7 @@ import time
 from matplotlib.collections import PolyCollection
 import os
 import sys
-import imp
+import importlib as imp
 
 from scipy.ndimage import gaussian_filter
 
