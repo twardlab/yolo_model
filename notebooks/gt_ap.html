@@ -37,8 +37,8 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+  <div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[62]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -69,7 +69,7 @@ from yolo_help import bbox_to_rectangles, imshow, convert_data, Net, get_best_bo
 
 import yolo_post_help
 imp.reload(yolo_post_help)
-from yolo_post_help import remove_low_conf_bboxes, postprocess, bb_to_rec, NMS
+from yolo_post_help import postprocess, bb_to_rec, NMS
 
 import yolo_help_3D
 imp.reload(yolo_help_3D)
@@ -93,17 +93,8 @@ from cellpose import models
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-2026-08-19 13:18:52.528356: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
-To enable the following instructions: AVX2 AVX512F FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
-</pre></div></div>
-</div>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def bb_slice_filter(all_bb, ax_idx, slice_val):
@@ -259,19 +250,28 @@ def remove_low_conf_bb(data, conf_idx = -4):
     Remove all bboxes with a conf of 0, so that they won't be considered when computing AP
     """
     data_out = []
-    for i in range(data.shape[0]):
-        for j in range(data.shape[1]):
-            for k in range(data.shape[2]):
-                if data[i,j,k,conf_idx] &gt; 0:
-                    data_out.append(data[i,j,k])
+    for i, row in enumerate(data):
+        if row[conf_idx] &gt; 0:
+            data_out.append(row)
     return np.array(data_out)
+
+# Remove bboxes which lie entirely outside of 'bounds' along all 3 axes
+def trim_bb(bb, bounds = [-0.5,127.5]):
+    # only keep the boxes that are inside
+    inds = np.all(bb[...,[1,3,5]] &gt; bounds[0], 1) # these are the right sides
+
+    # and the left sides
+    inds *= np.all( bb[...,[0,2,4]] &lt; bounds[1], 1)
+
+    bb = bb[inds]
+    return bb
 </pre></div>
 </div>
 </div>
 <section id="(0)-Load-all-the-models,-the-target-volume,-and-the-associated-annotation">
 <h1>(0) Load all the models, the target volume, and the associated annotation<a class="headerlink" href="#(0)-Load-all-the-models,-the-target-volume,-and-the-associated-annotation" title="Link to this heading">¶</a></h1>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load the YOLO model
@@ -320,7 +320,7 @@ Found model &#39;3D_demo&#39; for &#39;StarDist3D&#39;.
 </div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-2026-08-19 11:57:12.184750: E external/local_xla/xla/stream_executor/cuda/cuda_platform.cc:51] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+2026-09-09 09:55:01.267516: E external/local_xla/xla/stream_executor/cuda/cuda_platform.cc:51] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
@@ -340,7 +340,7 @@ Successfully loaded GT annotations (276 total cells) . . .
 <section id="Visualize-img-+-GT-annotations">
 <h2>Visualize img + GT annotations<a class="headerlink" href="#Visualize-img-+-GT-annotations" title="Link to this heading">¶</a></h2>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img0 = img[img.shape[0]//2,:,:]
@@ -449,7 +449,7 @@ Text(0.5, 1.0, &#39;Preprocessing&#39;)
 <section id="(1)-Apply-each-model-to-the-target-volume">
 <h1>(1) Apply each model to the target volume<a class="headerlink" href="#(1)-Apply-each-model-to-the-target-volume" title="Link to this heading">¶</a></h1>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Segment annotated region from original img, to dec memory cost
@@ -472,16 +472,19 @@ Annotated area size: (64, 64, 64)
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Apply YOLO (img is upsampled and gamma corrected)
 start = time.time()
 outdir_slices = '/ifshome/abenneck/docs_public/misc_outputs/gt_data/slices'
 outdir_cube = '/ifshome/abenneck/docs_public/misc_outputs/gt_data/cube'
-apply_2D_yolo_to_slices(img_path, model_path, outdir_slices, verbose = False)
-yolo_out = stitch_slices_into_cube(os.path.join(outdir_slices,'ax0'), os.path.join(outdir_slices,'ax1'), os.path.join(outdir_slices,'ax2'), outdir_cube)
-yolo_nms = NMS(yolo_out)
+# apply_2D_yolo_to_slices(img_path, model_path, outdir_slices, verbose = False)
+# yolo_out = stitch_slices_into_cube(os.path.join(outdir_slices,'ax0'), os.path.join(outdir_slices,'ax1'), os.path.join(outdir_slices,'ax2'), outdir_cube)
+yolo_out = np.load(os.path.join(outdir_cube,'i0000_j0000_k0000_d256_Ex_488_Em_525.npy'))
+conf_thresh=1e-3
+nms_thresh=0.3
+yolo_nms = NMS(yolo_out, conf_thresh = conf_thresh, nms_thresh = nms_thresh)
 print(f'Finished applying YOLO model in {time.time() - start:.2f}s')
 
 # Apply Stardist
@@ -502,9 +505,19 @@ print(f'Finished applying CellPose model in {time.time() - start:.2f}s')
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+................................................................97.85% of bboxes removed
+Finished applying YOLO model in 1.21s
+Finished applying StarDist model in 5.69s
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
 <div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-yolo_3D_pipeline_help.py (90): To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+100%|██████████| 127/127 [00:00&lt;00:00, 1601.81it/s]
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
@@ -512,37 +525,15 @@ yolo_3D_pipeline_help.py (90): To copy construct from a tensor, it is recommende
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Total Cubes Shape: (1, 1, 1)
-Starting cube (0,0,0) . . .
-Edge? - True True True
-Extent: [1.5,1021.5],[1.5,1021.5],[1.5,1021.5]
-Extent_i:  [0,255],[0,255],[0,255]
-Finished initializing global variables and data structures . . .
-Finished combining detections along transverse view . . .
-Finished combining detections along coronal view . . .
-Finished combining detections along sagittal view . . .
-(64, 64, 64, 8),(64, 64, 64, 8),(64, 64, 64, 8)
-Finished cube (0,0,0) in 4.72s
-
-................................................................99.46% of bboxes removed
-Finished applying YOLO model in 51.95s
-Finished applying StarDist model in 2.58s
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area stderr docutils container">
-<div class="highlight"><pre>
-100%|██████████| 127/127 [00:00&lt;00:00, 712.97it/s]
+Finished applying CellPose model in 419.91s
 </pre></div></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area docutils container">
+<div class="output_area stderr docutils container">
 <div class="highlight"><pre>
-Finished applying CellPose model in 181.41s
+
 </pre></div></div>
 </div>
 <section id="(BROKEN)-Visualize-Data-(Original-img-of-s=256-+-annotation-of-s=64)">
@@ -873,7 +864,7 @@ fig.set_size_inches(9,6)
 <section id="Plot-all-bb-pruned-during-NMS">
 <h2>Plot all bb pruned during NMS<a class="headerlink" href="#Plot-all-bb-pruned-during-NMS" title="Link to this heading">¶</a></h2>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[76]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[33]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>img_m0_idx = img_up.shape[0]//2
@@ -884,7 +875,14 @@ img0 = img_up[img_m0_idx,:,:]
 img1 = img_up[:,img_m1_idx,:]
 img2 = img_up[:,:,img_m2_idx]
 
-lim = [96,160]
+# xlim = [0,128]
+# ylim = [128,0]
+
+# xlim = [96,160]
+# ylim = [96,160]
+
+xlim = [-200,350]
+ylim = [350,-200]
 
 # Convert YOLO outputs into lists of bboxes
 yolo_bb = yolo_output_to_bb_list(yolo_out)
@@ -895,8 +893,13 @@ gt_bb_adjusted = convert_bb_units(gt_bb)
 yolo_bb = convert_bb_units(yolo_bb)
 yolo_bb_nms = convert_bb_units(yolo_bb_nms)
 
+# Remove bb predictions outside of the annotated area
+yolo_bb_trimmed = trim_bb(yolo_bb)
+yolo_bb_nms_trimmed = trim_bb(yolo_bb_nms)
+
+
 # Each row will be a different angle, and each col will be (img, img+outputs)
-fig, axs = plt.subplots(2,3,layout='tight', sharex=True, sharey=True)
+fig, axs = plt.subplots(3,3,layout='tight', sharex=True, sharey=True)
 
 # ==============================
 # ===== Col 0 (Transverse) =====
@@ -925,6 +928,22 @@ if len(bb_yolo_nms) &gt; 0:
     bb_plot_yolo_nms = bb_to_rec(bb_yolo_nms, pos = [4, 2, 5, 3], fc='none', ec='lime', alpha=scores)
     axs[1,0].add_collection(bb_plot_yolo_nms)
 
+# Original image
+axs[2,0].imshow(img0, cmap='gray')
+
+# YOLO bboxes (Orig)
+bb_yolo_trimmed = bb_slice_filter(yolo_bb_trimmed, 0, img_m0_idx)
+if len(bb_yolo_trimmed) &gt; 0:
+    scores = bb_yolo_trimmed[:,-4]
+    bb_plot_yolo_trimmed = bb_to_rec(bb_yolo_trimmed, pos = [4, 2, 5, 3], fc='none', ec='red', alpha=scores)
+    axs[2,0].add_collection(bb_plot_yolo_trimmed)
+
+bb_yolo_nms_trimmed = bb_slice_filter(yolo_bb_nms_trimmed, 0, img_m0_idx)
+if len(bb_yolo_nms_trimmed) &gt; 0:
+    scores = bb_yolo_nms_trimmed[:,-4]
+    bb_plot_yolo_nms_trimmed = bb_to_rec(bb_yolo_nms_trimmed, pos = [4, 2, 5, 3], fc='none', ec='lime', alpha=scores)
+    axs[2,0].add_collection(bb_plot_yolo_nms_trimmed)
+
 # ===========================
 # ===== Col 1 (Coronal) =====
 # ===========================
@@ -951,6 +970,22 @@ if len(bb_yolo_nms) &gt; 0:
     scores = bb_yolo_nms[:,-4]
     bb_plot_yolo_nms = bb_to_rec(bb_yolo_nms, pos = [4, 0, 5, 1], fc='none', ec='lime', alpha=scores)
     axs[1,1].add_collection(bb_plot_yolo_nms)
+
+# Original image
+axs[2,1].imshow(img1, cmap='gray')
+
+# YOLO bboxes
+bb_yolo_trimmed = bb_slice_filter(yolo_bb_trimmed, 1, img_m1_idx)
+if len(bb_yolo_trimmed) &gt; 0:
+    scores = bb_yolo_trimmed[:,-4]
+    bb_plot_yolo_trimmed = bb_to_rec(bb_yolo_trimmed, pos = [4, 0, 5, 1], fc='none', ec='red', alpha=scores)
+    axs[2,1].add_collection(bb_plot_yolo_trimmed)
+
+bb_yolo_nms_trimmed = bb_slice_filter(yolo_bb_nms_trimmed, 1, img_m1_idx)
+if len(bb_yolo_nms_trimmed) &gt; 0:
+    scores = bb_yolo_nms_trimmed[:,-4]
+    bb_plot_yolo_nms_trimmed = bb_to_rec(bb_yolo_nms_trimmed, pos = [4, 0, 5, 1], fc='none', ec='lime', alpha=scores)
+    axs[2,1].add_collection(bb_plot_yolo_nms_trimmed)
 
 
 # ============================
@@ -980,15 +1015,32 @@ if len(bb_yolo_nms) &gt; 0:
     bb_plot_yolo_nms = bb_to_rec(bb_yolo_nms, pos = [2, 0, 3, 1], fc='none', ec='lime', alpha=scores)
     axs[1,2].add_collection(bb_plot_yolo_nms)
 
+# Original image
+axs[2,2].imshow(img2, cmap='gray')
+
+# YOLO bboxes (Trimmed)
+bb_yolo_trimmed = bb_slice_filter(yolo_bb_trimmed, 2, img_m2_idx)
+if len(bb_yolo_trimmed) &gt; 0:
+    scores = bb_yolo_trimmed[:,-4]
+    bb_plot_yolo_trimmed = bb_to_rec(bb_yolo_trimmed, pos = [2, 0, 3, 1], fc='none', ec='red', alpha=scores)
+    axs[2,2].add_collection(bb_plot_yolo_trimmed)
+
+bb_yolo_nms_trimmed = bb_slice_filter(yolo_bb_nms_trimmed, 2, img_m2_idx)
+if len(bb_yolo_nms_trimmed) &gt; 0:
+    scores = bb_yolo_nms_trimmed[:,-4]
+    bb_plot_yolo_nms_trimmed = bb_to_rec(bb_yolo_nms_trimmed, pos = [2, 0, 3, 1], fc='none', ec='lime', alpha=scores)
+    axs[2,2].add_collection(bb_plot_yolo_nms_trimmed)
+
+
 # ========================
 # ===== Whole Figure =====
 # ========================
 
 # Set same limits for every view
-# for ax in axs:
-#     for ax_i in ax:
-#         ax_i.set_xlim(lim)
-#         ax_i.set_ylim(lim)
+for ax in axs:
+    for ax_i in ax:
+        ax_i.set_xlim(xlim)
+        ax_i.set_ylim(ylim)
 
 # Generate a legend for the figure
 legend_handles = [
@@ -1015,26 +1067,29 @@ fig.set_size_inches(9,6)
 <section id="Compute-AP-(IOU-=-0.5)-for-each-model">
 <h2>Compute AP (IOU = 0.5) for each model<a class="headerlink" href="#Compute-AP-(IOU-=-0.5)-for-each-model" title="Link to this heading">¶</a></h2>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[83]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># NOTE: Each element of the 'performance' object contains a list of values defined as follows:
 # [idx, best_gt_iou_idx, pred_conf, best_gt_iou, TP, FP, total_TP, total_FP, precision, recall]
 
-iou_thresh = 0.5
+iou_thresh = 0.1
 
 # Convert to relative units (YOLO and GT are in units of the original img, but Star and Cell are in units of the segmented, upsampled annotated region
 gt_bb_adjusted = convert_bb_units(gt_bb)
 
 # YOLO
-# yolo_bb = yolo_output_to_bb_list(yolo_out)
-# yolo_bb = yolo_output_to_bb_list(yolo_nms_filtered)
-# yolo_bb_adjusted = convert_bb_units(yolo_bb)
-# AP_yolo, perf_yolo = get_AP(gt_bb_adjusted, yolo_bb_adjusted, iou_thresh = iou_thresh, verbose = True)
+yolo_bb = yolo_output_to_bb_list(yolo_out)
+yolo_bb_adjusted = convert_bb_units(yolo_bb)
+yolo_bb_final = trim_bb(yolo_bb_adjusted)
+yolo_bb_final = remove_low_conf_bb(yolo_bb_final)
+AP_yolo, perf_yolo = get_AP(gt_bb_adjusted, yolo_bb_final, iou_thresh = iou_thresh, verbose = True)
 
-yolo_nms_filtered = remove_low_conf_bb(yolo_nms)
-yolo_bb_adjusted = convert_bb_units(yolo_nms_filtered)
-AP_yolo, perf_yolo = get_AP(gt_bb_adjusted, yolo_bb_adjusted, iou_thresh = iou_thresh, verbose = True)
+yolo_bb_nms = yolo_output_to_bb_list(yolo_nms)
+yolo_bb_nms_adjusted = convert_bb_units(yolo_bb_nms)
+yolo_bb_nms_final = trim_bb(yolo_bb_nms_adjusted)
+yolo_bb_nms_final = remove_low_conf_bb(yolo_bb_nms_final)
+AP_yolo_nms, perf_yolo_nms = get_AP(gt_bb_adjusted, yolo_bb_nms_final, iou_thresh = iou_thresh, verbose = True)
 
 # Stardist
 star_bb = stardist_to_bb_list(stardist_raw_outputs, mode = '3D')
@@ -1044,7 +1099,7 @@ AP_star, perf_star = get_AP(gt_bb_adjusted, star_bb, conf_idx = -1, iou_thresh =
 cell_bb = cellpose_to_bb_list(masks_stitched)
 AP_cell, perf_cell = get_AP(gt_bb_adjusted, cell_bb, conf_idx = -1, iou_thresh = iou_thresh, verbose = True)
 
-print(f'AP_yolo: {AP_yolo:.2f} vs AP_star: {AP_star:.2f} vs AP_cell: {AP_cell:.2f} ')
+print(f'AP_yolo: {AP_yolo:.2f} vs AP_yolo (NMS): {AP_yolo_nms:.2f} vs AP_star: {AP_star:.2f} vs AP_cell: {AP_cell:.2f} ')
 </pre></div>
 </div>
 </div>
@@ -1053,19 +1108,26 @@ print(f'AP_yolo: {AP_yolo:.2f} vs AP_star: {AP_star:.2f} vs AP_cell: {AP_cell:.2
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-AP_yolo: 0.04 vs AP_star: 0.00 vs AP_cell: 0.02
+AP_yolo: 0.75 vs AP_yolo (NMS): 0.77 vs AP_star: 0.27 vs AP_cell: 0.43
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[84]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(f'GT: {len(gt_bb_adjusted)} total cells')
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># num_yolo = len(yolo_bb_final)
+# print(num_yolo)
+
+# num_yolo_nms = len(np.where(yolo_bb_nms[:,-4] &gt; 0)[0])
+# print(num_yolo_nms)
+
+print(f'GT: {len(gt_bb_adjusted)} total cells')
 print()
-print('Dataset: AP | # detections | total TP | total FP ')
-print(f'YOLO: {AP_yolo:.4f} | {len(yolo_bb_adjusted)} | {perf_yolo[-1,-4].astype(int)} | {perf_yolo[-1,-3].astype(int)}')
-print(f'StarDist: {AP_star:.4f} | {len(star_bb)} | {perf_star[-1,-4].astype(int)} | {perf_star[-1,-3].astype(int)}')
-print(f'CellPose: {AP_cell:.4f} | {len(cell_bb)} | {perf_cell[-1,-4].astype(int)} | {perf_cell[-1,-3].astype(int)}')
+print(f'{"Dataset":&lt;10}: {"AP":&lt;6} | # detections | total TP | total FP ')
+print(f'{"YOLO":&lt;10}: {AP_yolo:.4f} | {len(yolo_bb_final)} {"|":&gt;9} {perf_yolo[-1,-4].astype(int)} {"|":&gt;6} {perf_yolo[-1,-3].astype(int)}')
+print(f'{"YOLO (NMS)":&lt;10}: {AP_yolo_nms:.4f} | {len(yolo_bb_nms_final)} {"|":&gt;9} {perf_yolo_nms[-1,-4].astype(int)} {"|":&gt;6} {perf_yolo_nms[-1,-3].astype(int)}')
+print(f'{"StarDist":&lt;10}: {AP_star:.4f} | {len(star_bb)} {"|":&gt;11} {perf_star[-1,-4].astype(int)} {"|":&gt;7} {perf_star[-1,-3].astype(int)}')
+print(f'{"CellPose":&lt;10}: {AP_cell:.4f} | {len(cell_bb)} {"|":&gt;10} {perf_cell[-1,-4].astype(int)} {"|":&gt;6} {perf_cell[-1,-3].astype(int)}')
 </pre></div>
 </div>
 </div>
@@ -1076,29 +1138,48 @@ print(f'CellPose: {AP_cell:.4f} | {len(cell_bb)} | {perf_cell[-1,-4].astype(int)
 <div class="highlight"><pre>
 GT: 276 total cells
 
-Dataset: AP | # detections | total TP | total FP
-YOLO: 0.0380 | 1413 | 109 | 1304
-StarDist: 0.0015 | 76 | 5 | 71
-CellPose: 0.0182 | 379 | 46 | 333
+Dataset   : AP     | # detections | total TP | total FP
+YOLO      : 0.7458 | 5681         | 275      | 5406
+YOLO (NMS): 0.7712 | 1371         | 268      | 1103
+StarDist  : 0.2664 | 76           | 75       | 1
+CellPose  : 0.4295 | 379          | 222      | 157
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[85]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Final (P, R, TP, FP)
+print(perf_yolo_nms[-1,-2], perf_yolo_nms[-1,-1], perf_yolo_nms[-1,-4], perf_yolo_nms[-1,-3])
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+0.19547775346462437 0.9710144927536232 268.0 1103.0
 </pre></div></div>
 </div>
 </section>
 <section id="Plot-results">
 <h2>Plot results<a class="headerlink" href="#Plot-results" title="Link to this heading">¶</a></h2>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[76]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fig, ax = plt.subplots()
 ax.plot(perf_yolo[:,-1], perf_yolo[:,-2], color='magenta', label='YOLO')
+ax.plot(perf_yolo_nms[:,-1], perf_yolo_nms[:,-2], color='lime', label='YOLO (NMS)')
 ax.plot(perf_star[:,-1], perf_star[:,-2], color='red', label='StarDist')
 ax.plot(perf_cell[:,-1], perf_cell[:,-2], color='c', label='CellPose')
 
 ax.set_xlabel('Recall')
 ax.set_ylabel('Precision')
 ax.set_title(f'Average Precision (IOU={iou_thresh})')
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
+ax.set_xlim([-0.025,1.025])
+ax.set_ylim([-0.025,1.025])
 
 _ = fig.legend()
 
@@ -1107,121 +1188,15 @@ _ = fig.legend()
 #     if bb[3] == 1:
 #         # print('Added point')
 #         ax.scatter(bb[-1], bb[-2], color = 'green', linewidth = 0.5)
-</pre></div>
+<br/></pre></div>
 </div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="../_images/notebooks_gt_ap_22_0.png" src="../_images/notebooks_gt_ap_22_0.png" />
+<img alt="../_images/notebooks_gt_ap_23_0.png" src="../_images/notebooks_gt_ap_23_0.png" />
 </div>
-</div>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[117]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># [idx, best_gt_iou_idx, pred_conf, best_gt_iou, TP, FP, total_TP, total_FP, precision, recall]
-
-# for elem in perf_star:
-#     print(elem)
-
-# for elem in star_bb:
-#     print(elem)
-
-cell_bb[20]
-</pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[117]:
-</pre></div>
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-array([  0,   9,  92, 102,  15,  29,  21])
-</pre></div></div>
-</div>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[46]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>for idx, elem in enumerate(perf_yolo):
-    if idx % 500 == 0:
-        print(elem)
-    if idx &gt; 10000:
-        break
-</pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-[  0.         266.           0.84788263   0.35855731   0.
-   1.           0.           1.           0.           0.        ]
-[5.00000000e+02 0.00000000e+00 6.37864649e-01 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 4.30000000e+01 4.58000000e+02
- 8.58283433e-02 1.55797101e-01]
-[1.00000000e+03 0.00000000e+00 5.78290284e-01 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 9.30000000e+01 9.08000000e+02
- 9.29070929e-02 3.36956522e-01]
-[1.50000000e+03 0.00000000e+00 5.22511780e-01 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.21000000e+02 1.38000000e+03
- 8.06129247e-02 4.38405797e-01]
-[2.00000000e+03 1.78000000e+02 4.53685164e-01 4.12333382e-02
- 0.00000000e+00 1.00000000e+00 1.34000000e+02 1.86700000e+03
- 6.69665167e-02 4.85507246e-01]
-[2.50000000e+03 0.00000000e+00 3.82419229e-01 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.46000000e+02 2.35500000e+03
- 5.83766493e-02 5.28985507e-01]
-[3.00000000e+03 0.00000000e+00 3.06370527e-01 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.51000000e+02 2.85000000e+03
- 5.03165611e-02 5.47101449e-01]
-[3.50000000e+03 0.00000000e+00 2.33058780e-01 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.54000000e+02 3.34700000e+03
- 4.39874322e-02 5.57971014e-01]
-[4.00000000e+03 0.00000000e+00 1.74453259e-01 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.54000000e+02 3.84700000e+03
- 3.84903774e-02 5.57971014e-01]
-[4.50000000e+03 0.00000000e+00 1.31217256e-01 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.57000000e+02 4.34400000e+03
- 3.48811375e-02 5.68840580e-01]
-[5.00000000e+03 0.00000000e+00 9.96136963e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.59000000e+02 4.84200000e+03
- 3.17936413e-02 5.76086957e-01]
-[5.50000000e+03 0.00000000e+00 7.56988153e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.59000000e+02 5.34200000e+03
- 2.89038357e-02 5.76086957e-01]
-[6.00000000e+03 0.00000000e+00 5.83156161e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.59000000e+02 5.84200000e+03
- 2.64955841e-02 5.76086957e-01]
-[6.50000000e+03 0.00000000e+00 4.53885905e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.59000000e+02 6.34200000e+03
- 2.44577757e-02 5.76086957e-01]
-[7.00000000e+03 0.00000000e+00 3.54443863e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.59000000e+02 6.84200000e+03
- 2.27110413e-02 5.76086957e-01]
-[7.50000000e+03 0.00000000e+00 2.77144946e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.60000000e+02 7.34100000e+03
- 2.13304893e-02 5.79710145e-01]
-[8.00000000e+03 0.00000000e+00 2.15411931e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.60000000e+02 7.84100000e+03
- 1.99975003e-02 5.79710145e-01]
-[8.50000000e+03 0.00000000e+00 1.74075905e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.60000000e+02 8.34100000e+03
- 1.88213151e-02 5.79710145e-01]
-[9.00000000e+03 0.00000000e+00 1.37610231e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.60000000e+02 8.84100000e+03
- 1.77758027e-02 5.79710145e-01]
-[9.50000000e+03 0.00000000e+00 1.05501954e-02 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.61000000e+02 9.34000000e+03
- 1.69455847e-02 5.83333333e-01]
-[1.00000000e+04 0.00000000e+00 8.28732923e-03 0.00000000e+00
- 0.00000000e+00 1.00000000e+00 1.61000000e+02 9.84000000e+03
- 1.60983902e-02 5.83333333e-01]
-</pre></div></div>
 </div>
 </section>
 <section id="Compute-mAP-(0.5:0.05:1.0)-for-each-model">
@@ -1230,20 +1205,950 @@ array([  0,   9,  92, 102,  15,  29,  21])
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>all_mAP = []
-for all_bb in [yolo_bb, star_bb, cell_bb]:
-    rolling_AP = 0
-    for iou in np.arange(0.5,1,0.05):
-        AP, performance = get_AP(gt_bb, all_bb, iou_thresh = iou, verbose = False)
-        rolling_AP += AP
-    mAP = rolling_AP / 10
-    all_mAP.append(mAP)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># all_mAP = []
+# for all_bb in [yolo_bb, star_bb, cell_bb]:
+#     rolling_AP = 0
+#     for iou in np.arange(0.5,1,0.05):
+#         AP, performance = get_AP(gt_bb, all_bb, iou_thresh = iou, verbose = False)
+#         rolling_AP += AP
+#     mAP = rolling_AP / 10
+#     all_mAP.append(mAP)
 </pre></div>
 </div>
 </div>
 </section>
-<section id="Plot-Results?">
-<h2>Plot Results?<a class="headerlink" href="#Plot-Results?" title="Link to this heading">¶</a></h2>
+</section>
+<section id="(4)-Use-GridSearch-CV-to-find-the-best-(nms_thresh,-conf_thresh)-combination">
+<h1>(4) Use GridSearch CV to find the best (nms_thresh, conf_thresh) combination<a class="headerlink" href="#(4)-Use-GridSearch-CV-to-find-the-best-(nms_thresh,-conf_thresh)-combination" title="Link to this heading">¶</a></h1>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[113]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Define iou_thresh and compute AP for YOLO output WITHOUT NMS
+iou_thresh = 0.3
+
+outdir_cube = '/ifshome/abenneck/docs_public/misc_outputs/gt_data/cube'
+yolo_out = np.load(os.path.join(outdir_cube,'i0000_j0000_k0000_d256_Ex_488_Em_525.npy'))
+yolo_bb = yolo_output_to_bb_list(yolo_out)
+yolo_bb_adjusted = convert_bb_units(yolo_bb)
+yolo_bb_final = trim_bb(yolo_bb_adjusted)
+yolo_bb_final = remove_low_conf_bb(yolo_bb_final)
+AP_yolo, perf_yolo = get_AP(gt_bb_adjusted, yolo_bb_final, iou_thresh = iou_thresh, verbose = True)
+print(AP_yolo)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+0.580636528796262
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[134]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>all_conf = np.arange(0.001,0.02,0.001)
+all_nms  = np.arange(0,1,0.1)
+all_AP = np.zeros((len(all_conf), len(all_nms)))
+
+for i, conf_thresh in enumerate(all_conf):
+    for j, nms_thresh in enumerate(all_nms):
+
+        print(f'Starting (conf, nms) = ({conf_thresh}, {nms_thresh})')
+
+        start = time.time()
+
+        yolo_nms = NMS(yolo_out, conf_thresh = conf_thresh, nms_thresh = nms_thresh)
+        yolo_bb_nms = yolo_output_to_bb_list(yolo_nms)
+        yolo_bb_nms_adjusted = convert_bb_units(yolo_bb_nms)
+        yolo_bb_nms_final = trim_bb(yolo_bb_nms_adjusted)
+        yolo_bb_nms_final = remove_low_conf_bb(yolo_bb_nms_final)
+        AP_yolo_nms, perf_yolo_nms = get_AP(gt_bb_adjusted, yolo_bb_nms_final, iou_thresh = iou_thresh, verbose = True)
+
+        all_AP[i,j] = AP_yolo_nms
+
+        print(f'Finished NMS in {time.time() - start:.2f}s')
+<br/><br/><br/></pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Starting (conf, nms) = (0.001, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 3.13s
+Starting (conf, nms) = (0.001, 0.1)
+................................................................99.36% of bboxes removed
+Finished NMS in 2.65s
+Starting (conf, nms) = (0.001, 0.2)
+................................................................98.86% of bboxes removed
+Finished NMS in 3.64s
+Starting (conf, nms) = (0.001, 0.30000000000000004)
+................................................................97.85% of bboxes removed
+Finished NMS in 3.91s
+Starting (conf, nms) = (0.001, 0.4)
+................................................................96.57% of bboxes removed
+Finished NMS in 5.83s
+Starting (conf, nms) = (0.001, 0.5)
+................................................................95.53% of bboxes removed
+Finished NMS in 6.21s
+Starting (conf, nms) = (0.001, 0.6000000000000001)
+................................................................94.94% of bboxes removed
+Finished NMS in 7.22s
+Starting (conf, nms) = (0.001, 0.7000000000000001)
+................................................................94.76% of bboxes removed
+Finished NMS in 7.04s
+Starting (conf, nms) = (0.001, 0.8)
+................................................................94.73% of bboxes removed
+Finished NMS in 7.11s
+Starting (conf, nms) = (0.001, 0.9)
+................................................................94.73% of bboxes removed
+Finished NMS in 7.10s
+Starting (conf, nms) = (0.002, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.45s
+Starting (conf, nms) = (0.002, 0.1)
+................................................................99.38% of bboxes removed
+Finished NMS in 2.87s
+Starting (conf, nms) = (0.002, 0.2)
+................................................................98.94% of bboxes removed
+Finished NMS in 3.50s
+Starting (conf, nms) = (0.002, 0.30000000000000004)
+................................................................98.06% of bboxes removed
+Finished NMS in 3.95s
+Starting (conf, nms) = (0.002, 0.4)
+................................................................96.90% of bboxes removed
+Finished NMS in 4.73s
+Starting (conf, nms) = (0.002, 0.5)
+................................................................95.92% of bboxes removed
+Finished NMS in 6.01s
+Starting (conf, nms) = (0.002, 0.6000000000000001)
+................................................................95.37% of bboxes removed
+Finished NMS in 6.75s
+Starting (conf, nms) = (0.002, 0.7000000000000001)
+................................................................95.19% of bboxes removed
+Finished NMS in 6.62s
+Starting (conf, nms) = (0.002, 0.8)
+................................................................95.17% of bboxes removed
+Finished NMS in 6.32s
+Starting (conf, nms) = (0.002, 0.9)
+................................................................95.17% of bboxes removed
+Finished NMS in 6.58s
+Starting (conf, nms) = (0.003, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.94s
+Starting (conf, nms) = (0.003, 0.1)
+................................................................99.39% of bboxes removed
+Finished NMS in 2.50s
+Starting (conf, nms) = (0.003, 0.2)
+................................................................98.99% of bboxes removed
+Finished NMS in 3.14s
+Starting (conf, nms) = (0.003, 0.30000000000000004)
+................................................................98.18% of bboxes removed
+Finished NMS in 4.10s
+Starting (conf, nms) = (0.003, 0.4)
+................................................................97.10% of bboxes removed
+Finished NMS in 4.52s
+Starting (conf, nms) = (0.003, 0.5)
+................................................................96.17% of bboxes removed
+Finished NMS in 5.75s
+Starting (conf, nms) = (0.003, 0.6000000000000001)
+................................................................95.63% of bboxes removed
+Finished NMS in 6.47s
+Starting (conf, nms) = (0.003, 0.7000000000000001)
+................................................................95.46% of bboxes removed
+Finished NMS in 6.04s
+Starting (conf, nms) = (0.003, 0.8)
+................................................................95.43% of bboxes removed
+Finished NMS in 6.60s
+Starting (conf, nms) = (0.003, 0.9)
+................................................................95.43% of bboxes removed
+Finished NMS in 6.04s
+Starting (conf, nms) = (0.004, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.88s
+Starting (conf, nms) = (0.004, 0.1)
+................................................................99.41% of bboxes removed
+Finished NMS in 2.46s
+Starting (conf, nms) = (0.004, 0.2)
+................................................................99.03% of bboxes removed
+Finished NMS in 3.36s
+Starting (conf, nms) = (0.004, 0.30000000000000004)
+................................................................98.28% of bboxes removed
+Finished NMS in 3.43s
+Starting (conf, nms) = (0.004, 0.4)
+................................................................97.25% of bboxes removed
+Finished NMS in 4.60s
+Starting (conf, nms) = (0.004, 0.5)
+................................................................96.36% of bboxes removed
+Finished NMS in 5.83s
+Starting (conf, nms) = (0.004, 0.6000000000000001)
+................................................................95.84% of bboxes removed
+Finished NMS in 5.69s
+Starting (conf, nms) = (0.004, 0.7000000000000001)
+................................................................95.66% of bboxes removed
+Finished NMS in 6.07s
+Starting (conf, nms) = (0.004, 0.8)
+................................................................95.64% of bboxes removed
+Finished NMS in 6.35s
+Starting (conf, nms) = (0.004, 0.9)
+................................................................95.64% of bboxes removed
+Finished NMS in 5.84s
+Starting (conf, nms) = (0.005, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.56s
+Starting (conf, nms) = (0.005, 0.1)
+................................................................99.42% of bboxes removed
+Finished NMS in 3.00s
+Starting (conf, nms) = (0.005, 0.2)
+................................................................99.06% of bboxes removed
+Finished NMS in 2.72s
+Starting (conf, nms) = (0.005, 0.30000000000000004)
+................................................................98.35% of bboxes removed
+Finished NMS in 3.90s
+Starting (conf, nms) = (0.005, 0.4)
+................................................................97.37% of bboxes removed
+Finished NMS in 4.23s
+Starting (conf, nms) = (0.005, 0.5)
+................................................................96.51% of bboxes removed
+Finished NMS in 5.36s
+Starting (conf, nms) = (0.005, 0.6000000000000001)
+................................................................96.00% of bboxes removed
+Finished NMS in 6.07s
+Starting (conf, nms) = (0.005, 0.7000000000000001)
+................................................................95.83% of bboxes removed
+Finished NMS in 5.66s
+Starting (conf, nms) = (0.005, 0.8)
+................................................................95.80% of bboxes removed
+Finished NMS in 5.90s
+Starting (conf, nms) = (0.005, 0.9)
+................................................................95.80% of bboxes removed
+Finished NMS in 6.22s
+Starting (conf, nms) = (0.006, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.25s
+Starting (conf, nms) = (0.006, 0.1)
+................................................................99.43% of bboxes removed
+Finished NMS in 2.68s
+Starting (conf, nms) = (0.006, 0.2)
+................................................................99.09% of bboxes removed
+Finished NMS in 3.25s
+Starting (conf, nms) = (0.006, 0.30000000000000004)
+................................................................98.41% of bboxes removed
+Finished NMS in 3.24s
+Starting (conf, nms) = (0.006, 0.4)
+................................................................97.47% of bboxes removed
+Finished NMS in 4.38s
+Starting (conf, nms) = (0.006, 0.5)
+................................................................96.64% of bboxes removed
+Finished NMS in 5.55s
+Starting (conf, nms) = (0.006, 0.6000000000000001)
+................................................................96.14% of bboxes removed
+Finished NMS in 5.38s
+Starting (conf, nms) = (0.006, 0.7000000000000001)
+................................................................95.97% of bboxes removed
+Finished NMS in 5.78s
+Starting (conf, nms) = (0.006, 0.8)
+................................................................95.94% of bboxes removed
+Finished NMS in 6.09s
+Starting (conf, nms) = (0.006, 0.9)
+................................................................95.94% of bboxes removed
+Finished NMS in 5.55s
+Starting (conf, nms) = (0.007, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.50s
+Starting (conf, nms) = (0.007, 0.1)
+................................................................99.43% of bboxes removed
+Finished NMS in 2.96s
+Starting (conf, nms) = (0.007, 0.2)
+................................................................99.11% of bboxes removed
+Finished NMS in 2.65s
+Starting (conf, nms) = (0.007, 0.30000000000000004)
+................................................................98.45% of bboxes removed
+Finished NMS in 3.48s
+Starting (conf, nms) = (0.007, 0.4)
+................................................................97.55% of bboxes removed
+Finished NMS in 4.59s
+Starting (conf, nms) = (0.007, 0.5)
+................................................................96.74% of bboxes removed
+Finished NMS in 4.88s
+Starting (conf, nms) = (0.007, 0.6000000000000001)
+................................................................96.25% of bboxes removed
+Finished NMS in 5.53s
+Starting (conf, nms) = (0.007, 0.7000000000000001)
+................................................................96.08% of bboxes removed
+Finished NMS in 5.97s
+Starting (conf, nms) = (0.007, 0.8)
+................................................................96.06% of bboxes removed
+Finished NMS in 5.67s
+Starting (conf, nms) = (0.007, 0.9)
+................................................................96.06% of bboxes removed
+Finished NMS in 5.41s
+Starting (conf, nms) = (0.008, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.47s
+Starting (conf, nms) = (0.008, 0.1)
+................................................................99.44% of bboxes removed
+Finished NMS in 2.94s
+Starting (conf, nms) = (0.008, 0.2)
+................................................................99.13% of bboxes removed
+Finished NMS in 2.63s
+Starting (conf, nms) = (0.008, 0.30000000000000004)
+................................................................98.50% of bboxes removed
+Finished NMS in 3.40s
+Starting (conf, nms) = (0.008, 0.4)
+................................................................97.62% of bboxes removed
+Finished NMS in 4.47s
+Starting (conf, nms) = (0.008, 0.5)
+................................................................96.83% of bboxes removed
+Finished NMS in 4.78s
+Starting (conf, nms) = (0.008, 0.6000000000000001)
+................................................................96.35% of bboxes removed
+Finished NMS in 5.71s
+Starting (conf, nms) = (0.008, 0.7000000000000001)
+................................................................96.18% of bboxes removed
+Finished NMS in 5.57s
+Starting (conf, nms) = (0.008, 0.8)
+................................................................96.15% of bboxes removed
+Finished NMS in 5.31s
+Starting (conf, nms) = (0.008, 0.9)
+................................................................96.15% of bboxes removed
+Finished NMS in 5.55s
+Starting (conf, nms) = (0.009000000000000001, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.74s
+Starting (conf, nms) = (0.009000000000000001, 0.1)
+................................................................99.45% of bboxes removed
+Finished NMS in 2.32s
+Starting (conf, nms) = (0.009000000000000001, 0.2)
+................................................................99.15% of bboxes removed
+Finished NMS in 2.86s
+Starting (conf, nms) = (0.009000000000000001, 0.30000000000000004)
+................................................................98.53% of bboxes removed
+Finished NMS in 3.65s
+Starting (conf, nms) = (0.009000000000000001, 0.4)
+................................................................97.68% of bboxes removed
+Finished NMS in 3.89s
+Starting (conf, nms) = (0.009000000000000001, 0.5)
+................................................................96.91% of bboxes removed
+Finished NMS in 5.25s
+Starting (conf, nms) = (0.009000000000000001, 0.6000000000000001)
+................................................................96.44% of bboxes removed
+Finished NMS in 5.05s
+Starting (conf, nms) = (0.009000000000000001, 0.7000000000000001)
+................................................................96.27% of bboxes removed
+Finished NMS in 5.47s
+Starting (conf, nms) = (0.009000000000000001, 0.8)
+................................................................96.24% of bboxes removed
+Finished NMS in 5.74s
+Starting (conf, nms) = (0.009000000000000001, 0.9)
+................................................................96.24% of bboxes removed
+Finished NMS in 5.19s
+Starting (conf, nms) = (0.010000000000000002, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.43s
+Starting (conf, nms) = (0.010000000000000002, 0.1)
+................................................................99.45% of bboxes removed
+Finished NMS in 2.87s
+Starting (conf, nms) = (0.010000000000000002, 0.2)
+................................................................99.16% of bboxes removed
+Finished NMS in 2.55s
+Starting (conf, nms) = (0.010000000000000002, 0.30000000000000004)
+................................................................98.57% of bboxes removed
+Finished NMS in 3.59s
+Starting (conf, nms) = (0.010000000000000002, 0.4)
+................................................................97.74% of bboxes removed
+Finished NMS in 3.81s
+Starting (conf, nms) = (0.010000000000000002, 0.5)
+................................................................96.99% of bboxes removed
+Finished NMS in 4.85s
+Starting (conf, nms) = (0.010000000000000002, 0.6000000000000001)
+................................................................96.52% of bboxes removed
+Finished NMS in 5.56s
+Starting (conf, nms) = (0.010000000000000002, 0.7000000000000001)
+................................................................96.36% of bboxes removed
+Finished NMS in 5.08s
+Starting (conf, nms) = (0.010000000000000002, 0.8)
+................................................................96.33% of bboxes removed
+Finished NMS in 5.38s
+Starting (conf, nms) = (0.010000000000000002, 0.9)
+................................................................96.33% of bboxes removed
+Finished NMS in 5.65s
+Starting (conf, nms) = (0.011, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.13s
+Starting (conf, nms) = (0.011, 0.1)
+................................................................99.45% of bboxes removed
+Finished NMS in 2.55s
+Starting (conf, nms) = (0.011, 0.2)
+................................................................99.18% of bboxes removed
+Finished NMS in 3.09s
+Starting (conf, nms) = (0.011, 0.30000000000000004)
+................................................................98.60% of bboxes removed
+Finished NMS in 2.98s
+Starting (conf, nms) = (0.011, 0.4)
+................................................................97.80% of bboxes removed
+Finished NMS in 4.00s
+Starting (conf, nms) = (0.011, 0.5)
+................................................................97.05% of bboxes removed
+Finished NMS in 5.10s
+Starting (conf, nms) = (0.011, 0.6000000000000001)
+................................................................96.60% of bboxes removed
+Finished NMS in 4.91s
+Starting (conf, nms) = (0.011, 0.7000000000000001)
+................................................................96.43% of bboxes removed
+Finished NMS in 5.31s
+Starting (conf, nms) = (0.011, 0.8)
+................................................................96.40% of bboxes removed
+Finished NMS in 5.61s
+Starting (conf, nms) = (0.011, 0.9)
+................................................................96.40% of bboxes removed
+Finished NMS in 5.03s
+Starting (conf, nms) = (0.012, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.39s
+Starting (conf, nms) = (0.012, 0.1)
+................................................................99.46% of bboxes removed
+Finished NMS in 2.83s
+Starting (conf, nms) = (0.012, 0.2)
+................................................................99.18% of bboxes removed
+Finished NMS in 2.52s
+Starting (conf, nms) = (0.012, 0.30000000000000004)
+................................................................98.63% of bboxes removed
+Finished NMS in 3.22s
+Starting (conf, nms) = (0.012, 0.4)
+................................................................97.84% of bboxes removed
+Finished NMS in 4.25s
+Starting (conf, nms) = (0.012, 0.5)
+................................................................97.11% of bboxes removed
+Finished NMS in 4.71s
+Starting (conf, nms) = (0.012, 0.6000000000000001)
+................................................................96.66% of bboxes removed
+Finished NMS in 5.12s
+Starting (conf, nms) = (0.012, 0.7000000000000001)
+................................................................96.50% of bboxes removed
+Finished NMS in 5.24s
+Starting (conf, nms) = (0.012, 0.8)
+................................................................96.47% of bboxes removed
+Finished NMS in 4.97s
+Starting (conf, nms) = (0.012, 0.9)
+................................................................96.47% of bboxes removed
+Finished NMS in 5.23s
+Starting (conf, nms) = (0.013000000000000001, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.66s
+Starting (conf, nms) = (0.013000000000000001, 0.1)
+................................................................99.46% of bboxes removed
+Finished NMS in 2.56s
+Starting (conf, nms) = (0.013000000000000001, 0.2)
+................................................................99.20% of bboxes removed
+Finished NMS in 2.49s
+Starting (conf, nms) = (0.013000000000000001, 0.30000000000000004)
+................................................................98.65% of bboxes removed
+Finished NMS in 3.21s
+Starting (conf, nms) = (0.013000000000000001, 0.4)
+................................................................97.87% of bboxes removed
+Finished NMS in 4.20s
+Starting (conf, nms) = (0.013000000000000001, 0.5)
+................................................................97.16% of bboxes removed
+Finished NMS in 4.41s
+Starting (conf, nms) = (0.013000000000000001, 0.6000000000000001)
+................................................................96.71% of bboxes removed
+Finished NMS in 5.04s
+Starting (conf, nms) = (0.013000000000000001, 0.7000000000000001)
+................................................................96.55% of bboxes removed
+Finished NMS in 5.44s
+Starting (conf, nms) = (0.013000000000000001, 0.8)
+................................................................96.53% of bboxes removed
+Finished NMS in 4.90s
+Starting (conf, nms) = (0.013000000000000001, 0.9)
+................................................................96.53% of bboxes removed
+Finished NMS in 5.17s
+Starting (conf, nms) = (0.014000000000000002, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.65s
+Starting (conf, nms) = (0.014000000000000002, 0.1)
+................................................................99.47% of bboxes removed
+Finished NMS in 2.27s
+Starting (conf, nms) = (0.014000000000000002, 0.2)
+................................................................99.21% of bboxes removed
+Finished NMS in 2.79s
+Starting (conf, nms) = (0.014000000000000002, 0.30000000000000004)
+................................................................98.67% of bboxes removed
+Finished NMS in 3.50s
+Starting (conf, nms) = (0.014000000000000002, 0.4)
+................................................................97.92% of bboxes removed
+Finished NMS in 3.63s
+Starting (conf, nms) = (0.014000000000000002, 0.5)
+................................................................97.21% of bboxes removed
+Finished NMS in 4.65s
+Starting (conf, nms) = (0.014000000000000002, 0.6000000000000001)
+................................................................96.77% of bboxes removed
+Finished NMS in 5.25s
+Starting (conf, nms) = (0.014000000000000002, 0.7000000000000001)
+................................................................96.61% of bboxes removed
+Finished NMS in 4.81s
+Starting (conf, nms) = (0.014000000000000002, 0.8)
+................................................................96.58% of bboxes removed
+Finished NMS in 5.09s
+Starting (conf, nms) = (0.014000000000000002, 0.9)
+................................................................96.58% of bboxes removed
+Finished NMS in 5.40s
+Starting (conf, nms) = (0.015, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.07s
+Starting (conf, nms) = (0.015, 0.1)
+................................................................99.47% of bboxes removed
+Finished NMS in 2.53s
+Starting (conf, nms) = (0.015, 0.2)
+................................................................99.22% of bboxes removed
+Finished NMS in 3.02s
+Starting (conf, nms) = (0.015, 0.30000000000000004)
+................................................................98.69% of bboxes removed
+Finished NMS in 2.89s
+Starting (conf, nms) = (0.015, 0.4)
+................................................................97.95% of bboxes removed
+Finished NMS in 3.82s
+Starting (conf, nms) = (0.015, 0.5)
+................................................................97.26% of bboxes removed
+Finished NMS in 4.87s
+Starting (conf, nms) = (0.015, 0.6000000000000001)
+................................................................96.82% of bboxes removed
+Finished NMS in 4.67s
+Starting (conf, nms) = (0.015, 0.7000000000000001)
+................................................................96.66% of bboxes removed
+Finished NMS in 5.31s
+Starting (conf, nms) = (0.015, 0.8)
+................................................................96.63% of bboxes removed
+Finished NMS in 4.77s
+Starting (conf, nms) = (0.015, 0.9)
+................................................................96.63% of bboxes removed
+Finished NMS in 5.33s
+Starting (conf, nms) = (0.016, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.36s
+Starting (conf, nms) = (0.016, 0.1)
+................................................................99.48% of bboxes removed
+Finished NMS in 2.22s
+Starting (conf, nms) = (0.016, 0.2)
+................................................................99.23% of bboxes removed
+Finished NMS in 2.70s
+Starting (conf, nms) = (0.016, 0.30000000000000004)
+................................................................98.71% of bboxes removed
+Finished NMS in 3.41s
+Starting (conf, nms) = (0.016, 0.4)
+................................................................97.99% of bboxes removed
+Finished NMS in 3.53s
+Starting (conf, nms) = (0.016, 0.5)
+................................................................97.31% of bboxes removed
+Finished NMS in 4.52s
+Starting (conf, nms) = (0.016, 0.6000000000000001)
+................................................................96.87% of bboxes removed
+Finished NMS in 4.99s
+Starting (conf, nms) = (0.016, 0.7000000000000001)
+................................................................96.72% of bboxes removed
+Finished NMS in 4.67s
+Starting (conf, nms) = (0.016, 0.8)
+................................................................96.69% of bboxes removed
+Finished NMS in 4.98s
+Starting (conf, nms) = (0.016, 0.9)
+................................................................96.69% of bboxes removed
+Finished NMS in 5.28s
+Starting (conf, nms) = (0.017, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.05s
+Starting (conf, nms) = (0.017, 0.1)
+................................................................99.48% of bboxes removed
+Finished NMS in 2.47s
+Starting (conf, nms) = (0.017, 0.2)
+................................................................99.24% of bboxes removed
+Finished NMS in 2.98s
+Starting (conf, nms) = (0.017, 0.30000000000000004)
+................................................................98.73% of bboxes removed
+Finished NMS in 2.85s
+Starting (conf, nms) = (0.017, 0.4)
+................................................................98.03% of bboxes removed
+Finished NMS in 3.75s
+Starting (conf, nms) = (0.017, 0.5)
+................................................................97.35% of bboxes removed
+Finished NMS in 4.79s
+Starting (conf, nms) = (0.017, 0.6000000000000001)
+................................................................96.92% of bboxes removed
+Finished NMS in 4.83s
+Starting (conf, nms) = (0.017, 0.7000000000000001)
+................................................................96.77% of bboxes removed
+Finished NMS in 4.64s
+Starting (conf, nms) = (0.017, 0.8)
+................................................................96.74% of bboxes removed
+Finished NMS in 4.92s
+Starting (conf, nms) = (0.017, 0.9)
+................................................................96.74% of bboxes removed
+Finished NMS in 5.23s
+Starting (conf, nms) = (0.018000000000000002, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.34s
+Starting (conf, nms) = (0.018000000000000002, 0.1)
+................................................................99.48% of bboxes removed
+Finished NMS in 2.22s
+Starting (conf, nms) = (0.018000000000000002, 0.2)
+................................................................99.25% of bboxes removed
+Finished NMS in 2.67s
+Starting (conf, nms) = (0.018000000000000002, 0.30000000000000004)
+................................................................98.75% of bboxes removed
+Finished NMS in 3.36s
+Starting (conf, nms) = (0.018000000000000002, 0.4)
+................................................................98.06% of bboxes removed
+Finished NMS in 3.43s
+Starting (conf, nms) = (0.018000000000000002, 0.5)
+................................................................97.40% of bboxes removed
+Finished NMS in 4.66s
+Starting (conf, nms) = (0.018000000000000002, 0.6000000000000001)
+................................................................96.97% of bboxes removed
+Finished NMS in 4.31s
+Starting (conf, nms) = (0.018000000000000002, 0.7000000000000001)
+................................................................96.82% of bboxes removed
+Finished NMS in 4.86s
+Starting (conf, nms) = (0.018000000000000002, 0.8)
+................................................................96.79% of bboxes removed
+Finished NMS in 5.15s
+Starting (conf, nms) = (0.018000000000000002, 0.9)
+................................................................96.79% of bboxes removed
+Finished NMS in 4.60s
+Starting (conf, nms) = (0.019000000000000003, 0.0)
+................................................................99.99% of bboxes removed
+Finished NMS in 2.29s
+Starting (conf, nms) = (0.019000000000000003, 0.1)
+................................................................99.48% of bboxes removed
+Finished NMS in 2.75s
+Starting (conf, nms) = (0.019000000000000003, 0.2)
+................................................................99.26% of bboxes removed
+Finished NMS in 2.39s
+Starting (conf, nms) = (0.019000000000000003, 0.30000000000000004)
+................................................................98.77% of bboxes removed
+Finished NMS in 3.03s
+Starting (conf, nms) = (0.019000000000000003, 0.4)
+................................................................98.10% of bboxes removed
+Finished NMS in 3.95s
+Starting (conf, nms) = (0.019000000000000003, 0.5)
+................................................................97.44% of bboxes removed
+Finished NMS in 4.07s
+Starting (conf, nms) = (0.019000000000000003, 0.6000000000000001)
+................................................................97.02% of bboxes removed
+Finished NMS in 4.54s
+Starting (conf, nms) = (0.019000000000000003, 0.7000000000000001)
+................................................................96.86% of bboxes removed
+Finished NMS in 5.09s
+Starting (conf, nms) = (0.019000000000000003, 0.8)
+................................................................96.84% of bboxes removed
+Finished NMS in 4.68s
+Starting (conf, nms) = (0.019000000000000003, 0.9)
+................................................................96.84% of bboxes removed
+Finished NMS in 4.54s
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[135]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import pandas as pd
+
+df = pd.DataFrame(all_AP, columns = all_nms, index = all_conf)
+df
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[135]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>0.0</th>
+      <th>0.1</th>
+      <th>0.2</th>
+      <th>0.3</th>
+      <th>0.4</th>
+      <th>0.5</th>
+      <th>0.6</th>
+      <th>0.7</th>
+      <th>0.8</th>
+      <th>0.9</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0.001</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.574302</td>
+      <td>0.597034</td>
+      <td>0.591867</td>
+      <td>0.583303</td>
+      <td>0.580718</td>
+      <td>0.580637</td>
+      <td>0.580637</td>
+    </tr>
+    <tr>
+      <th>0.002</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.574302</td>
+      <td>0.597034</td>
+      <td>0.591867</td>
+      <td>0.583303</td>
+      <td>0.580718</td>
+      <td>0.580637</td>
+      <td>0.580637</td>
+    </tr>
+    <tr>
+      <th>0.003</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.574302</td>
+      <td>0.597034</td>
+      <td>0.591867</td>
+      <td>0.583303</td>
+      <td>0.580718</td>
+      <td>0.580637</td>
+      <td>0.580637</td>
+    </tr>
+    <tr>
+      <th>0.004</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.573609</td>
+      <td>0.597034</td>
+      <td>0.591867</td>
+      <td>0.583303</td>
+      <td>0.580718</td>
+      <td>0.580637</td>
+      <td>0.580637</td>
+    </tr>
+    <tr>
+      <th>0.005</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.573609</td>
+      <td>0.597034</td>
+      <td>0.591867</td>
+      <td>0.583303</td>
+      <td>0.580718</td>
+      <td>0.580637</td>
+      <td>0.580637</td>
+    </tr>
+    <tr>
+      <th>0.006</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.573609</td>
+      <td>0.597034</td>
+      <td>0.591867</td>
+      <td>0.583303</td>
+      <td>0.580718</td>
+      <td>0.580637</td>
+      <td>0.580637</td>
+    </tr>
+    <tr>
+      <th>0.007</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.573609</td>
+      <td>0.597034</td>
+      <td>0.591867</td>
+      <td>0.583303</td>
+      <td>0.580718</td>
+      <td>0.580637</td>
+      <td>0.580637</td>
+    </tr>
+    <tr>
+      <th>0.008</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.573609</td>
+      <td>0.596504</td>
+      <td>0.591461</td>
+      <td>0.582943</td>
+      <td>0.580370</td>
+      <td>0.580291</td>
+      <td>0.580291</td>
+    </tr>
+    <tr>
+      <th>0.009</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.573609</td>
+      <td>0.596504</td>
+      <td>0.591461</td>
+      <td>0.582943</td>
+      <td>0.580370</td>
+      <td>0.580291</td>
+      <td>0.580291</td>
+    </tr>
+    <tr>
+      <th>0.010</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.591461</td>
+      <td>0.582943</td>
+      <td>0.580370</td>
+      <td>0.580291</td>
+      <td>0.580291</td>
+    </tr>
+    <tr>
+      <th>0.011</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.591024</td>
+      <td>0.582558</td>
+      <td>0.579999</td>
+      <td>0.579922</td>
+      <td>0.579922</td>
+    </tr>
+    <tr>
+      <th>0.012</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.591024</td>
+      <td>0.582558</td>
+      <td>0.579999</td>
+      <td>0.579922</td>
+      <td>0.579922</td>
+    </tr>
+    <tr>
+      <th>0.013</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.591024</td>
+      <td>0.582558</td>
+      <td>0.579999</td>
+      <td>0.579922</td>
+      <td>0.579922</td>
+    </tr>
+    <tr>
+      <th>0.014</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.591024</td>
+      <td>0.582558</td>
+      <td>0.579999</td>
+      <td>0.579922</td>
+      <td>0.579922</td>
+    </tr>
+    <tr>
+      <th>0.015</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.591024</td>
+      <td>0.582558</td>
+      <td>0.579999</td>
+      <td>0.579922</td>
+      <td>0.579922</td>
+    </tr>
+    <tr>
+      <th>0.016</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.591024</td>
+      <td>0.582558</td>
+      <td>0.579999</td>
+      <td>0.579922</td>
+      <td>0.579922</td>
+    </tr>
+    <tr>
+      <th>0.017</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.590542</td>
+      <td>0.582135</td>
+      <td>0.579593</td>
+      <td>0.579518</td>
+      <td>0.579518</td>
+    </tr>
+    <tr>
+      <th>0.018</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.590542</td>
+      <td>0.582135</td>
+      <td>0.579593</td>
+      <td>0.579518</td>
+      <td>0.579518</td>
+    </tr>
+    <tr>
+      <th>0.019</th>
+      <td>0.004106</td>
+      <td>0.493348</td>
+      <td>0.537084</td>
+      <td>0.572738</td>
+      <td>0.596504</td>
+      <td>0.590542</td>
+      <td>0.582135</td>
+      <td>0.579593</td>
+      <td>0.579518</td>
+      <td>0.579518</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -1252,7 +2157,6 @@ for all_bb in [yolo_bb, star_bb, cell_bb]:
 </pre></div>
 </div>
 </div>
-</section>
 </section>
 
 
@@ -1280,9 +2184,9 @@ for all_bb in [yolo_bb, star_bb, cell_bb]:
 <li><a class="reference internal" href="#Compute-AP-(IOU-=-0.5)-for-each-model">Compute AP (IOU = 0.5) for each model</a></li>
 <li><a class="reference internal" href="#Plot-results">Plot results</a></li>
 <li><a class="reference internal" href="#Compute-mAP-(0.5:0.05:1.0)-for-each-model">Compute mAP (0.5:0.05:1.0) for each model</a></li>
-<li><a class="reference internal" href="#Plot-Results?">Plot Results?</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#(4)-Use-GridSearch-CV-to-find-the-best-(nms_thresh,-conf_thresh)-combination">(4) Use GridSearch CV to find the best (nms_thresh, conf_thresh) combination</a></li>
 </ul>
 
   </div>
