@@ -37,8 +37,8 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[62]:
+  <div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
@@ -92,6 +92,15 @@ sys.path.append('/ifshome/abenneck/docs_public/libraries/cellpose')
 from cellpose import models
 </pre></div>
 </div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+2026-09-15 10:56:25.307174: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+</pre></div></div>
 </div>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
@@ -1261,11 +1270,26 @@ for i, conf_thresh in enumerate(all_conf):
 
         start = time.time()
 
+        # Apply NMS to the single cube
         yolo_nms = NMS(yolo_out, conf_thresh = conf_thresh, nms_thresh = nms_thresh)
+
+        # Convert the output from an array to a list
         yolo_bb_nms = yolo_output_to_bb_list(yolo_nms)
+
+        # NOTE: I pushed the entire GT image of size 256 through the YOLO pipeline, but only the middle cube of size 64 was annotated
+        #       So the units of the yolo output need to be converted into units relative to the annotated region.
+        #       Also, the predictions outside of the annotated zone must be trimmed since there are no GT to compare against
+
+        # Convert output units, so they are relative to the annotated region, with origin in the upper left corner
         yolo_bb_nms_adjusted = convert_bb_units(yolo_bb_nms)
+
+        # Trim off predictions located outside of the annotated region
         yolo_bb_nms_final = trim_bb(yolo_bb_nms_adjusted)
+
+        # Remove all bboxes with a confidence of 0
         yolo_bb_nms_final = remove_low_conf_bb(yolo_bb_nms_final)
+
+        # Compute AP for the current (conf_thresh, nms_thresh) pair
         AP_yolo_nms, perf_yolo_nms = get_AP(gt_bb_adjusted, yolo_bb_nms_final, iou_thresh = iou_thresh, verbose = True)
 
         all_AP[i,j] = AP_yolo_nms
