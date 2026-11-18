@@ -1,0 +1,2585 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Assign region labels to cells based on cell center &#8212; yolo_model  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Assign region labels to cells based on cell center</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
+import matplotlib.pyplot as plt
+import os
+import time
+import numpy as np
+import pandas as pd
+import random
+from matplotlib.patches import Rectangle
+import tifffile
+import h5py
+from torch.utils.data import DataLoader
+import imageio.v2 as imageio
+from scipy.ndimage import gaussian_filter
+from matplotlib.patches import Patch
+
+import importlib as imp
+import sys
+sys.path.append(os.path.join(os.path.split(os.getcwd())[0], 'scripts'))
+
+import yolo_tiles
+imp.reload(yolo_tiles)
+from yolo_tiles import img_to_tiles, apply_model_to_tiles, load_test_image, preprocess, tileDataset, remove_bbox_in_overlap
+
+import yolo_help
+imp.reload(yolo_help)
+from yolo_help import bbox_to_rectangles, imshow, convert_data, Net, get_best_bounding_box_per_cell
+
+import yolo_post_help
+imp.reload(yolo_post_help)
+from yolo_post_help import postprocess, bb_to_rec, NMS
+
+import yolo_help_3D
+imp.reload(yolo_help_3D)
+from yolo_help_3D import apply_model_to_orthogonal_slices, gen_3D_GT, recon_down, vol_to_mip_rgb, orthogonal_to_3D, vol_to_mip
+
+import yolo_avg_prec
+imp.reload(yolo_avg_prec)
+from yolo_avg_prec import get_AP, gt_bbox_to_pred_bbox_format, IOU_3D, yolo_output_to_list
+
+import yolo_3D_pipeline_help
+imp.reload(yolo_3D_pipeline_help)
+from yolo_3D_pipeline_help import apply_2D_yolo_to_slices, stitch_slices_into_cube
+
+import nibabel as nib
+from csbdeep.utils import normalize
+
+from stardist.models import StarDist3D
+from cellpose import models
+
+pd.set_option('display.max_rows', 500)
+
+sys.path.append('/home/abenneck/equivariance_model')
+import moment_kernels as mk
+imp.reload(mk)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+2026-11-17 14:01:50.050121: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-11-17 14:01:50.057065: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:467] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+E0000 00:00:1794952910.065625 3031105 cuda_dnn.cc:8579] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+E0000 00:00:1794952910.068215 3031105 cuda_blas.cc:1407] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+W0000 00:00:1794952910.074561 3031105 computation_placer.cc:177] computation placer already registered. Please check linkage and avoid linking the same target more than once.
+W0000 00:00:1794952910.074569 3031105 computation_placer.cc:177] computation placer already registered. Please check linkage and avoid linking the same target more than once.
+W0000 00:00:1794952910.074570 3031105 computation_placer.cc:177] computation placer already registered. Please check linkage and avoid linking the same target more than once.
+W0000 00:00:1794952910.074571 3031105 computation_placer.cc:177] computation placer already registered. Please check linkage and avoid linking the same target more than once.
+2026-11-17 14:01:50.076963: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX512F AVX512_VNNI, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;module &#39;moment_kernels&#39; from &#39;/home/abenneck/equivariance_model/moment_kernels.py&#39;&gt;
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>def voxel_to_um(voxel_dim, val, val_pos):
+    if val_pos == 0:
+        return val * voxel_dim[0]
+    elif val_pos == 1:
+        return val * voxel_dim[1]
+    elif val_pos == 2:
+        return val * voxel_dim[2]
+    else:
+        raise ValueError('val_pos must be from [0,1,2]')
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>indir = '/home/abenneck/mounts/bmaproot/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v04_NMS/'
+conf_thresh = 0.3
+outdir = f'/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_{str(conf_thresh).replace('.','_')}_origin0'
+next_idx = 0
+voxel_dim = [2, 1.866, 1.866]
+verbose = True
+
+for idx, fname in enumerate(os.listdir(indir)):
+
+    if idx &lt; next_idx:
+        continue
+
+    print(f'Starting {fname} ({idx}/{len(os.listdir(indir))}) . . .')
+    start = time.time()
+
+    data = np.load(os.path.join(indir, fname))
+    if len(np.unique(data[...,6])) == 1:
+        print('Skipping empty cube . . .\n')
+        continue
+
+    out_data = list()
+    count = 0
+
+    cube_slice = int(fname[1:5])
+    cube_row   = int(fname[7:11])
+    cube_col   = int(fname[13:17])
+
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            for k in range(data.shape[2]):
+                pred = data[i,j,k]
+
+                conf = pred[6]
+
+                if conf &lt; conf_thresh:
+                    continue
+
+                if verbose:
+                    # print(f'Adding cell {i*data.shape[0] + j*data.shape[1] + k*data.shape[2]:_} / {data.shape[0]*data.shape[1]*data.shape[2]:_}')
+                    count += 1
+
+                slice_min = voxel_to_um(voxel_dim, pred[0], 0)
+                slice_max = voxel_to_um(voxel_dim, pred[1], 0)
+                row_min = voxel_to_um(voxel_dim, pred[2], 1)
+                row_max = voxel_to_um(voxel_dim, pred[3], 1)
+                col_min = voxel_to_um(voxel_dim, pred[4], 2)
+                col_max = voxel_to_um(voxel_dim, pred[5], 2)
+
+                cl0 = pred[7]
+                cl1 = pred[8]
+                cl2 = pred[9]
+
+                c_slice = (slice_min + slice_max) / 2
+                c_row = (row_min + row_max) / 2
+                c_col = (col_min + col_max) / 2
+
+                l_slice = np.abs(slice_max - slice_min)
+                l_row = np.abs(row_max - row_min)
+                l_col = np.abs(col_max - col_min)
+
+                out_data.append([cube_slice, cube_row, cube_col, c_slice, c_row, c_col, l_slice, l_row, l_col, conf, cl0, cl1, cl2])
+
+    out_fname = fname[:17] + f'_counts_n{count}.npy'
+    np.save(os.path.join(outdir, out_fname), np.array(out_data))
+
+    print(f'Finished appending {count} cells in {time.time() - start:.2f}s\n')
+
+    # break
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[49]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>indir = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3'
+
+# out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.pkl'
+# columns = ["cube_slice", "cube_row", "cube_col", "c_slice", "c_row", "c_col", "l_slice", "l_row", "l_col", "conf", "cl0", "cl1", "cl2"]
+
+out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.h5'
+columns = ["cube_slice", "cube_row", "cube_col", "c_slice", "c_row", "c_col", "l_slice", "l_row", "l_col"]
+
+next_idx = 3
+
+for idx, fname in enumerate(os.listdir(indir)):
+
+    if idx &lt; next_idx:
+        continue
+
+    print(f'Starting {idx}/{len(os.listdir(indir))} . . .')
+
+    # out_df = pd.read_pickle(out_fname)
+    if idx == 0 and 'h5' in out_fname:
+        out_df = pd.DataFrame(columns = ["cube_slice", "cube_row", "cube_col", "c_slice", "c_row", "c_col", "l_slice", "l_row", "l_col"], dtype = int)
+        # out_df.to_hdf(out_fname, key="table", mode="a", format="table")
+    else:
+        out_df = pd.read_hdf(out_fname, key='table', mode="a")
+
+    data = np.load(os.path.join(indir, fname))
+    if data.shape == (0,):
+        print(f'{fname} is empty, skipping it . . .')
+        continue
+    data_ = [[round(i) for i in row] for row in data[:,:9]]
+    new_df = pd.DataFrame(data_, columns=columns, dtype=int)
+
+    out_df = pd.concat([out_df, new_df])
+    # out_df.to_pickle(out_fname, protocol=5)
+    out_df.to_hdf(out_fname, key='table', mode="a")
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Starting 3/187 . . .
+Starting 4/187 . . .
+Starting 5/187 . . .
+Starting 6/187 . . .
+Starting 7/187 . . .
+Starting 8/187 . . .
+Starting 9/187 . . .
+Starting 10/187 . . .
+Starting 11/187 . . .
+Starting 12/187 . . .
+Starting 13/187 . . .
+Starting 14/187 . . .
+Starting 15/187 . . .
+Starting 16/187 . . .
+Starting 17/187 . . .
+Starting 18/187 . . .
+Starting 19/187 . . .
+Starting 20/187 . . .
+Starting 21/187 . . .
+Starting 22/187 . . .
+Starting 23/187 . . .
+Starting 24/187 . . .
+Starting 25/187 . . .
+Starting 26/187 . . .
+Starting 27/187 . . .
+Starting 28/187 . . .
+Starting 29/187 . . .
+Starting 30/187 . . .
+Starting 31/187 . . .
+Starting 32/187 . . .
+Starting 33/187 . . .
+Starting 34/187 . . .
+Starting 35/187 . . .
+Starting 36/187 . . .
+Starting 37/187 . . .
+Starting 38/187 . . .
+Starting 39/187 . . .
+Starting 40/187 . . .
+Starting 41/187 . . .
+Starting 42/187 . . .
+Starting 43/187 . . .
+Starting 44/187 . . .
+Starting 45/187 . . .
+Starting 46/187 . . .
+Starting 47/187 . . .
+Starting 48/187 . . .
+Starting 49/187 . . .
+Starting 50/187 . . .
+Starting 51/187 . . .
+Starting 52/187 . . .
+Starting 53/187 . . .
+Starting 54/187 . . .
+Starting 55/187 . . .
+Starting 56/187 . . .
+Starting 57/187 . . .
+Starting 58/187 . . .
+Starting 59/187 . . .
+Starting 60/187 . . .
+Starting 61/187 . . .
+Starting 62/187 . . .
+Starting 63/187 . . .
+Starting 64/187 . . .
+Starting 65/187 . . .
+Starting 66/187 . . .
+Starting 67/187 . . .
+Starting 68/187 . . .
+Starting 69/187 . . .
+i0003_j0004_k0000_counts_n0.npy is empty, skipping it . . .
+Starting 70/187 . . .
+Starting 71/187 . . .
+Starting 72/187 . . .
+Starting 73/187 . . .
+Starting 74/187 . . .
+Starting 75/187 . . .
+Starting 76/187 . . .
+Starting 77/187 . . .
+Starting 78/187 . . .
+Starting 79/187 . . .
+Starting 80/187 . . .
+Starting 81/187 . . .
+Starting 82/187 . . .
+Starting 83/187 . . .
+Starting 84/187 . . .
+Starting 85/187 . . .
+Starting 86/187 . . .
+Starting 87/187 . . .
+Starting 88/187 . . .
+Starting 89/187 . . .
+Starting 90/187 . . .
+Starting 91/187 . . .
+Starting 92/187 . . .
+Starting 93/187 . . .
+Starting 94/187 . . .
+Starting 95/187 . . .
+Starting 96/187 . . .
+Starting 97/187 . . .
+Starting 98/187 . . .
+Starting 99/187 . . .
+Starting 100/187 . . .
+Starting 101/187 . . .
+Starting 102/187 . . .
+Starting 103/187 . . .
+Starting 104/187 . . .
+Starting 105/187 . . .
+Starting 106/187 . . .
+Starting 107/187 . . .
+Starting 108/187 . . .
+Starting 109/187 . . .
+Starting 110/187 . . .
+Starting 111/187 . . .
+Starting 112/187 . . .
+Starting 113/187 . . .
+Starting 114/187 . . .
+Starting 115/187 . . .
+Starting 116/187 . . .
+Starting 117/187 . . .
+Starting 118/187 . . .
+Starting 119/187 . . .
+Starting 120/187 . . .
+Starting 121/187 . . .
+Starting 122/187 . . .
+Starting 123/187 . . .
+Starting 124/187 . . .
+Starting 125/187 . . .
+Starting 126/187 . . .
+Starting 127/187 . . .
+Starting 128/187 . . .
+Starting 129/187 . . .
+Starting 130/187 . . .
+Starting 131/187 . . .
+Starting 132/187 . . .
+Starting 133/187 . . .
+Starting 134/187 . . .
+Starting 135/187 . . .
+Starting 136/187 . . .
+Starting 137/187 . . .
+Starting 138/187 . . .
+Starting 139/187 . . .
+Starting 140/187 . . .
+Starting 141/187 . . .
+Starting 142/187 . . .
+Starting 143/187 . . .
+Starting 144/187 . . .
+Starting 145/187 . . .
+Starting 146/187 . . .
+Starting 147/187 . . .
+Starting 148/187 . . .
+Starting 149/187 . . .
+Starting 150/187 . . .
+Starting 151/187 . . .
+Starting 152/187 . . .
+Starting 153/187 . . .
+Starting 154/187 . . .
+Starting 155/187 . . .
+Starting 156/187 . . .
+Starting 157/187 . . .
+Starting 158/187 . . .
+Starting 159/187 . . .
+Starting 160/187 . . .
+Starting 161/187 . . .
+Starting 162/187 . . .
+Starting 163/187 . . .
+Starting 164/187 . . .
+Starting 165/187 . . .
+Starting 166/187 . . .
+Starting 167/187 . . .
+Starting 168/187 . . .
+Starting 169/187 . . .
+Starting 170/187 . . .
+Starting 171/187 . . .
+Starting 172/187 . . .
+Starting 173/187 . . .
+Starting 174/187 . . .
+Starting 175/187 . . .
+Starting 176/187 . . .
+Starting 177/187 . . .
+Starting 178/187 . . .
+Starting 179/187 . . .
+Starting 180/187 . . .
+Starting 181/187 . . .
+Starting 182/187 . . .
+Starting 183/187 . . .
+Starting 184/187 . . .
+Starting 185/187 . . .
+Starting 186/187 . . .
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># # Convert the .pkl file into an .h5 file (TOO MUCH MEMORY)
+# in_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.pkl'
+# out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.h5'
+
+# data = pd.DataFrame([])
+# data.to_hdf(out_fname, key="table", mode="a", format="table")
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[43]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Intialize the DataFrame + Save as .pkl or .h5 file
+# df = pd.DataFrame(columns = ["cube_slice", "cube_row", "cube_col", "c_slice", "c_row", "c_col", "l_slice", "l_row", "l_col", "conf", "cl0", "cl1", "cl2"])
+df = pd.DataFrame(columns = ["cube_slice", "cube_row", "cube_col", "c_slice", "c_row", "c_col", "l_slice", "l_row", "l_col"], dtype = int)
+
+# out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.pkl'
+# df.to_pickle(out_fname, protocol=5)
+
+out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.h5'
+df.to_hdf(out_fname, key="table", mode="a", format="table")
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.h5'
+out_df_h5 = pd.read_hdf(out_fname, key="table", mode="a")
+
+out_df_h5.head()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cube_slice</th>
+      <th>cube_row</th>
+      <th>cube_col</th>
+      <th>c_slice</th>
+      <th>c_row</th>
+      <th>c_col</th>
+      <th>l_slice</th>
+      <th>l_row</th>
+      <th>l_col</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4100</td>
+      <td>1908</td>
+      <td>4495</td>
+      <td>20</td>
+      <td>16</td>
+      <td>19</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4102</td>
+      <td>1910</td>
+      <td>4630</td>
+      <td>10</td>
+      <td>23</td>
+      <td>12</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4101</td>
+      <td>1908</td>
+      <td>4774</td>
+      <td>16</td>
+      <td>14</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4097</td>
+      <td>1910</td>
+      <td>4821</td>
+      <td>11</td>
+      <td>16</td>
+      <td>9</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4099</td>
+      <td>1911</td>
+      <td>4823</td>
+      <td>19</td>
+      <td>16</td>
+      <td>10</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.pkl'
+out_df_pkl = pd.read_pickle(out_fname)
+
+out_df_pkl.head()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cube_slice</th>
+      <th>cube_row</th>
+      <th>cube_col</th>
+      <th>c_slice</th>
+      <th>c_row</th>
+      <th>c_col</th>
+      <th>l_slice</th>
+      <th>l_row</th>
+      <th>l_col</th>
+      <th>conf</th>
+      <th>cl0</th>
+      <th>cl1</th>
+      <th>cl2</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2.0</td>
+      <td>1.0</td>
+      <td>2.0</td>
+      <td>4099.824219</td>
+      <td>1908.150391</td>
+      <td>4495.180664</td>
+      <td>20.001465</td>
+      <td>16.392944</td>
+      <td>18.506348</td>
+      <td>0.469228</td>
+      <td>-1.39782</td>
+      <td>-0.289171</td>
+      <td>0.748363</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2.0</td>
+      <td>1.0</td>
+      <td>2.0</td>
+      <td>4102.341309</td>
+      <td>1909.708496</td>
+      <td>4630.251465</td>
+      <td>9.629883</td>
+      <td>22.632568</td>
+      <td>12.150391</td>
+      <td>0.352865</td>
+      <td>-1.157141</td>
+      <td>-0.492396</td>
+      <td>0.330309</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2.0</td>
+      <td>1.0</td>
+      <td>2.0</td>
+      <td>4101.232422</td>
+      <td>1908.155029</td>
+      <td>4774.298828</td>
+      <td>15.681152</td>
+      <td>14.338501</td>
+      <td>14.991699</td>
+      <td>0.651453</td>
+      <td>-0.359325</td>
+      <td>-0.631465</td>
+      <td>-0.839321</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2.0</td>
+      <td>1.0</td>
+      <td>2.0</td>
+      <td>4097.318359</td>
+      <td>1910.303467</td>
+      <td>4821.268555</td>
+      <td>10.615723</td>
+      <td>16.286011</td>
+      <td>8.728027</td>
+      <td>0.447413</td>
+      <td>-0.524833</td>
+      <td>-0.114612</td>
+      <td>0.026317</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>2.0</td>
+      <td>1.0</td>
+      <td>2.0</td>
+      <td>4098.69873</td>
+      <td>1911.343018</td>
+      <td>4822.849609</td>
+      <td>19.353516</td>
+      <td>16.089478</td>
+      <td>10.103516</td>
+      <td>0.309374</td>
+      <td>-0.453654</td>
+      <td>-0.612545</td>
+      <td>-0.022999</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<section id="Assign-region-labels-to-cells-based-on-cell-center">
+<h1>Assign region labels to cells based on cell center<a class="headerlink" href="#Assign-region-labels-to-cells-based-on-cell-center" title="Link to this heading">¶</a></h1>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[54]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Load the original hdf5 file (Voxel =&gt; um, but no origin shift)
+out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.h5'
+out_df_h5 = pd.read_hdf(out_fname, key="table", mode="a")
+
+# # Change coordinate space to have origin at the center instead of upper left hand corner
+# out_df_h5['c_slice'] = out_df_h5['c_slice'] - (ntif[0]-1)/2*dtif[0]
+# out_df_h5['c_row'] = out_df_h5['c_row'] - (ntif[1]-1)/2*dtif[1]
+# out_df_h5['c_col'] = out_df_h5['c_col'] - (ntif[2]-1)/2*dtif[2]
+# out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3_origin_center.h5'
+# out_df_h5.to_hdf(out_fname, key="table", mode="a", format="table")
+
+# # Load the adjusted hdf5 file (Voxel =&gt; um + origin shift)
+# out_fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3_origin_center.h5'
+# out_fname = '/home/abenneck/mounts/bmaproot/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v04_NMS/conf_0_3_origin_center.h5'
+# out_df_h5 = pd.read_hdf(out_fname, key="table", mode="a")
+out_df_h5.head()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[54]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cube_slice</th>
+      <th>cube_row</th>
+      <th>cube_col</th>
+      <th>c_slice</th>
+      <th>c_row</th>
+      <th>c_col</th>
+      <th>l_slice</th>
+      <th>l_row</th>
+      <th>l_col</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4100</td>
+      <td>1908</td>
+      <td>4495</td>
+      <td>20</td>
+      <td>16</td>
+      <td>19</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4102</td>
+      <td>1910</td>
+      <td>4630</td>
+      <td>10</td>
+      <td>23</td>
+      <td>12</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4101</td>
+      <td>1908</td>
+      <td>4774</td>
+      <td>16</td>
+      <td>14</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4097</td>
+      <td>1910</td>
+      <td>4821</td>
+      <td>11</td>
+      <td>16</td>
+      <td>9</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>4099</td>
+      <td>1911</td>
+      <td>4823</td>
+      <td>19</td>
+      <td>16</td>
+      <td>10</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[59]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(np.min(out_df_h5['c_slice'])/2, np.max(out_df_h5['c_slice'])/2)
+print(np.min(out_df_h5['c_row'])/1.866, np.max(out_df_h5['c_row'])/1.866)
+print(np.min(out_df_h5['c_col'])/1.866, np.max(out_df_h5['c_col'])/1.866)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+69.0 3541.5
+94.85530546623794 8497.320471596999
+527.8670953912111 6906.752411575562
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>registration_output_dir = '/home/abenneck/mounts/bmaproot/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/registration_outputs'
+label_file = os.path.join(registration_output_dir,'transformed_atlas_labels.nii')
+vol = nib.load(label_file)
+L = np.array(vol.dataobj)
+
+o = vol.affine[:3,-1]
+d = np.diag(vol.affine[:3,:3])
+n = np.array(vol.shape[-3:])
+xL = [np.arange(ni)*di + oi for ni,di,oi in zip(n,d,o)]
+
+dtif = np.array([2.0, 1.866, 1.866]) # todo, add more decimal places if we have them
+otif = np.array([0,0,0])
+ntif = np.array([3600,8587,7321]) # 3600 slices 8587 rows 7321 slices
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+1204539731.py (4): __array__ implementation doesn&#39;t accept a copy keyword, so passing copy=False failed. __array__ must implement &#39;dtype&#39; and &#39;copy&#39; keyword arguments. To learn more, see the migration guide https://numpy.org/devdocs/numpy_2_0_migration_guide.html#adapting-to-changes-in-the-copy-keyword
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[29]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Convert from microns into voxel label units
+c_slice = np.round((out_df_h5['c_slice'] - o[0])/d[0]).astype(int)
+c_row   = np.round((out_df_h5['c_row']   - o[1])/d[1]).astype(int)
+c_col   = np.round((out_df_h5['c_col']   - o[2])/d[2]).astype(int)
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[30]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Evaluate the labels at every cell center
+cell_anatomical_labels = L[(np.zeros(c_slice.shape[0],dtype=int), c_slice, c_row, c_col)]
+out_df_h5['Region ID'] = cell_anatomical_labels
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[30]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+array([ 74, 142, 142, ...,   0,   0,   0],
+      shape=(114489273,), dtype=uint16)
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[34]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>out_df_h5.to_hdf(out_fname, key="table", mode="a", format="table")
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Data-Exploration">
+<h1>Data Exploration<a class="headerlink" href="#Data-Exploration" title="Link to this heading">¶</a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fname = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3_origin_center.h5'
+data = pd.read_hdf(fname, key="table", mode="a")
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>out_df_h5['cube_slice'] = out_df_h5['cube_slice'].astype(np.uint8)
+out_df_h5['cube_row'] = out_df_h5['cube_row'].astype(np.uint8)
+out_df_h5['cube_col'] = out_df_h5['cube_col'].astype(np.uint8)
+
+out_df_h5['c_slice'] = out_df_h5['c_slice'].astype(np.int16)
+out_df_h5['c_row'] = out_df_h5['c_row'].astype(np.int16)
+out_df_h5['c_col'] = out_df_h5['c_col'].astype(np.int16)
+
+out_df_h5['l_slice'] = out_df_h5['l_slice'].astype(np.uint8)
+out_df_h5['l_row'] = out_df_h5['l_row'].astype(np.uint8)
+out_df_h5['l_col'] = out_df_h5['l_col'].astype(np.uint8)
+out_df_h5['Region ID'] = out_df_h5['Region ID'].astype(np.uint16)
+
+data = out_df_h5.to_hdf(fname, key="table", mode="a", index = False)
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>vals, counts = np.unique(data['Region ID'], return_counts=True)
+
+[print(v,c) for v, c in zip(vals,counts)]
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+0 3639291
+2 172031
+3 883531
+4 464032
+6 229242
+7 121955
+8 703817
+9 12347
+10 7951
+11 47332
+12 21085
+13 4818
+14 95389
+15 421397
+16 92664
+18 3100995
+19 77583
+20 96942
+21 25115
+22 10208
+23 159089
+24 37500
+25 6417
+26 1081
+27 136219
+28 239523
+29 815442
+30 150261
+31 35444
+32 425286
+33 126335
+34 39629
+35 378043
+36 87980
+37 7997
+38 198559
+39 67348
+40 41891
+41 260985
+42 3604710
+43 322407
+44 19952
+45 29260
+46 755707
+47 267434
+48 38683
+49 35162
+50 598072
+51 217552
+52 184409
+53 23238
+55 4856
+59 58534
+60 17148
+61 17304
+62 2013
+63 139851
+64 2964
+65 5504
+67 387717
+68 73165
+72 2751
+74 1515720
+76 10412
+78 126286
+80 57188
+81 28671
+82 81544
+83 82143
+84 90961
+86 155394
+87 183038
+88 32875
+89 112430
+90 27128
+91 29761
+92 22892
+93 1315121
+96 498037
+97 36980
+99 71338
+100 130933
+104 86452
+105 44790
+106 626177
+107 12456
+108 14452
+110 2632
+111 42050
+112 74502
+113 26512
+114 8370
+115 17778
+117 67675
+118 33366
+119 76370
+120 20940
+122 351681
+123 276402
+124 447239
+125 17861
+126 12367
+129 105767
+130 19990
+131 1079518
+134 107512
+138 114634
+141 25081
+142 1954661
+143 69583
+146 62785
+147 56190
+149 65727
+150 260821
+152 67960
+154 88098
+156 32673
+159 443762
+160 130668
+162 367549
+164 70473
+165 11926
+166 129577
+167 4927
+168 2202
+170 30212
+172 109084
+173 34340
+174 6340
+176 6196
+177 58301
+178 80200
+179 15089
+180 8675
+181 129335
+182 25907
+183 60172
+186 444064
+189 115401
+190 233363
+192 105848
+193 126849
+194 16509
+195 70610
+196 1298196
+199 175504
+201 47890
+202 4569
+203 128677
+204 149341
+206 8883
+207 3807
+208 201549
+212 45391
+215 110365
+216 135995
+217 142466
+219 187550
+220 32229
+221 1545
+223 9383
+224 226180
+225 59193
+228 327807
+229 35635
+230 25929
+231 11868
+232 14814
+234 58686
+235 95684
+236 48822
+237 18967
+238 71712
+239 51692
+241 109188
+242 53664
+243 53409
+245 26229
+246 176840
+247 125435
+248 28320
+250 3172
+251 173502
+253 206167
+254 9538
+256 209650
+257 79737
+259 64287
+260 16040
+266 27809
+267 33069
+268 7391
+271 15145
+272 224727
+273 13335
+275 12729
+276 200598
+279 134516
+280 15613
+282 42372
+283 54596
+284 36958
+287 45572
+291 36201
+293 72745
+294 263665
+295 60821
+296 61780
+297 94458
+298 123796
+300 97985
+303 62664
+304 45738
+305 16538
+306 134843
+311 49296
+312 48449
+313 709437
+315 76570
+320 29204
+321 3193
+322 11209
+323 13793
+324 62136
+325 47521
+326 133027
+329 6454
+330 6985
+331 3079
+332 3357
+333 373865
+335 13482
+336 73439
+337 4115
+338 7673
+340 95243
+341 245679
+342 152762
+343 225
+344 50440
+347 61944
+348 143673
+349 11919
+350 43621
+351 3423
+352 628982
+354 30475
+355 20719
+356 388012
+357 704506
+359 58333
+361 38771
+362 24220
+365 4385
+366 25373
+367 31467
+368 80568
+369 83515
+371 1803574
+372 70705
+373 24670
+374 116996
+375 746915
+376 7844
+377 59894
+378 72329
+380 38989
+386 10676
+387 134490
+389 22483
+390 8466
+391 20633
+392 107551
+393 21713
+394 11189
+395 9426
+397 75545
+399 84686
+401 5714
+402 21236
+405 30197
+407 68302
+409 24397
+412 1269
+413 121332
+414 13965
+415 126792
+416 35839
+417 392643
+419 552425
+422 1037309
+423 25632
+424 41741
+426 1181344
+427 237172
+428 229997
+430 36334
+432 211380
+435 91905
+438 451660
+439 41575
+440 18492
+441 74990
+442 1015647
+443 144391
+444 36512
+445 792335
+446 12734
+449 15105
+450 96050
+451 39948
+453 22939
+454 130661
+456 22736
+458 91419
+459 99826
+460 26181
+461 34726
+462 212740
+464 7064
+465 72939
+466 12822
+467 4550
+470 109268
+473 43815
+474 167239
+475 81056
+476 7043
+478 176901
+479 56529
+480 17821
+481 6179
+484 2586
+485 11643
+486 245015
+487 14269
+488 20042
+490 29806
+491 5205
+493 15848
+494 1352408
+497 97773
+499 6850
+500 4571
+501 36905
+503 80145
+504 10513
+505 70364
+507 91182
+508 85703
+510 55227
+511 4174
+512 45003
+513 31474
+514 323
+516 426
+517 22560
+518 176150
+519 77525
+520 95124
+528 84889
+529 33978
+533 13355
+535 94250
+536 72092
+537 142759
+538 26894
+539 62067
+540 62915
+541 37834
+542 238292
+544 40687
+545 107984
+546 45171
+548 38620
+549 75062
+550 6493
+553 44534
+554 51243
+555 4861
+556 64164
+557 109538
+559 8506
+561 17731
+562 105922
+563 76142
+565 9180
+568 13088
+570 19239
+571 44371
+572 50585
+573 101188
+574 226843
+575 38178
+576 356000
+578 10797
+579 26984
+581 91496
+582 29577
+584 235461
+586 75909
+591 126610
+593 41500
+594 18259
+595 602960
+597 400214
+599 50305
+601 25392
+602 324480
+604 84143
+606 40247
+611 9031
+612 99
+613 21208
+614 246618
+616 774495
+617 158486
+619 286736
+620 1969
+621 94170
+622 2682
+623 251859
+624 133154
+625 457267
+627 19561
+628 474812
+629 10433
+631 18980
+632 198571
+635 16118
+638 16282
+639 13729
+641 86
+642 82685
+643 156407
+644 21679
+645 295891
+646 117941
+647 17418
+648 47135
+650 2443
+652 15806
+653 252546
+656 92128
+657 23547
+658 3341
+660 87339
+661 35332
+662 85163
+665 38218
+666 229600
+667 55844
+671 179081
+672 1706
+673 568785
+674 30836
+677 13548
+678 30561
+679 62682
+680 68856
+681 564078
+682 120056
+683 212762
+684 124955
+686 291591
+687 48798
+688 423711
+690 7713607
+693 60049
+695 821281
+696 114214
+697 321174
+698 89670
+699 10598
+701 215366
+702 286441
+704 24222
+706 244731
+707 343001
+708 27934
+709 13743
+710 15206
+711 36646
+712 20069
+713 8685
+716 137550
+717 590670
+720 264482
+722 237242
+724 297308
+725 179379
+727 4642
+729 40706
+731 26699
+733 400245
+734 63764
+735 10324
+736 18769
+737 49129
+740 124479
+744 89364
+746 8331
+748 13320
+749 526274
+750 23565
+752 1595
+754 18063
+755 40939
+757 23544
+758 13256
+759 83200
+760 249475
+762 30014
+763 22575
+764 167525
+765 31851
+767 55882
+768 101625
+769 9527
+770 60006
+771 2719
+772 51803
+773 2811
+774 54405
+775 367429
+778 6583
+779 505178
+780 17144
+783 26049
+784 93729
+785 46443
+787 72534
+789 3288
+790 27281
+791 539379
+793 6800
+796 104221
+797 76631
+798 115578
+799 22714
+803 240191
+804 889278
+808 167549
+809 1600665
+810 6836
+812 290127
+816 348185
+818 110430
+819 2104
+821 47840
+823 74452
+824 578214
+826 16555
+827 33314
+829 15923
+830 321721
+831 20485
+832 19311
+834 12458
+835 25691
+837 59664
+839 88952
+840 5503
+841 6051
+842 1095762
+843 3708980
+844 1879
+846 26082
+849 15696
+850 317224
+851 151862
+855 2402
+856 32403
+857 46436
+858 122868
+861 100705
+863 184413
+864 963
+867 123468
+868 36959
+869 2639
+870 129712
+871 433416
+872 39734
+874 15643
+875 905
+876 563640
+877 12809
+878 24360
+879 85657
+880 733451
+881 861
+883 246117
+885 15260
+888 76439
+889 10713
+892 141388
+893 10102
+894 81182
+895 84010
+896 126557
+898 54276
+899 1770
+901 253982
+902 198034
+906 38214
+908 41811
+909 124279
+911 73633
+913 118302
+916 79441
+917 101153
+919 27586
+920 129672
+921 60420
+925 82183
+926 1128901
+927 433886
+928 66949
+929 2792
+931 7055
+934 15720
+935 29811
+936 29349
+937 5840
+938 3765
+941 349635
+942 1065994
+944 66131
+945 722
+946 57621
+951 106115
+953 44167
+954 150842
+955 125614
+956 56584
+957 7099
+959 52242
+963 173560
+964 163795
+965 14193
+966 34427
+969 79324
+970 6283
+971 347377
+972 74617
+973 145184
+977 30934
+978 130225
+980 67577
+981 34675
+982 58598
+983 6397
+989 56703
+991 34015
+992 101558
+993 243044
+995 80822
+996 5434
+997 15701
+998 439910
+999 80285
+1000 545114
+1002 52845
+1004 24887
+1005 161185
+1006 114938
+1007 19368
+1008 30783
+1009 36660
+1010 46001
+1011 1319
+1012 75724
+1013 110272
+1014 139326
+1015 67765
+1016 170748
+1017 230360
+1018 155768
+1019 208072
+1020 328822
+1021 670479
+1022 404224
+1023 53934
+1024 44966
+1025 92757
+1100 17287
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+[None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None,
+ None]
+</pre></div></div>
+</div>
+</section>
+<section id="Append-other-objects-to-the-hdf5-file">
+<h1>Append other objects to the hdf5 file<a class="headerlink" href="#Append-other-objects-to-the-hdf5-file" title="Link to this heading">¶</a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># out_fname = '/home/abenneck/mounts/bmaproot/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v04_NMS/conf_0_3_origin_center.h5'
+# out_df_h5 = pd.read_hdf(out_fname, key="data", mode="a")
+
+# # Remove the cube columns and add the feature columns as float32
+# # out_df_h5 = out_df_h5.drop(columns=["cube_slice","cube_row","cube_col"])
+# # out_df_h5['cl0'] = out_df_pkl['cl0'].astype(np.float32)
+# # out_df_h5['cl1'] = out_df_pkl['cl1'].astype(np.float32)
+
+# out_df_h5.to_hdf(out_fname, key="data", mode="a", format="table", index = False)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[52]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># # Initialize the hdf5 file by defining a few new objects
+
+# fname = '/home/abenneck/mounts/bmaproot/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v04_NMS/conf_0_3_origin_center.h5'
+# with h5py.File(fname, "a") as f:
+#     properties = f.create_group("properties")
+
+#     properties.create_dataset("voxel_dim", data=[2.0, 1.866, 1.866])
+#     properties.create_dataset("data_dim", data=[3600,8587,7321])
+
+#     out_df_h5.to_hdf(fname, key="data", mode="a", format="table", index = False)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># # # Change units from microns back to pixels
+# # # NOTE: To evaluate a cell's location in the atlas, coords must be in units of microns with an origin center,
+# # # BUT we want to store the cell's location in terms of pixels (i.e. units of the original input data)
+
+# # in_fname  = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3.h5'
+# in_fname  = '/home/abenneck/misc_outputs/cell_counting/Ex_488_Em_525_NMS/conf_0_3_origin_center.h5'
+# out_fname = '/home/abenneck/mounts/bmaproot/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v04_NMS/conf_0_3_origin_center.h5'
+
+# data_in = pd.read_hdf(in_fname, key="table", mode="a")
+# data_out = pd.read_hdf(out_fname, key="data", mode="a")
+
+# # data_out["c_slice"] = data_in["c_slice"] / 2
+# # data_out["c_slice"] = data_out["c_slice"].astype(np.uint16)
+# # data_out["c_row"] = data_in["c_row"] / 1.866
+# # data_out["c_row"] = data_out["c_row"].astype(np.uint16)
+# # data_out["c_col"] = data_in["c_col"] / 1.866
+# # data_out["c_col"] = data_out["c_col"].astype(np.uint16)
+
+# # data_out["l_slice"] = (data_in["l_slice"] / 2).astype(np.uint8)
+# # data_out["l_row"] = (data_in["l_row"] / 1.866).astype(np.uint8)
+# # data_out["l_col"] = (data_in["l_col"] / 1.866).astype(np.uint8)
+
+# # data_out["Region ID"] = data_in["Region ID"].astype(np.uint16)
+
+# data_out.to_hdf(out_fname, key="data", mode="a", format="table", index = False)
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>fname = '/home/abenneck/mounts/bmaproot/nafs/shattuck/RodentToolsData/ZW-DT-1-P56-1/yolo_3D_outputs_v04_NMS/conf_0_3_origin_center.h5'
+with h5py.File(fname, "a") as f:
+
+    def print_structure(name, obj):
+        print(name, type(obj))
+
+    f.visititems(print_structure)
+    print()
+
+    dtif = np.array(f['properties/voxel_dim'])
+    print(f'dtif: {dtif}')
+
+    ntif = np.array(f['properties/data_dim'])
+    print(f'ntif: {ntif}')
+
+    data = pd.read_hdf(fname, key='data', mode='a')
+    print(data.head())
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+data &lt;class &#39;h5py._hl.group.Group&#39;&gt;
+data/table &lt;class &#39;h5py._hl.dataset.Dataset&#39;&gt;
+properties &lt;class &#39;h5py._hl.group.Group&#39;&gt;
+properties/data_dim &lt;class &#39;h5py._hl.dataset.Dataset&#39;&gt;
+properties/voxel_dim &lt;class &#39;h5py._hl.dataset.Dataset&#39;&gt;
+
+dtif: [2.    1.866 1.866]
+ntif: [3600 8587 7321]
+   c_slice  c_row  c_col  l_slice  l_row  l_col       cl0       cl1  Region ID
+0     2050   1022   2408       10      8     10 -1.397820 -0.289171         74
+1     2051   1023   2481        5     12      6 -1.157141 -0.492396        142
+2     2050   1022   2558        8      7      8 -0.359325 -0.631465        142
+3     2048   1023   2583        5      8      4 -0.524833 -0.114612        162
+4     2049   1024   2584        9      8      5 -0.453654 -0.612545        162
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[26]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(f'dataset dimensions: {ntif}')
+print(f'slice: [{np.min(data['c_slice'])}, {np.max(data['c_slice'])}]')
+print(f'row:   [{np.min(data['c_row'])}, {np.max(data['c_row'])}]')
+print(f'col:   [{np.min(data['c_col'])}, {np.max(data['c_col'])}]')
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+dataset dimensions: [3600 8587 7321]
+slice: [69, 3541]
+row:   [94, 8497]
+col:   [527, 6906]
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[29]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>for col in data.columns:
+    print(f'{col:&lt;10} {data[col].dtype}')
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+c_slice    uint16
+c_row      uint16
+c_col      uint16
+l_slice    uint8
+l_row      uint8
+l_col      uint8
+cl0        float32
+cl1        float32
+Region ID  uint16
+</pre></div></div>
+</div>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Assign region labels to cells based on cell center</a></li>
+<li><a class="reference internal" href="#Data-Exploration">Data Exploration</a></li>
+<li><a class="reference internal" href="#Append-other-objects-to-the-hdf5-file">Append other objects to the hdf5 file</a></li>
+</ul>
+
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/notebooks/cell_counting.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">yolo_model  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Assign region labels to cells based on cell center</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Andrew Bennecke, Daniel Tward.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>
