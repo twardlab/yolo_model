@@ -33,14 +33,16 @@ from yolo_help_3D import apply_model_to_orthogonal_slices, gen_3D_GT, recon_down
 import yolo_avg_prec
 from yolo_avg_prec import get_AP, gt_bbox_to_pred_bbox_format, IOU_3D, yolo_output_to_list
 
-def apply_2D_yolo_to_slices(img_path, model_path, outdir, verbose=False):
+# def apply_2D_yolo_to_slices(img_path, model_path, outdir, verbose=False):
+# (10/20/26) Changed input from img_path to img, needed for permutation analysis
+def apply_2D_yolo_to_slices(img, model_path, outdir, verbose=False):
 
-    # Load the target volume
-    if 'nii.gz' in img_path:
-        img = nib.load(img_path)
-        img = img.get_fdata()
-    else:
-        raise Exception(f'Invalid file provided, only Nifti files are accepted')
+    # # Load the target volume
+    # if 'nii.gz' in img_path:
+    #     img = nib.load(img_path)
+    #     img = img.get_fdata()
+    # else:
+    #     raise Exception(f'Invalid file provided, only Nifti files are accepted')
 
     # Load the YOLO model
     net = Net()
@@ -48,14 +50,18 @@ def apply_2D_yolo_to_slices(img_path, model_path, outdir, verbose=False):
     B = net.B
     stride = net.stride
 
+    # If outdir DNE, make it
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
     start_total = time.time()
     next_idx = 0
     # Apply the model to orthognal views of the input image
     for curr_ax in [0,1,2]:
     
-        outdir = os.path.join(outdir, f'ax{curr_ax}')
-        if not os.path.exists(outdir):
-            os.mkdir(outdir)
+        outdir_ = os.path.join(outdir, f'ax{curr_ax}')
+        if not os.path.exists(outdir_):
+            os.mkdir(outdir_)
         
         for idx in np.arange(img.shape[curr_ax]):
         
@@ -91,7 +97,7 @@ def apply_2D_yolo_to_slices(img_path, model_path, outdir, verbose=False):
             out = postprocess(out, B, stride, pads, up_factor=2, verbose=False)
         
             # Save the processed output
-            out_path = os.path.join(outdir, out_fname)
+            out_path = os.path.join(outdir_, out_fname)
             if True:
                 np.save(out_path, out)
 
@@ -101,7 +107,7 @@ def apply_2D_yolo_to_slices(img_path, model_path, outdir, verbose=False):
 
     return
 
-def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4):
+def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4, verbose=False):
     """
     Stitch together 3 sets of orthogonal slices into a single cube
 
@@ -138,11 +144,14 @@ def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4
     shape2 = data2.shape
     
     final_shape = np.array([shape1[0], shape0[0], shape0[1]]) # [DV, AP, LR]
+    if verbose:
+        print(f'Final shape - {final_shape}')
     
     n_cube_i = int(np.ceil(final_shape[0] / d)) # Num complete cubes along AP axis (Transverse)
     n_cube_j = int(np.ceil(final_shape[1] / d)) # Num complete cubes along DV axis (Coronal)
     n_cube_k = int(np.ceil(final_shape[2] / d)) # Num complete cubes along LR axis (Sagittal)
-    print(f'Total Cubes Shape: ({n_cube_i}, {n_cube_j}, {n_cube_k})')
+    if verbose:
+        print(f'Total Cubes Shape: ({n_cube_i}, {n_cube_j}, {n_cube_k})')
 
     # If there is only 1 cube to process, edge cases are dealt with in a slightly different way
     small_data = False
@@ -165,15 +174,17 @@ def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4
     
                 if k < next_k and i <= next_i and j <= next_j:
                     continue
-    
-                print(f'Starting cube ({i},{j},{k}) . . .')
+
+                if verbose:   
+                    print(f'Starting cube ({i},{j},{k}) . . .')
                 start_time = time.time()
     
                 # Determine if cube is an edge case
                 isEdge_i = True if i == n_cube_i - 1 else False
                 isEdge_j = True if j == n_cube_j - 1 else False
                 isEdge_k = True if k == n_cube_k - 1 else False
-                print(f'Edge? - {isEdge_i} {isEdge_j} {isEdge_k}')
+                if verbose:
+                    print(f'Edge? - {isEdge_i} {isEdge_j} {isEdge_k}')
     
                 # The spatial coordinates of the datacube
                 ndatacube = np.array((d,d,d)) 
@@ -219,10 +230,11 @@ def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4
                 end0i = len(ax0files)-1 if isEdge_i else np.ceil(end0).astype(int)
                 end1i = len(ax1files)-1 if isEdge_j else np.ceil(end1).astype(int)
                 end2i = len(ax2files)-1 if isEdge_k else np.ceil(end2).astype(int)
-    
-                print(f'Extent: [{start0},{end0}],[{start1},{end1}],[{start2},{end2}]')
-                print(f'Extent_i:  [{start0i},{end0i}],[{start1i},{end1i}],[{start2i},{end2i}]')
-    
+
+                if verbose:    
+                    print(f'Extent: [{start0},{end0}],[{start1},{end1}],[{start2},{end2}]')
+                    print(f'Extent_i:  [{start0i},{end0i}],[{start1i},{end1i}],[{start2i},{end2i}]')
+        
                 # get the pixel locations, and extents for display, in each of the three views
                 ax0x1 = np.arange(ax0detects.shape[0])*down_factor + np.mean( np.array([0,1,2,3]) )
                 ax0x2 = np.arange(ax0detects.shape[1])*down_factor + np.mean( np.array([0,1,2,3]) )
@@ -239,7 +251,7 @@ def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4
                 ax2x = [ax2x0,ax2x1]
                 extentax20,extentax21,extentax22 = extent_from_x([ax2x0,ax2x1,[0,1],])
                 
-                print('Finished initializing global variables and data structures . . .')
+                # print('Finished initializing global variables and data structures . . .')
                 
                 # Start by loading the transverse slices + Compress data via downsampling
                 detects = []
@@ -266,7 +278,7 @@ def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4
                         detects.append(detects__)        
                         detects_ = []        
                 ax0combinedetects = np.stack(detects,axis=0)
-                print('Finished combining detections along transverse view . . .')
+                # print('Finished combining detections along transverse view . . .')
                 
                 # next load the coronal slices
                 detects = []
@@ -292,7 +304,7 @@ def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4
                         detects.append(detects__)        
                         detects_ = []        
                 ax1combinedetects = np.stack(detects,axis=1)
-                print('Finished combining detections along coronal view . . .')
+                # print('Finished combining detections along coronal view . . .')
                 
                 # now do the sagittal slices
                 detects = []
@@ -318,7 +330,7 @@ def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4
                         detects.append(detects__)        
                         detects_ = []        
                 ax2combinedetects = np.stack(detects,axis=2)
-                print('Finished combining detections along sagittal view . . .')
+                # print('Finished combining detections along sagittal view . . .')
                 
                 # Initialize the data cube
                 datacubenew = np.zeros(ax1combinedetects.shape[:3]+(10,)) # 6 for xyzminmax, 1 prob, 3 features
@@ -357,8 +369,9 @@ def stitch_slices_into_cube(indir0, indir1, indir2, outdir, d=256, down_factor=4
                 datacubeoutput[...,:6] = datacubenew[...,permutation]
                 
                 np.save(outname, datacubeoutput)
-    
-                print(f'Finished cube ({i},{j},{k}) in {time.time()-start_time:.2f}s\n')
+
+                if verbose:
+                    print(f'Finished cube ({i},{j},{k}) in {time.time()-start_time:.2f}s\n')
 
     return datacubeoutput
 

@@ -355,7 +355,7 @@ def apply_model_to_tiles(tiles, model_path, img_dim0, img_dim1, out_path='', bat
                 # Apply trained model to the image + define some key model outputs
                 out = net((torch.tensor(I[None],dtype=dtype)))
                 out = remove_bbox_in_overlap(out, B, stride, tile_dim, boundary_cond = boundary_cond)
-                
+
                 # Append model output to reconstruction
                 tile_out = out[0].detach().numpy()
                 # tile_out = NMS_tile(tile_out)

@@ -29,10 +29,12 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = Fa
 
     # Assign each detection to a GT bbox + remove the GT bbox after pairing
     tpfp_out = []
+    bb_out = []
     total_TP = 0
     total_FP = 0
     num_gt_remaining = len(gt_bboxes)
     for i, pred_i in enumerate(pred_sorted):
+
         best_gt_iou_idx = np.argmax(pw_IOU[i, :])
         best_gt_iou = pw_IOU[i, best_gt_iou_idx]
         pred_conf = pred_i[conf_idx]
@@ -47,6 +49,8 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = Fa
             total_FP += 1
             TP = 0
             FP = 1
+            best_gt_iou_idx = -1 # (10/20/26) If the current prediction's associated GT bbox already has an assigned prediction, don't pair the current prediction with any GTs
+            best_gt_iou = -1
 
         precision = total_TP / (i+1) # Precision = num TP / all detections considered so far
         recall = total_TP / len(gt_bboxes) # Recall = num TP / all ground truths
@@ -55,6 +59,7 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = Fa
             print(f'i: {i:<5}, conf: {pred_conf:.3f}, iou: {best_gt_iou:.3f}, TP: {TP}, FP: {FP}')
        
         tpfp_out.append([i, best_gt_iou_idx, pred_conf, best_gt_iou, TP, FP, total_TP, total_FP, precision, recall])
+        bb_out.append(pred_i)
 
         # All GT bboxes have been found, so all remaining bboxes are FP. Update the counts and terminate the loop.
         if num_gt_remaining == 0:
@@ -65,12 +70,16 @@ def get_AP(gt_bboxes, pred_bboxes, conf_idx = -4, iou_thresh = 0.3, verbose = Fa
             # Append one more row summarizing all remaining FPs
             interp = [i+1, -1, 0, 0, 0, 1, total_TP, total_FP_final, precision_final, recall]
             tpfp_out.append(interp)
+
+            # Append an empty box, so these 2 objects stay the same shape
+            interp = [0,0,0,0,0,0,0,0,0,0]
+            bb_out.append(interp)
             break
             
     tpfp_out = np.array(tpfp_out)
     AP = auc(tpfp_out[:,-1], tpfp_out[:,-2])
     
-    return AP, tpfp_out
+    return AP, tpfp_out, np.array(bb_out)
 
 def gt_bbox_to_pred_bbox_format(gt_bbox, idx = [2,1,0,5,4,3]):
     """
